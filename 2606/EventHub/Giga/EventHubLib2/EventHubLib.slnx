@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Txt/">
+    <File Path="Code.txt" />
+    <File Path="Notes.txt" />
+    <File Path="Reffs.txt" />
+  </Folder>
+  <Project Path="CaEventBus01/CaEventBus01.csproj" />
+  <Project Path="EventHub01/EventHub01.csproj" />
+</Solution>

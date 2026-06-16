@@ -1,0 +1,27 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "PipePoolQuoteServer03\\PipePoolQuoteServer03.csproj",
+        "Action": "StartWithoutDebugging"
+      },
+      {
+        "Path": "CaUniClient021\\CaUniClient021.csproj",
+        "Action": "StartWithoutDebugging"
+      },
+      {
+        "Path": "CaUniClient022\\CaUniClient022.csproj",
+        "Action": "StartWithoutDebugging"
+      },
+      {
+        "Path": "CaUniClient023\\CaUniClient023.csproj",
+        "Action": "StartWithoutDebugging"
+      },
+      {
+        "Path": "CaUniClient024\\CaUniClient024.csproj",
+        "Action": "StartWithoutDebugging"
+      }
+    ]
+  }
+]

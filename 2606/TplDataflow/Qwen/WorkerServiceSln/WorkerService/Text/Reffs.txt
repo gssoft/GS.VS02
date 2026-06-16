@@ -1,0 +1,8 @@
+﻿-------------------------------------------------------------------------
+Two PublisherServiceEtalon and SubscriberService interact with each other
+One MonitoringService in monitor Interaction  
+-------------------------------------------------------------------------
+26.06.10 Qwen
+https://chat.qwen.ai/s/85ca8d90-4ed5-4ae5-af78-daff549e477e?fev=0.2.63
+TPL_Dataflow
+----------------------------------

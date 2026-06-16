@@ -1,0 +1,205 @@
+﻿26.06.03
+-------------------------------
+https://chat.qwen.ai/s/3187068e-a269-4d30-85aa-1cf82ba05e20?fev=0.2.57
+-------------------------------
+EventHubWorkerService
+-------------------------------
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-EventHubWorkerService-69a04d88-63c5-4317-a915-3573a714eb38</UserSecretsId>
+	<ConsoleOutputEncoding>utf-8</ConsoleOutputEncoding>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EventBus.Core\EventBus.Core.csproj" />
+  </ItemGroup>
+</Project>
+-------------------------------------------------------------------------
+// Handlers/MyEventHandler.cs
+-------------------------------------------------------------------------
+using EventBus.Abstractions;
+using EventHubWorkerService.Messages;
+using Microsoft.Extensions.Logging;
+
+namespace EventHubWorkerService.Handlers;
+
+public class MyEventHandler : IHandler<MyEvent>
+{
+    private readonly ILogger<MyEventHandler> _logger;
+
+    public MyEventHandler(ILogger<MyEventHandler> logger)
+    {
+        _logger = logger;
+    }
+
+    public Task HandleAsync(MyEvent @event, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("✅ [Handler] Received event: {Id} | {Payload}",
+            @event.Id, @event.Payload);
+
+        // Имитация асинхронной работы (БД, сеть и т.д.)
+        // Обратите внимание: это выполняется в контексте MyAnalyticsService!
+        return Task.Delay(100, cancellationToken);
+    }
+ }
+------------------------------------------------------------------------
+// Handlers/OrderCreatedHandler.cs
+------------------------------------------------------------------------
+using EventBus.Abstractions;
+using EventHubWorkerService.Messages;
+
+using Microsoft.Extensions.Logging;
+
+namespace EventHubWorkerService.Handlers;
+
+public class OrderCreatedHandler : IHandler<OrderCreatedEvent>
+{
+    private readonly ILogger<MyEventHandler> _logger;
+
+    public OrderCreatedHandler(ILogger<MyEventHandler> logger)
+    {
+        _logger = logger;
+    }
+
+    public Task HandleAsync(OrderCreatedEvent @event, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("✅ [Handler] Received event: {Id} | {Payload}",
+            @event.OrderId, @event.Amount);
+
+        // Имитация асинхронной работы (БД, сеть и т.д.)
+        // Обратите внимание: это выполняется в контексте MyAnalyticsService!
+        return Task.Delay(100, cancellationToken);
+    }
+}
+------------------------------------------------------------------------------
+// Messages/MyEvent.cs
+------------------------------------------------------------------------------
+namespace EventHubWorkerService.Messages;
+
+// Если у вас есть базовый интерфейс сообщений в EventBus.Abstractions, наследуйте его.
+// Если нет — можно оставить как есть.
+public record MyEvent(Guid Id, string Payload, DateTime Timestamp);
+-------------------------------------------------------------------------------
+// Messages/OrderCreatedEvent.cs
+-------------------------------------------------------------------------------
+namespace EventHubWorkerService.Messages;
+
+public record OrderCreatedEvent(Guid OrderId, decimal Amount);
+-------------------------------------------------------------------------------
+// Services/DataProducerService.cs
+-------------------------------------------------------------------------------
+using EventBus.Abstractions;
+using EventHubWorkerService.Messages;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace EventHubWorkerService.Services;
+
+public class DataProducerService : BackgroundService
+{
+    private readonly IEventBus _bus;
+    private readonly ILogger<DataProducerService> _logger;
+    private int _counter;
+
+    public DataProducerService(IEventBus bus, ILogger<DataProducerService> logger)
+    {
+        _bus = bus;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("🚀 Producer started");
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var @event = new MyEvent(
+                Id: Guid.NewGuid(),
+                Payload: $"Message #{++_counter}",
+                Timestamp: DateTime.UtcNow
+            );
+
+            // Публикация: возвращает управление мгновенно!
+            await _bus.PublishAsync(@event, stoppingToken);
+
+            _logger.LogDebug("📤 Published event {Id}", @event.Id);
+
+            await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+            // await Task.Delay(TimeSpan.FromMilliseconds(500), stoppingToken); // Было 2 секунды
+        }
+    }
+}
+---------------------------------------------------------------------------------------
+// Services/MyAnalyticsService.cs
+---------------------------------------------------------------------------------------
+using System.Threading.Channels;
+using EventBus.Abstractions;
+using EventBus.Core;
+using EventBus.Hosting;
+using EventHubWorkerService.Messages;
+using Microsoft.Extensions.Logging;
+
+namespace EventHubWorkerService.Services;
+
+public class MyAnalyticsService : EventSubscriberService<MyEvent>
+{
+    private readonly IEventBus _bus;
+    private readonly Channel<MyEvent> _inbox;
+
+    public MyAnalyticsService(
+        IEventBus bus,
+        Channel<MyEvent> inbox,
+        IHandler<MyEvent> handler,
+        ILogger<MyAnalyticsService> logger)
+        : base(inbox, logger, handler)
+    {
+        _bus = bus;
+        _inbox = inbox;
+
+        // Подписываем свой канал на шину
+        // Приводим к конкретному типу, чтобы получить доступ к Subscribe
+        if (bus is ChannelEventBus channelBus)
+        {
+            channelBus.Subscribe(_inbox.Writer);
+        }
+    }
+}
+--------------------------------------------------------------------------------------------
+Program.cs
+--------------------------------------------------------------------------------------------
+// Program.cs
+
+using EventBus.Abstractions;
+using EventBus.Extensions;
+using EventHubWorkerService.Handlers;
+using EventHubWorkerService.Messages;
+using EventHubWorkerService.Services;
+using Microsoft.Extensions.Hosting;
+
+Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+// 1. Регистрируем шину событий
+builder.Services.AddChannelEventBus();
+
+// 2. Регистрируем обработчик (транзиентный, создаётся на каждое событие)
+builder.Services.AddTransient<IHandler<MyEvent>, MyEventHandler>();
+
+// 3. Регистрируем подписчика с буфером на 500 сообщений
+// AddSubscriber автоматически регистрирует и сам сервис, и его канал
+builder.Services.AddSubscriber<MyEvent, MyAnalyticsService>(bufferSize: 500);
+
+// 4. Регистрируем паблишер
+builder.Services.AddHostedService<DataProducerService>();
+
+await builder.Build().RunAsync();
+-----------------------------------------------------------------------------------------------

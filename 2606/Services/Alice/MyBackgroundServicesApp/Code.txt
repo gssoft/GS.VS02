@@ -1,0 +1,332 @@
+------------------------------------------------------------------------------
+Alice 26.06.05
+------------------------------------------------------------------------------
+D:\Projects\VS\2605\Alice\MyBackgroundServicesApp\MyBackgroundServicesApp.slnx
+------------------------------------------------------------------------------
+MyBackgroundServicesApp
+------------------------------------------------------------------------------
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-MyBackgroundServicesApp-55575fa1-85a9-4358-a963-317b9abe4544</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+  </ItemGroup>
+</Project>
+-------------------------------------------------------------------------------
+// Bus/IMessageBus.cs
+interface IMessageBus
+{
+    ValueTask PublishAsync(IMessage message, CancellationToken ct = default);
+    ValueTask SendAsync(ICommand command, CancellationToken ct = default);
+}
+-------------------------------------------------------------------------------
+// Bus/MessageBus.cs
+
+using System.Threading.Channels;
+
+class MessageBus : IMessageBus
+{
+    private readonly Channel<IMessage> _channel;
+    private readonly IServiceProvider _serviceProvider;
+
+    public MessageBus(IServiceProvider serviceProvider, Channel<IMessage> channel)
+    {
+        _serviceProvider = serviceProvider;
+        _channel = channel;
+    }
+
+    public ValueTask PublishAsync(IMessage message, CancellationToken ct = default)
+    {
+        return _channel.Writer.WriteAsync(message, ct);
+    }
+
+    public ValueTask SendAsync(ICommand command, CancellationToken ct = default)
+    {
+        return _channel.Writer.WriteAsync(command, ct);
+    }
+}
+----------------------------------------------------------------------------------
+// Bus/MessageRouter.cs
+
+using System.Reflection;
+using System.Threading.Channels;
+
+class MessageRouter : BackgroundService
+{
+    private readonly ChannelReader<IMessage> _reader;
+    private readonly IServiceProvider _serviceProvider;
+
+    public MessageRouter(Channel<IMessage> channel, IServiceProvider serviceProvider)
+    {
+        _reader = channel.Reader;
+        _serviceProvider = serviceProvider;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        await foreach (var message in _reader.ReadAllAsync(stoppingToken))
+        {
+            await RouteMessageAsync(message, stoppingToken);
+        }
+    }
+
+    private async Task RouteMessageAsync(IMessage message, CancellationToken ct)
+    {
+        var messageType = message.GetType();
+        var handlerInterface = typeof(IHandler<>).MakeGenericType(messageType);
+        var handlers = _serviceProvider.GetServices(handlerInterface);
+
+        if (!handlers.Any())
+        {
+            Console.WriteLine($"No handlers found for message type: {messageType.Name}");
+            return;
+        }
+
+        var executionMode = ExecutionMode.Parallel; // можно настроить иначе
+
+        await ExecutionManager.ExecuteHandlersAsync(
+            handlers,
+            message,
+            executionMode,
+            ct);
+    }
+}
+------------------------------------------------------------------------------------
+// Execution/ExecutionManager.cs
+
+using System.Reflection;
+using System.Threading;
+using System.Collections.Generic;
+
+public class ExecutionManager
+{
+    public static async Task ExecuteHandlersAsync<TMessage>(
+        IEnumerable<object> handlers,
+        TMessage message,
+        ExecutionMode mode,
+        CancellationToken ct) where TMessage : IMessage
+    {
+        if (mode == ExecutionMode.Parallel)
+        {
+            var tasks = new List<Task>();
+            foreach (var handler in handlers)
+            {
+                if (handler == null) continue; // Пропускаем null-элементы
+
+                var handleMethod = handler.GetType()
+                    .GetMethod("HandleAsync")
+            ?? throw new InvalidOperationException($"Method HandleAsync not found on {handler.GetType()}");
+
+                var task = (Task)handleMethod.Invoke(handler, new object[] { message, ct })!;
+                tasks.Add(task);
+            }
+            await Task.WhenAll(tasks);
+        }
+        else
+        {
+            foreach (var handler in handlers)
+            {
+                if (handler == null) continue; // Пропускаем null-элементы
+
+                var handleMethod = handler.GetType()
+            .GetMethod("HandleAsync")
+            ?? throw new InvalidOperationException($"Method HandleAsync not found on {handler.GetType()}");
+                await (Task)handleMethod.Invoke(handler, new object[] { message, ct })!;
+            }
+        }
+    }
+}
+------------------------------------------------------------------------------------
+// Execution/ExecutionMode.cs
+
+public enum ExecutionMode
+{
+    Sequential,
+    Parallel
+}
+--------------------------------------------------------------------------------------
+// Handlers/AnotherCommandHandler.cs
+class AnotherCommandHandler : IHandler<AnotherCommand>
+{
+    public async Task HandleAsync(AnotherCommand message, CancellationToken ct)
+    {
+        Console.WriteLine($"AnotherCommandHandler: Processing correlation {message.CorrelationId} at {message.Timestamp}");
+        await Task.Delay(500, ct);
+    }
+}
+--------------------------------------------------------------------------------------
+// Handlers/IHandler.cs
+
+interface IHandler<in TMessage> where TMessage : IMessage
+{
+    Task HandleAsync(TMessage message, CancellationToken ct);
+}
+---------------------------------------------------------------------------------------
+// Handlers/SomeCommandHandler.cs
+class SomeCommandHandler : IHandler<SomeCommand>
+{
+    private readonly IMessageBus _bus;
+
+    public SomeCommandHandler(IMessageBus bus)
+    {
+        _bus = bus;
+    }
+
+    public async Task HandleAsync(SomeCommand message, CancellationToken ct)
+    {
+        Console.WriteLine($"SomeCommandHandler: Processing command {message.Id} with data: {message.Data}");
+
+        // Отправляем событие после обработки команды
+        await _bus.PublishAsync(new SomeEvent("CommandProcessed", DateTime.UtcNow), ct);
+
+        await Task.Delay(1000, ct); // Имитация работы
+    }
+}
+----------------------------------------------------------------------------------------
+// Handlers/SomeEventHandler.cs
+class SomeEventHandler : IHandler<SomeEvent>
+{
+    public async Task HandleAsync(SomeEvent message, CancellationToken ct)
+    {
+        Console.WriteLine($"SomeEventHandler: Received event {message.EventType} at {message.OccurredAt}");
+        await Task.Delay(300, ct);
+    }
+}
+-----------------------------------------------------------------------------------------
+// Messages/AnotherCommand.cs
+record AnotherCommand(Guid CorrelationId, DateTime Timestamp) : ICommand;
+-----------------------------------------------------------------------------------------
+// Messages/ICommand.cs
+interface ICommand : IMessage { }
+------------------------------------------------------------------------------------------
+// Messages/IEvent.cs
+interface IEvent : IMessage { }
+------------------------------------------------------------------------------------------
+// Messages/IMessage.cs
+public interface IMessage { }
+------------------------------------------------------------------------------------------
+// Messages/SomeCommand.cs
+record SomeCommand(int Id, string Data) : ICommand;
+------------------------------------------------------------------------------------------
+// Messages/SomeEvent.cs
+record SomeEvent(string EventType, DateTime OccurredAt) : IEvent;
+------------------------------------------------------------------------------------------
+// Services/Service1.cs
+class Service1 : BackgroundService
+{
+    private readonly IMessageBus _bus;
+    private int _counter = 1;
+
+    public Service1(IMessageBus bus)
+    {
+        _bus = bus;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            // Отправляем команду
+            var command = new SomeCommand(_counter, $"Data from Service1 - {DateTime.UtcNow}");
+            await _bus.SendAsync(command, stoppingToken);
+
+            _counter++;
+            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+        }
+    }
+}
+----------------------------------------------------------------------------------------
+// Services/Service2.cs
+
+class Service2 : BackgroundService
+{
+    private readonly IMessageBus _bus;
+    private int _eventCounter = 1;
+
+    public Service2(IMessageBus bus)
+    {
+        _bus = bus;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            // Отправляем событие каждые 7 секунд
+            var eventMsg = new SomeEvent(
+                $"Service2Event-{_eventCounter}",
+                DateTime.UtcNow
+            );
+            await _bus.PublishAsync(eventMsg, stoppingToken);
+
+            _eventCounter++;
+            await Task.Delay(TimeSpan.FromSeconds(7), stoppingToken);
+        }
+    }
+}
+------------------------------------------------------------------------------------------
+// Services/Service3.cs
+
+class Service3 : BackgroundService
+{
+    private readonly IMessageBus _bus;
+    private int _commandCounter = 1;
+
+    public Service3(IMessageBus bus)
+    {
+        _bus = bus;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            // Отправляем другую команду каждые 10 секунд
+            var command = new AnotherCommand(
+                Guid.NewGuid(),
+                DateTime.UtcNow
+            );
+            await _bus.SendAsync(command, stoppingToken);
+
+            _commandCounter++;
+            await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+        }
+    }
+}
+---------------------------------------------------------------------------------------------
+// Program.cs
+
+using Microsoft.Extensions.Hosting;
+using System.Threading.Channels;
+
+var builder = Host.CreateDefaultBuilder(args)
+    .ConfigureServices((context, services) =>
+    {
+        // Канал для шины сообщений
+        services.AddSingleton(Channel.CreateUnbounded<IMessage>());
+
+        // Регистрация шины сообщений
+        services.AddSingleton<IMessageBus, MessageBus>();
+
+        // Регистрация маршрутизатора
+        services.AddHostedService<MessageRouter>();
+
+        // Регистрация Background Services
+        services.AddHostedService<Service1>();
+        services.AddHostedService<Service2>();
+        services.AddHostedService<Service3>();
+
+        // Регистрация обработчиков
+        services.AddTransient<IHandler<SomeCommand>, SomeCommandHandler>();
+        services.AddTransient<IHandler<AnotherCommand>, AnotherCommandHandler>();
+        services.AddTransient<IHandler<SomeEvent>, SomeEventHandler>();
+    });
+
+await builder.Build().RunAsync();
+--------------------------------------------------------------------------------------

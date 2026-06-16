@@ -1,0 +1,65 @@
+[
+  {
+    "Name": "PipePoolQuoteServer03",
+    "Projects": [
+      {
+        "Path": "PipePoolQuoteServer03\\PipePoolQuoteServer03.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "CaUniClient021\\CaUniClient021.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "CaUniClient022\\CaUniClient022.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "CaUniClient023\\CaUniClient023.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "CaUniClient024\\CaUniClient024.csproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "WebQuotes",
+    "Projects": [
+      {
+        "Path": "WebQuoteServer01\\WebQuoteServer01.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "QuotesClientA\\QuotesClientA.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "QuotesClientB\\QuotesClientB.csproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "NamedPipesRazorApp082",
+    "Projects": [
+      {
+        "Path": "QuotesClientA\\QuotesClientA.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "QuotesClientB\\QuotesClientB.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "NamedPipesRazorApp082\\NamedPipesRazorApp082.csproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "Empty",
+    "Projects": []
+  }
+]

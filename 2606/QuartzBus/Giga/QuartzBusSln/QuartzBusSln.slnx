@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MyCompany.SchedulerDemo/MyCompany.SchedulerDemo.csproj" />
+  <Project Path="QuartzBus01/QuartzBus01.csproj" />
+</Solution>

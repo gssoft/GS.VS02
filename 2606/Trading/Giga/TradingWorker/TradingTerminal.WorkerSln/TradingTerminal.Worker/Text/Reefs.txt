@@ -1,0 +1,4 @@
+﻿https://giga.chat/link/gcsFLGxWZX
+
+D:\Projects\VS02\2606\Trading\Giga\TradingWorker\TradingTerminal.WorkerSln\TradingTerminal.WorkerSln.slnx
+D:\Projects\VS02\2606\Trading\Giga\TradingWorker\TradingTerminal.WorkerSln\TradingTerminal.Worker\TradingTerminal.Worker.csproj

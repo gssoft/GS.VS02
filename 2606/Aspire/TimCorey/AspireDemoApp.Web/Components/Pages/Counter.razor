@@ -1,0 +1,24 @@
+﻿@page "/counter"
+@rendermode InteractiveServer
+@inject ILogger<Counter> log
+
+<PageTitle>Counter</PageTitle>
+
+<h1>Counter</h1>
+
+<p role="status">Current count: @currentCount</p>
+
+<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+
+@code {
+    private int currentCount = 0;
+
+    private void IncrementCount()
+    {
+        currentCount++;
+        log.LogInformation("The counter value is {Count} and the value is {EvenOddResult}", 
+            currentCount,
+            ((currentCount % 2) == 0 ? "even": "odd")
+        );
+    }
+}

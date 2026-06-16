@@ -1,0 +1,17 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>380c8e82-62dd-49f0-b7f8-88978ca1632e</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AspireNamedPipesApp01.ApiService\AspireNamedPipesApp01.ApiService.csproj" />
+    <ProjectReference Include="..\AspireNamedPipesApp01.Web\AspireNamedPipesApp01.Web.csproj" />
+    <ProjectReference Include="..\MyPipeService\MyPipeService.csproj" />
+  </ItemGroup>
+
+</Project>

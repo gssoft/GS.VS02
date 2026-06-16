@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/Text/">
+    <File Path="Code.txt" />
+    <File Path="Descr.txt" />
+    <File Path="Epilog.txt" />
+    <File Path="Reffs.txt" />
+    <File Path="Report.txt" />
+  </Folder>
+  <Project Path="WorkerEventBusTpl01/WorkerEventBusTpl01.csproj" />
+  <Project Path="WorkerEventBusTpl02/WorkerEventBusTpl02.csproj" />
+  <Project Path="WorkerEventBusTpl03/WorkerEventBusTpl03.csproj" />
+  <Project Path="WorkerEventBusTpl04/WorkerEventBusTpl04.csproj" Id="b441ad0c-f677-4d8c-be55-96eac54e1e1e" />
+  <Project Path="WorkerEventBusTpl05/WorkerEventBusTpl05.csproj" />
+</Solution>

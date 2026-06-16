@@ -1,0 +1,2 @@
+﻿260601_CQRS_MediatR_Channels.pdf
+260602_CQRS_MediatR_Channels_Continue_260601.pdf

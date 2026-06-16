@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/Images/">
+    <File Path="2026-05-28_22-39-26_NapePipesSln01_Startup.png" />
+  </Folder>
+  <Project Path="CaUniClient021/CaUniClient021.csproj" />
+  <Project Path="CaUniClient022/CaUniClient022.csproj" />
+  <Project Path="CaUniClient023/CaUniClient023.csproj" />
+  <Project Path="CaUniClient024/CaUniClient024.csproj" />
+  <Project Path="ConsoleApp1/ConsoleApp1.csproj" />
+  <Project Path="PipePoolQuoteServer/PipePoolQuoteServer.csproj" />
+  <Project Path="PipePoolQuoteServer02/PipePoolQuoteServer02.csproj" />
+  <Project Path="PipePoolQuoteServer03/PipePoolQuoteServer03.csproj" />
+</Solution>

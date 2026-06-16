@@ -1,0 +1,460 @@
+﻿Giga 26.06.07
+------------------------------------
+https://giga.chat/link/gcsZifKSQr
+------------------------------------
+file:///D:/chathistory/Giga/pdf/260607_Terminology_PublishAsync_SendAsync_EventHubGiga_WorkerExamle.pdf
+D:/chathistory/Giga/pdf/260607_Terminology_PublishAsync_SendAsync_EventHubGiga_WorkerExamle.pdf
+D:/chathistory/Giga/doc/260607_Terminology_PublishAsync_SendAsync_EventHubGiga_WorkerExamle.docx
+------------------------------------
+Need Gracefool Shootdown
+------------------------------------
+D:\Projects\VS\2606\Workers\Giga\WorkerServiceExampleSln\WorkerServiceExampleSln.slnx
+----------------------------------------------------
+D:\Projects\VS\2606\Workers\Giga\WorkerServiceExampleSln\WorkerServiceExample\WorkerServiceExample.csproj
+-----------------------------------------------------
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-WorkerServiceExample-8bd73abc-66d2-4772-a63c-d02669ca53f6</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+  </ItemGroup>
+</Project>
+------------------------------------------------------
+// Application/Comands/CreateUserCommand.cs
+
+using Application.Interfaces;
+using System.ComponentModel.DataAnnotations;
+
+namespace Application.Commands;
+// DTO (Data Transfer Object) для команды. Сама команда не должна содержать логику.
+public class CreateUserCommand : ICommand
+{
+    [Required]
+    public string Username { get; set; } = string.Empty;
+}
+--------------------------------------------------------
+// Application/Comands/CreateUserCommandHandler.cs
+
+using System.Threading;
+using System.Threading.Tasks;
+using Application.Commands;
+using Application.Interfaces;
+using Application.Events; // Важно: хендлер команды публикует событие!
+using Microsoft.Extensions.Logging;
+
+namespace Application.Commands;
+// Обработчик команды. Здесь сосредоточена бизнес-логика.
+public class CreateUserCommandHandler : ICommandHandler<CreateUserCommand>
+{
+    private readonly IEventBus _eventBus; // Инжектим шину событий для публикации результата.
+    private readonly ILogger<CreateUserCommandHandler> _logger;
+
+    public CreateUserCommandHandler(IEventBus eventBus, ILogger<CreateUserCommandHandler> logger)
+    {
+        _eventBus = eventBus;
+        _logger = logger;
+    }
+
+    public async Task HandleAsync(CreateUserCommand command, CancellationToken ct)
+    {
+        // 1. Бизнес-логика: создание пользователя (здесь просто логируем)
+        _logger.LogInformation("Creating user with name: {Username}", command.Username);
+
+        // Имитация асинхронной операции (например, запись в БД)
+        await Task.Delay(100, ct);
+
+        // 2. Публикация события о том, что пользователь создан.
+        var userCreatedEvent = new UserCreatedEvent { Username = command.Username };
+
+        // Fire and Forget. Мы не ждем завершения обработки события.
+        await _eventBus.PublishAsync(userCreatedEvent, ct);
+
+        _logger.LogInformation("User created and event published.");
+    }
+}
+---------------------------------------------------------------------------------------
+// Application/Events/UserCreatedEvent.cs
+
+using Application.Interfaces;
+
+namespace Application.Events;
+// DTO для события. Просто данные о факте.
+public class UserCreatedEvent : IEvent
+{
+    public string Username { get; set; } = string.Empty; // Данные о событии.
+}
+-------------------------------------------------------------------------------------------
+// Application/Events/UserCreatedEventHandler.cs
+
+using System.Threading;
+using System.Threading.Tasks;
+using Application.Events; // Обработчик подписывается на конкретное событие.
+using Application.Interfaces;
+using Microsoft.Extensions.Logging;
+
+namespace Application.Events;
+// Обработчик события. Реагирует на факт.
+public class UserCreatedEventHandler : IEventHandler<UserCreatedEvent>
+{
+    private readonly ILogger<UserCreatedEventHandler> _logger;
+
+    public UserCreatedEventHandler(ILogger<UserCreatedEventHandler> logger)
+    {
+        _logger = logger;
+    }
+
+    public Task HandleAsync(UserCreatedEvent @event, CancellationToken ct)
+    {
+        // Логика реакции на событие: отправить письмо, обновить кэш и т.д.
+        _logger.LogInformation("REACTING TO EVENT: Sending welcome email to new user: {@Username}", @event.Username);
+
+        // Имитация отправки email или другой долгой операции.
+        return Task.CompletedTask;
+    }
+}
+----------------------------------------------------------------------------------------------
+// Application/Infrastructure/Buses/Buses.cs
+
+using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
+using Application.Interfaces;
+
+namespace Infrastructure.Buses;
+
+public class CommandBus : ICommandBus
+{
+    private readonly ChannelWriter<ICommand> _writer;
+
+    public CommandBus(ChannelWriter<ICommand> writer)
+    {
+        _writer = writer;
+    }
+
+    public ValueTask SendAsync(ICommand command, CancellationToken ct = default)
+    {
+        return _writer.WriteAsync(command, ct);
+    }
+}
+
+public class EventBus : IEventBus
+{
+    private readonly ChannelWriter<IEvent> _writer;
+
+    public EventBus(ChannelWriter<IEvent> writer)
+    {
+        _writer = writer;
+    }
+
+    public ValueTask PublishAsync(IEvent @event, CancellationToken ct = default)
+    {
+        return _writer.WriteAsync(@event, ct);
+    }
+}
+------------------------------------------------------------
+// Application/Infrastructure/Channels/Channel.cs
+
+using System.Threading.Channels;
+using Application.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+namespace Infrastructure.Channels;
+
+// Регистрируем канал как синглтон с помощью хоста-хелпера
+public static class CommandChannel
+{
+    public static void AddCommandChannel(this IServiceCollection services)
+    {
+        var channel = Channel.CreateBounded<ICommand>(new BoundedChannelOptions(100)
+        {
+            SingleReader = true, // Один роутер на все команды
+            FullMode = BoundedChannelFullMode.Wait // Блокировать отправителя, если канал полон
+        });
+        services.AddSingleton(channel);
+        services.AddSingleton(channel.Reader);
+        services.AddSingleton(channel.Writer);
+    }
+}
+
+// Аналогично для событий, но позволим несколько читателей для параллелизма
+public static class EventChannel
+{
+    public static void AddEventChannel(this IServiceCollection services)
+    {
+        var channel = Channel.CreateBounded<IEvent>(new BoundedChannelOptions(500)
+        {
+            SingleReader = false, // Можем запустить несколько роутеров для событий
+            FullMode = BoundedChannelFullMode.DropOldest // Если канал полон, удаляем самое старое событие (логика для логов/аналитики)
+        });
+        services.AddSingleton(channel);
+        services.AddSingleton(channel.Reader);
+        services.AddSingleton(channel.Writer);
+    }
+}
+----------------------------------------------------------
+// Application/Infrastructure/Routers/Routers.cs
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
+using Application.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace Infrastructure.Routers;
+// Роутер для команд. Использует TryRead для последовательной обработки.
+public class CommandRouter : BackgroundService
+{
+    private readonly ChannelReader<ICommand> _reader;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<CommandRouter> _logger;
+
+    public CommandRouter(ChannelReader<ICommand> reader, IServiceProvider serviceProvider, ILogger<CommandRouter> logger)
+    {
+        _reader = reader;
+        _serviceProvider = serviceProvider;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("CommandRouter is starting.");
+
+        while (await _reader.WaitToReadAsync(stoppingToken))
+        {
+            while (_reader.TryRead(out var command))
+            {
+                if (stoppingToken.IsCancellationRequested) break;
+                await RouteCommandAsync(command, stoppingToken);
+            }
+        }
+        _logger.LogInformation("CommandRouter is stopping.");
+    }
+
+    private async Task RouteCommandAsync(ICommand command, CancellationToken ct)
+    {
+        var commandType = command.GetType();
+        var handlerType = typeof(ICommandHandler<>).MakeGenericType(commandType);
+
+        using var scope = _serviceProvider.CreateScope();
+        var handler = scope.ServiceProvider.GetService(handlerType);
+
+        if (handler == null)
+            throw new InvalidOperationException($"No handler registered for command: {commandType.Name}");
+
+        var method = handlerType.GetMethod("HandleAsync");
+        await (Task)method.Invoke(handler, new object[] { command, ct })!;
+    }
+}
+// Роутер для событий. Использует ReadAllAsync для параллельной обработки.
+public class EventRouter : BackgroundService
+{
+    private readonly ChannelReader<IEvent> _reader;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<EventRouter> _logger;
+
+    public EventRouter(ChannelReader<IEvent> reader, IServiceProvider serviceProvider, ILogger<EventRouter> logger)
+    {
+        _reader = reader;
+        _serviceProvider = serviceProvider;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("EventRouter is starting.");
+        await foreach (var @event in _reader.ReadAllAsync(stoppingToken))
+        {
+            if (stoppingToken.IsCancellationRequested) break;
+            await RouteEventAsync(@event, stoppingToken);
+        }
+        _logger.LogInformation("EventRouter is stopping.");
+    }
+
+    private async Task RouteEventAsync(IEvent @event, CancellationToken ct)
+    {
+        var eventType = @event.GetType();
+        var handlerType = typeof(IEventHandler<>).MakeGenericType(eventType);
+
+        using var scope = _serviceProvider.CreateScope();
+        var handlers = scope.ServiceProvider.GetServices(handlerType);
+
+        if (!handlers.Any())
+            _logger.LogWarning("No handlers found for event: {EventName}", eventType.Name);
+
+        var tasks = handlers.Select(handler =>
+            (Task)handler.GetType().GetMethod("HandleAsync")!.Invoke(handler, new object[] { @event, ct })!
+        );
+
+        await Task.WhenAll(tasks); // Параллельное выполнение всех обработчиков события.
+    }
+}
+------------------------------------------------------------------------------------------
+// Application/Interfaces/ICommand.cs
+
+namespace Application.Interfaces;
+
+// Наследуем от IMessage для полиморфизма, если понадобится
+public interface ICommand : IMessage { }
+-------------------------------------------------------------------------------------------
+// Application/Interfaces/ICommandBus.cs
+
+using Application.Interfaces;
+
+public interface ICommandBus
+{
+    ValueTask SendAsync(ICommand command, CancellationToken ct = default);
+}
+--------------------------------------------------------------------------------------------
+// Application/Interfaces/ICommandHandler.cs
+
+namespace Application.Interfaces;
+
+public interface ICommandHandler<in TCommand> where TCommand : ICommand
+{
+    Task HandleAsync(TCommand command, CancellationToken ct);
+}
+-----------------------------------------------------------------------------------------------
+// Application/Interfaces/IEvent.cs
+
+namespace Application.Interfaces;
+
+// Наследуем от IMessage для полиморфизма, если понадобится
+public interface IEvent : IMessage { }
+------------------------------------------------------------------------------------------------
+// Application/Interfaces/IEventBus.cs
+
+using Application.Interfaces;
+
+public interface IEventBus
+{
+    ValueTask PublishAsync(IEvent @event, CancellationToken ct = default);
+}
+-------------------------------------------------------------------------------------------------
+// Application/Interfaces/IEventHandler.cs
+
+namespace Application.Interfaces;
+
+public interface IEventHandler<in TEvent> where TEvent : IEvent
+{
+    Task HandleAsync(TEvent @event, CancellationToken ct);
+}
+--------------------------------------------------------------------------------------------------
+// Application/Interfaces/IMessage.cs
+
+// Маркерный интерфейс для всех сообщений (и команд, и событий)
+namespace Application.Interfaces;
+
+public interface IMessage { }
+----------------------------------------------------------------------------------------------------
+// Program.cs
+
+using Application.Commands;
+using Application.Events;
+using Application.Interfaces;
+using Infrastructure.Buses;
+using Infrastructure.Channels;
+using Infrastructure.Routers;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Console;
+// using WorkerServiceExample; // Для цвета в консоли
+
+var builder = Host.CreateDefaultBuilder(args);
+builder.ConfigureLogging(logging =>
+{
+    logging.AddSimpleConsole(options =>
+    {
+        options.ColorBehavior = LoggerColorBehavior.Enabled; // Цветной вывод в консоли Windows Terminal/Powershell.
+    });
+});
+builder.ConfigureServices((hostContext, services) =>
+{
+    // == 1. Регистрация каналов ==
+    services.AddCommandChannel(); // Из Infrastructure.Channels.CommandChannel.AddCommandChannel()
+    services.AddEventChannel();   // Из Infrastructure.Channels.EventChannel.AddEventChannel()
+
+    // == 2. Регистрация шин ==
+    services.AddSingleton<ICommandBus, CommandBus>();
+    services.AddSingleton<IEventBus, EventBus>();
+
+    // == 3. Регистрация роутеров как фоновых сервисов ==
+    services.AddHostedService<CommandRouter>();
+    services.AddHostedService<EventRouter>();
+
+    // == 4. Регистрация бизнес-логики (хендлеров) ==
+
+    // --- Команды ---
+    services.AddTransient<ICommandHandler<CreateUserCommand>, CreateUserCommandHandler>();
+
+    // --- События ---
+    services.AddTransient<IEventHandler<UserCreatedEvent>, UserCreatedEventHandler>();
+
+    // == 5. Регистрация воркера ==
+    services.AddHostedService<Worker>();
+});
+// builder.UseWindowsService(); // Если планируется запуск как службы Windows
+
+var host = builder.Build();
+host.Run();
+-----------------------------------------------------------------------------------------------------
+// Worker.cs
+
+using System.Text.Json; // Для красивого логирования объектов .NET 6+
+using System.Threading.Tasks;
+using Application.Commands; // Используем нашу команду.
+using Application.Interfaces; // Используем шины.
+using Microsoft.Extensions.Hosting;
+// ... другие using
+
+public class Worker : BackgroundService // Наследуемся от BackgroundService вместо старого WorkerBase (.NET 6+)
+{
+    private readonly ICommandBus _commandBus; // Инжектим шину команд.
+
+    public Worker(ICommandBus commandBus) // Можно инжектить и IEventBus напрямую, если нужно публиковать события из воркера.
+    {
+        _commandBus = commandBus;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        int i = 0; // Счетчик для имитации работы.
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            i++;
+
+            // Логика воркера: например, каждую 5-ю итерацию создаем нового пользователя.
+            if (i % 5 == 0)
+            {
+                var newUsername = $"User_{DateTime.Now:HHmmss}_{i}";
+                var createUserCmd = new CreateUserCommand { Username = newUsername };
+
+                Console.WriteLine($"[Worker] Sending command: {JsonSerializer.Serialize(createUserCmd)}");
+                await _commandBus.SendAsync(createUserCmd, stoppingToken);
+            }
+
+            await Task.Delay(1000, stoppingToken); // Пауза в 1 секунду.
+            Console.WriteLine($"[Worker] Worker running at: {DateTimeOffset.Now}");
+
+            if (i > 20) i = 0; // Сбросим счетчик после 20 итераций.
+
+            stoppingToken.ThrowIfCancellationRequested();
+        }
+
+        Console.WriteLine("[Worker] Background service is stopping.");
+    }
+}
+-------------------------------------------------------------------------------------------------

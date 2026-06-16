@@ -1,0 +1,27 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "AspireNamedPipesApp01.ApiService\\AspireNamedPipesApp01.ApiService.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "AspireNamedPipesApp01.AppHost\\AspireNamedPipesApp01.AppHost.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "AspireNamedPipesApp01.ServiceDefaults\\AspireNamedPipesApp01.ServiceDefaults.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "AspireNamedPipesApp01.Web\\AspireNamedPipesApp01.Web.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "MyPipeService\\MyPipeService.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

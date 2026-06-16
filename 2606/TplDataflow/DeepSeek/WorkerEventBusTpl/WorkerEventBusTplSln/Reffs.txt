@@ -1,0 +1,16 @@
+Blogspot
+https://gsmainprojects.blogspot.com/2026/06/tpldataflow-deepseek-projects.html
+Deepseek
+https://chat.deepseek.com/share/n5vo4662xpfloh2f05
+https://chat.deepseek.com/share/zb6zeufbfy6tkzo2vu
+Giga
+https://giga.chat/link/gcsdjzysbE
+Doc
+D:\chathistory\DeepSeek\docx
+260610_TPL_Dataflow_Projects_.docx
+260610_DeepSeek_TPL_Dataflow_EventBus_Handlers_Subscribe_.docx
+pdf
+D:\chathistory\DeepSeek\pdf
+260610_TPL_Dataflow_Projects_.pdf
+260610_DeepSeek_TPL_Dataflow_EventBus_Handlers_Subscribe_.pdf
+

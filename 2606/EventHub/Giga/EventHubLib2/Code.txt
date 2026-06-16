@@ -1,0 +1,355 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
+------------------------------------------
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Messaging
+{
+    public sealed class ChannelsBus<TKey>
+        where TKey : notnull
+    {
+        public SyncChannel<TKey> Sync { get; }
+        public AsyncChannel<TKey> Async { get; }
+
+        public ChannelsBus(
+            Action<TKey, Exception>? onSyncTopicFault = null,
+            Action<TKey, Exception>? onAsyncTopicFault = null)
+        {
+            Sync = new SyncChannel<TKey>(onSyncTopicFault);
+            Async = new AsyncChannel<TKey>(onAsyncTopicFault);
+        }
+    }
+
+    // ---------------- SYNC ----------------
+
+    public sealed class SyncChannel<TKey>
+        where TKey : notnull
+    {
+        private readonly ConcurrentDictionary<TKey, SyncTopic> _topics = new();
+        private readonly Action<TKey, Exception>? _onTopicFault;
+
+        public SyncChannel(Action<TKey, Exception>? onTopicFault = null)
+            => _onTopicFault = onTopicFault;
+
+        public IDisposable Subscribe<TMessage>(TKey key, Action<TMessage> handler)
+        {
+            if (handler is null) throw new ArgumentNullException(nameof(handler));
+            var topic = _topics.GetOrAdd(key, k => new SyncTopic(k, _onTopicFault));
+            return topic.Add(handler);
+        }
+
+        public void Publish<TMessage>(TKey key, TMessage message)
+        {
+            if (!_topics.TryGetValue(key, out var topic)) return;
+            topic.Publish(message);
+        }
+
+        private sealed class SyncTopic
+        {
+            private readonly TKey _key;
+            private readonly Action<TKey, Exception>? _onFault;
+
+            private readonly object _gate = new();
+            private List<ISyncHandler> _handlers = new();
+            private bool _blocked;
+
+            public SyncTopic(TKey key, Action<TKey, Exception>? onFault)
+            {
+                _key = key;
+                _onFault = onFault;
+            }
+
+            public IDisposable Add<TMessage>(Action<TMessage> handler)
+            {
+                lock (_gate)
+                {
+                    if (_blocked) return NoopDisposable.Instance;
+
+                    var entry = new SyncHandler<TMessage>(handler);
+                    var next = new List<ISyncHandler>(_handlers.Count + 1);
+                    next.AddRange(_handlers);
+                    next.Add(entry); // FIFO by subscription order
+                    _handlers = next;
+
+                    return new Subscription(this, entry);
+                }
+            }
+
+            public void Publish<TMessage>(TMessage message)
+            {
+                ISyncHandler[] snapshot;
+                lock (_gate)
+                {
+                    if (_blocked) return;
+                    snapshot = _handlers.ToArray();
+                }
+
+                foreach (var h in snapshot)
+                {
+                    try
+                    {
+                        h.Invoke(message);
+                    }
+                    catch (Exception ex)
+                    {
+                        BlockAndClear(ex);
+                        return;
+                    }
+                }
+            }
+
+            private void BlockAndClear(Exception ex)
+            {
+                lock (_gate)
+                {
+                    if (_blocked) return;
+                    _blocked = true;
+                    _handlers = new List<ISyncHandler>(0); // очищаем
+                }
+                _onFault?.Invoke(_key, ex);
+            }
+
+            private void Remove(ISyncHandler entry)
+            {
+                lock (_gate)
+                {
+                    if (_blocked) return;
+
+                    var idx = _handlers.IndexOf(entry);
+                    if (idx < 0) return;
+
+                    var next = new List<ISyncHandler>(_handlers.Count - 1);
+                    for (int i = 0; i < _handlers.Count; i++)
+                        if (i != idx) next.Add(_handlers[i]);
+
+                    _handlers = next;
+                }
+            }
+
+            private sealed class Subscription : IDisposable
+            {
+                private SyncTopic? _topic;
+                private readonly ISyncHandler _entry;
+
+                public Subscription(SyncTopic topic, ISyncHandler entry)
+                {
+                    _topic = topic;
+                    _entry = entry;
+                }
+
+                public void Dispose()
+                {
+                    var t = Interlocked.Exchange(ref _topic, null);
+                    t?.Remove(_entry);
+                }
+            }
+
+            private interface ISyncHandler
+            {
+                void Invoke<TMessage>(TMessage msg);
+            }
+
+            private sealed class SyncHandler<TMessage> : ISyncHandler
+            {
+                private readonly Action<TMessage> _handler;
+                public SyncHandler(Action<TMessage> handler) => _handler = handler;
+
+                public void Invoke<TAny>(TAny msg)
+                {
+                    if (msg is TMessage typed)
+                        _handler(typed);
+                }
+            }
+        }
+    }
+
+    // ---------------- ASYNC ----------------
+
+    public sealed class AsyncChannel<TKey>
+        where TKey : notnull
+    {
+        private readonly ConcurrentDictionary<TKey, AsyncTopic> _topics = new();
+        private readonly Action<TKey, Exception>? _onTopicFault;
+
+        public AsyncChannel(Action<TKey, Exception>? onTopicFault = null)
+            => _onTopicFault = onTopicFault;
+
+        public IDisposable Subscribe<TMessage>(TKey key, Func<TMessage, ValueTask> handler)
+        {
+            if (handler is null) throw new ArgumentNullException(nameof(handler));
+            var topic = _topics.GetOrAdd(key, k => new AsyncTopic(k, _onTopicFault));
+            return topic.Add(handler);
+        }
+
+        public ValueTask PublishAsync<TMessage>(TKey key, TMessage message, CancellationToken ct = default)
+        {
+            if (!_topics.TryGetValue(key, out var topic)) return ValueTask.CompletedTask;
+            return topic.PublishAsync(message, ct);
+        }
+
+        private sealed class AsyncTopic
+        {
+            private readonly TKey _key;
+            private readonly Action<TKey, Exception>? _onFault;
+
+            private readonly object _gate = new();
+            private List<IAsyncHandler> _handlers = new();
+            private bool _blocked;
+
+            public AsyncTopic(TKey key, Action<TKey, Exception>? onFault)
+            {
+                _key = key;
+                _onFault = onFault;
+            }
+
+            public IDisposable Add<TMessage>(Func<TMessage, ValueTask> handler)
+            {
+                lock (_gate)
+                {
+                    if (_blocked) return NoopDisposable.Instance;
+
+                    var entry = new AsyncHandler<TMessage>(handler);
+                    var next = new List<IAsyncHandler>(_handlers.Count + 1);
+                    next.AddRange(_handlers);
+                    next.Add(entry); // FIFO by subscription order
+                    _handlers = next;
+
+                    return new Subscription(this, entry);
+                }
+            }
+
+            public async ValueTask PublishAsync<TMessage>(TMessage message, CancellationToken ct)
+            {
+                IAsyncHandler[] snapshot;
+                lock (_gate)
+                {
+                    if (_blocked) return;
+                    snapshot = _handlers.ToArray();
+                }
+
+                foreach (var h in snapshot)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    try
+                    {
+                        await h.InvokeAsync(message, ct).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        BlockAndClear(ex);
+                        return;
+                    }
+                }
+            }
+
+            private void BlockAndClear(Exception ex)
+            {
+                lock (_gate)
+                {
+                    if (_blocked) return;
+                    _blocked = true;
+                    _handlers = new List<IAsyncHandler>(0); // очищаем
+                }
+                _onFault?.Invoke(_key, ex);
+            }
+
+            private void Remove(IAsyncHandler entry)
+            {
+                lock (_gate)
+                {
+                    if (_blocked) return;
+
+                    var idx = _handlers.IndexOf(entry);
+                    if (idx < 0) return;
+
+                    var next = new List<IAsyncHandler>(_handlers.Count - 1);
+                    for (int i = 0; i < _handlers.Count; i++)
+                        if (i != idx) next.Add(_handlers[i]);
+
+                    _handlers = next;
+                }
+            }
+
+            private sealed class Subscription : IDisposable
+            {
+                private AsyncTopic? _topic;
+                private readonly IAsyncHandler _entry;
+
+                public Subscription(AsyncTopic topic, IAsyncHandler entry)
+                {
+                    _topic = topic;
+                    _entry = entry;
+                }
+
+                public void Dispose()
+                {
+                    var t = Interlocked.Exchange(ref _topic, null);
+                    t?.Remove(_entry);
+                }
+            }
+
+            private interface IAsyncHandler
+            {
+                ValueTask InvokeAsync<TMessage>(TMessage msg, CancellationToken ct);
+            }
+
+            private sealed class AsyncHandler<TMessage> : IAsyncHandler
+            {
+                private readonly Func<TMessage, ValueTask> _handler;
+                public AsyncHandler(Func<TMessage, ValueTask> handler) => _handler = handler;
+
+                public ValueTask InvokeAsync<TAny>(TAny msg, CancellationToken ct)
+                {
+                    if (msg is TMessage typed)
+                        return _handler(typed);
+
+                    return ValueTask.CompletedTask;
+                }
+            }
+        }
+    }
+
+    internal sealed class NoopDisposable : IDisposable
+    {
+        public static NoopDisposable Instance { get; } = new();
+        public void Dispose() { }
+    }
+}
+----------------------------------
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EventHub01\EventHub01.csproj" />
+  </ItemGroup>
+
+</Project>
+---------------------------------------
+var bus = new Messaging.ChannelsBus<string>(
+    onSyncTopicFault: (k, ex) => Console.WriteLine($"SYNC topic '{k}' fault: {ex.Message}"),
+    onAsyncTopicFault: (k, ex) => Console.WriteLine($"ASYNC topic '{k}' fault: {ex.Message}")
+);
+
+bus.Sync.Subscribe<int>("SyncTopic", x => Console.WriteLine($"sync {x}"));
+bus.Async.Subscribe<int>("AsyncTopic", async x => { await Task.Delay(100); Console.WriteLine($"async {x}"); });
+
+bus.Sync.Publish("SyncTopic", 123);
+await bus.Async.PublishAsync("AsyncTopic", 456);
+---------------------------------------

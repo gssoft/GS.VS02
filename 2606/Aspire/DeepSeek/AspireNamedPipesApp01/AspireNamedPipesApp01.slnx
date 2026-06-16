@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="AspireNamedPipesApp01.ApiService/AspireNamedPipesApp01.ApiService.csproj" />
+  <Project Path="AspireNamedPipesApp01.AppHost/AspireNamedPipesApp01.AppHost.csproj" />
+  <Project Path="AspireNamedPipesApp01.ServiceDefaults/AspireNamedPipesApp01.ServiceDefaults.csproj" />
+  <Project Path="AspireNamedPipesApp01.Web/AspireNamedPipesApp01.Web.csproj" />
+  <Project Path="MyPipeService/MyPipeService.csproj" />
+</Solution>

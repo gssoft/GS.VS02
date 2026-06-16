@@ -1,0 +1,222 @@
+﻿26.06.14
+-----------------------
+ActiveBlockSln.slnx
+D:\Projects\VS02\2606\TplDataflow\Giga\ActiveBlockSln\ActiveBlockSln.slnx
+D:\Projects\VS02\2606\TplDataflow\Giga\ActiveBlockSln\CaActiveBlock01\CaActiveBlock01.csproj
+----------------------------------------------------
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
+-----------------------------------------------------
+// Models/LimitOrder.cs
+
+namespace TradingTerminal.Models;
+
+public class LimitOrder
+{
+    public string Symbol { get; set; } = "AAPL";
+    public decimal LimitPrice { get; set; }
+    public int Volume { get; set; }
+}
+-----------------------------------------------------
+// Models/Quote.cs
+
+namespace TradingTerminal.Models;
+
+public class Quote
+{
+    public string Symbol { get; set; } = "AAPL";
+    public decimal Price { get; set; }
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+}
+--------------------------------------------------------------
+// Models/Trade.cs
+
+namespace TradingTerminal.Models;
+
+public class Trade
+{
+    public string Symbol { get; set; } = "AAPL";
+    public decimal Price { get; set; }
+    public int Volume { get; set; }
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+}
+--------------------------------------------------------------
+// Providers/MarketDataProvider.cs
+
+using System.Collections.Generic;
+using TradingTerminal.Models;
+
+namespace TradingTerminal.Providers;
+
+public static class MarketDataProvider
+{
+    public static async IAsyncEnumerable<object> GetMarketDataAsync()
+    {
+        var rnd = new Random();
+        while (true)
+        {
+            var quote = new Quote
+            {
+                Price = 150m + (decimal)rnd.NextDouble() * 5m // Цена от 150 до 155
+            };
+            yield return quote;
+
+            // 10% шанс сгенерировать сделку по текущей цене
+            if (rnd.Next(10) == 0)
+            {
+                yield return new Trade { Price = quote.Price, Volume = rnd.Next(10, 100) };
+            }
+
+            await Task.Delay(200); // Пауза между тиками
+        }
+    }
+}
+----------------------------------------------------------------
+// Services/OrderExecutionService.cs
+
+using System.Collections.Generic;
+using System.Linq;
+using TradingTerminal.Models;
+using System.Threading.Tasks;
+
+namespace TradingTerminal.Services;
+
+public class OrderExecutionService
+{
+    // В реальном приложении это был бы репозиторий или кэш
+    private readonly List<LimitOrder> _activeOrders = new()
+    {
+        new LimitOrder { LimitPrice = 152.50m, Volume = 100 },
+        new LimitOrder { LimitPrice = 153.00m, Volume = 50 }
+    };
+
+    // Этот метод будет передан в ActionBlock как делегат
+    public Task ProcessDataAsync(object data)
+    {
+        if (data is Quote quote)
+        {
+            var ordersToExecute = _activeOrders.Where(o => quote.Price >= o.LimitPrice).ToList();
+            foreach (var order in ordersToExecute)
+            {
+                Console.WriteLine($"[ENGINE] Исполнен ордер на {order.Volume} лотов по цене {quote.Price:C2}");
+                _activeOrders.Remove(order);
+            }
+        }
+        return Task.CompletedTask;
+    }
+}
+----------------------------------------------------------
+// Services/PortfolioManagementService.cs
+
+using System.Collections.Generic;
+using TradingTerminal.Models;
+using System.Threading.Tasks;
+
+namespace TradingTerminal.Services;
+
+public class PortfolioManagementService
+{
+    private readonly Dictionary<string, int> _portfolio = new();
+
+    // Этот метод будет передан в ActionBlock как делегат
+    public Task ProcessDataAsync(object data)
+    {
+        if (data is Trade trade)
+        {
+            if (_portfolio.ContainsKey(trade.Symbol))
+                _portfolio[trade.Symbol] += trade.Volume;
+            else
+                _portfolio[trade.Symbol] = trade.Volume;
+
+            Console.WriteLine($"[PORTFOLIO] Позиция по {trade.Symbol} обновлена: {_portfolio[trade.Symbol]} лотов");
+        }
+        return Task.CompletedTask;
+    }
+}
+-----------------------------------------------------------------
+// Program.cs
+
+using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
+using TradingTerminal.Models;
+using TradingTerminal.Providers;
+using TradingTerminal.Services;
+
+// Создаем экземпляры наших сервисов бизнес-логики
+var orderService = new OrderExecutionService();
+var portfolioService = new PortfolioManagementService();
+var uiService = new PortfolioManagementService(); // Можно использовать тот же сервис или создать отдельный для UI
+
+// --- СОЗДАЕМ БЛОКИ DATAFLOW ---
+// 1. Блок для логирования в консоль (наш "UI")
+var uiUpdateBlock = new ActionBlock<object>(data =>
+{
+    string message = data switch
+    {
+        Quote q => $"[UI] Котировка: {q.Symbol} @ {q.Price:C2}",
+        Trade t => $"[UI] Сделка: {t.Volume} лотов @ {t.Price:C2}",
+        _ => "Неизвестное событие"
+    };
+    Console.WriteLine(message);
+});
+
+// 2. Блок для исполнения ордеров, использующий логику из OrderExecutionService
+var orderExecutionBlock = new ActionBlock<object>(data => orderService.ProcessDataAsync(data));
+
+// 3. Блок для управления портфелем, использующий логику из PortfolioManagementService
+var portfolioManagerBlock = new ActionBlock<object>(data => portfolioService.ProcessDataAsync(data));
+
+
+// --- СБОРКА КОНВЕЙЕРА ---
+var linkOptions = new DataflowLinkOptions { PropagateCompletion = true };
+
+// Создаем BroadcastBlock для распределения данных по нескольким потребителям.
+// Он будет нашим "входом" в систему.
+var dataBroadcaster = new BroadcastBlock<object>(null);
+dataBroadcaster.LinkTo(uiUpdateBlock, linkOptions);
+dataBroadcaster.LinkTo(orderExecutionBlock, linkOptions);
+dataBroadcaster.LinkTo(portfolioManagerBlock, linkOptions);
+
+
+// --- ЗАПУСК ПРОЦЕССА ---
+_ = Task.Run(async () =>
+{
+    await foreach (var marketData in MarketDataProvider.GetMarketDataAsync())
+    {
+        // Отправляем данные в начало конвейера.
+        if (!dataBroadcaster.Post(marketData))
+        {
+            // Если очередь переполнена, подождем и попробуем снова.
+            await Task.Delay(50);
+            dataBroadcaster.Post(marketData);
+        }
+    }
+});
+
+
+// --- ОЖИДАНИЕ ЗАВЕРШЕНИЯ ---
+Console.WriteLine("Торговый терминал запущен. Нажмите Enter для выхода...");
+Console.ReadLine();
+Console.WriteLine("Инициируем завершение работы...");
+
+
+// Завершаем работу источника данных.
+dataBroadcaster.Complete();
+
+// Ждем завершения всех блоков в конвейере.
+await Task.WhenAll(
+    uiUpdateBlock.Completion,
+    orderExecutionBlock.Completion,
+    portfolioManagerBlock.Completion
+);
+
+Console.WriteLine("Система остановлена.");
+

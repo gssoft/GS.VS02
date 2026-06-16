@@ -1,0 +1,410 @@
+26.06.10
+--------------------------
+D:\Projects\VS02\2606\TplDataflow\DeepSeek\WorkerEventBusTpl\WorkerEventBusTplSln\WorkerEventBusTplSln.slnx
+D:\Projects\VS02\2606\TplDataflow\DeepSeek\WorkerEventBusTpl\WorkerEventBusTplSln\WorkerEventBusTpl05\WorkerEventBusTpl05.csproj
+--------------------------
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-WorkerEventBusTpl05-08f54e88-2ddc-43f4-8513-3decb7f7b087</UserSecretsId>
+	<Encoding>UTF-8</Encoding>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+  </ItemGroup>
+</Project>
+----------------------------
+// Events/EventA.cs
+namespace WorkerEventBus.Events;
+
+public record EventA(string Data) : IEvent
+{
+    public string Id => Guid.NewGuid().ToString();
+    public DateTime OccurredOn => DateTime.UtcNow;
+}
+-----------------------------
+// Events/EventB.cs
+namespace WorkerEventBus.Events;
+
+public record EventB(int Number) : IEvent
+{
+    public string Id => Guid.NewGuid().ToString();
+    public DateTime OccurredOn => DateTime.UtcNow;
+}
+-----------------------------
+// Events/EventC.cs
+namespace WorkerEventBus.Events;
+
+public record EventC(bool Flag) : IEvent
+{
+    public string Id => Guid.NewGuid().ToString();
+    public DateTime OccurredOn => DateTime.UtcNow;
+}
+------------------------------
+// Events/IEvent.cs
+namespace WorkerEventBus.Events;
+
+public interface IEvent
+{
+    string Id { get; }
+    DateTime OccurredOn { get; }
+}
+-------------------------------
+// Handlers/HandlerA.cs
+using WorkerEventBus.Events;
+
+namespace WorkerEventBus.Handlers;
+
+public class HandlerA : IEventHandler<EventA>
+{
+    private readonly ILogger<HandlerA> _logger;
+
+    public HandlerA(ILogger<HandlerA> logger)
+    {
+        _logger = logger;
+    }
+
+    // HandlerA.cs
+    public async Task HandleAsync(EventA @event, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("🟢 HandlerA started for event {@Event}", @event);
+        await Task.Delay(50, cancellationToken); // ✅ 100ms вместо 1000ms
+        _logger.LogInformation("✅ HandlerA completed: {Data}", @event.Data);
+    }
+}
+-----------------------------------
+// Handlers/HandlerB.cs
+using WorkerEventBus.Events;
+
+namespace WorkerEventBus.Handlers;
+
+public class HandlerB : IEventHandler<EventB>
+{
+    private readonly ILogger<HandlerB> _logger;
+
+    public HandlerB(ILogger<HandlerB> logger)
+    {
+        _logger = logger;
+    }
+
+    // HandlerB.cs
+    public async Task HandleAsync(EventB @event, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("🔵 HandlerB started for event {@Event}", @event);
+        await Task.Delay(75, cancellationToken); // ✅ 150ms вместо 1500ms
+        _logger.LogInformation("✅ HandlerB completed: Number={Number}", @event.Number);
+    }  
+}
+---------------------------------------
+// Handlers/HandlerC.cs
+using WorkerEventBus.Events;
+
+namespace WorkerEventBus.Handlers;
+
+public class HandlerC : IEventHandler<EventC>
+{
+    private readonly ILogger<HandlerC> _logger;
+
+    public HandlerC(ILogger<HandlerC> logger)
+    {
+        _logger = logger;
+    }
+
+    // HandlerC.cs
+    public async Task HandleAsync(EventC @event, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("🟡 HandlerC started for event {@Event}", @event);
+        await Task.Delay(40, cancellationToken); // ✅ 80ms вместо 800ms
+        _logger.LogInformation("✅ HandlerC completed: Flag={Flag}", @event.Flag);
+    }
+}
+------------------------------------------
+// Handlers/IEventHandler.cs
+
+using WorkerEventBus.Events;
+
+namespace WorkerEventBus.Handlers;
+
+public interface IEventHandler<in TEvent> where TEvent : IEvent
+{
+    Task HandleAsync(TEvent @event, CancellationToken cancellationToken);
+}
+-------------------------------------------
+// EventBus.cs
+
+using System.Threading.Tasks.Dataflow;
+using WorkerEventBus.Events;
+using WorkerEventBus.Handlers;
+
+namespace WorkerEventBus;
+
+public class EventBus : IDisposable
+{
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<EventBus> _logger;
+    private readonly Dictionary<Type, List<Type>> _handlers = new();
+    private readonly Dictionary<Type, ActionBlock<object>> _executionBlocks = new();
+    private readonly CancellationTokenSource _cts = new();
+    private bool _disposed;
+
+    public EventBus(IServiceProvider serviceProvider, ILogger<EventBus> logger)
+    {
+        _serviceProvider = serviceProvider;
+        _logger = logger;
+
+        RegisterEvent<EventA, HandlerA>();
+        RegisterEvent<EventB, HandlerB>();
+        RegisterEvent<EventC, HandlerC>();
+
+        InitializeExecutionBlocks();
+    }
+
+    private void RegisterEvent<TEvent, THandler>()
+        where TEvent : IEvent
+        where THandler : IEventHandler<TEvent>
+    {
+        var eventType = typeof(TEvent);
+        if (!_handlers.ContainsKey(eventType))
+            _handlers[eventType] = new List<Type>();
+
+        _handlers[eventType].Add(typeof(THandler));
+        _logger.LogInformation("Registered {Handler} for {Event}",
+            typeof(THandler).Name, eventType.Name);
+    }
+    private void InitializeExecutionBlocks()
+    {
+        foreach (var eventType in _handlers.Keys)
+        {
+            // Определяем оптимальный DOP для каждого типа
+            var dop = eventType.Name switch
+            {
+                "EventA" => 20,  // HandlerA: 1000ms -> 20 параллельных
+                "EventB" => 30,  // HandlerB: 1500ms -> 30 параллельных  
+                "EventC" => 15,  // HandlerC: 800ms -> 15 параллельных
+                _ => 10
+            };
+
+            var block = new ActionBlock<object>(async (eventObj) =>
+            {
+                var handlers = _handlers[eventType];
+                foreach (var handlerType in handlers)
+                {
+                    try
+                    {
+                        using var scope = _serviceProvider.CreateScope();
+                        var handler = scope.ServiceProvider.GetRequiredService(handlerType);
+
+                        var method = handlerType.GetMethod("HandleAsync");
+                        if (method != null)
+                        {
+                            var task = (Task)method.Invoke(handler, new[] { eventObj, _cts.Token });
+                            await task;
+                            _logger.LogDebug("✓ Handler {HandlerType} completed", handlerType.Name);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing event {EventType}", eventType.Name);
+                    }
+                }
+            }, 
+            new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = 20,
+                // MaxDegreeOfParallelism = dop,     // ✅ Динамический DOP
+                // BoundedCapacity = 1000,           // ✅ Увеличен до 1000
+                BoundedCapacity = 500,
+                CancellationToken = _cts.Token
+            });
+
+            _executionBlocks[eventType] = block;
+            _logger.LogInformation("Created execution block for {EventType} with MaxDOP={DOP}", eventType.Name, dop);
+        }
+    }
+
+   
+
+    // Добавьте в EventBus.cs
+    public void ClearQueues()
+    {
+        _logger.LogWarning("⚠️ Clearing all queues!");
+
+        foreach (var block in _executionBlocks.Values)
+        {
+            // Пропускаем все ожидающие сообщения
+            while (block.InputCount > 0)
+            {
+                // Принудительно очищаем
+            }
+        }
+    }
+
+    
+
+    public async Task PublishAsync<TEvent>(TEvent @event) where TEvent : IEvent
+    {
+        var eventType = typeof(TEvent);
+
+        if (!_executionBlocks.ContainsKey(eventType))
+        {
+            _logger.LogWarning("No handlers registered for {EventType}", eventType.Name);
+            return;
+        }
+
+        _logger.LogInformation("📨 Publishing {EventType}: {@Event}", eventType.Name, @event);
+
+        var accepted = await _executionBlocks[eventType].SendAsync(@event, _cts.Token);
+
+        if (!accepted)
+        {
+            _logger.LogWarning("Event {EventId} was not accepted by block", @event.Id);
+        }
+    }
+
+    public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken) where TEvent : IEvent
+    {
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, cancellationToken);
+
+        var eventType = typeof(TEvent);
+
+        if (!_executionBlocks.ContainsKey(eventType))
+        {
+            _logger.LogWarning("No handlers registered for {EventType}", eventType.Name);
+            return;
+        }
+
+        _logger.LogInformation("📨 Publishing {EventType}: {@Event}", eventType.Name, @event);
+
+        var accepted = await _executionBlocks[eventType].SendAsync(@event, linkedCts.Token);
+
+        if (!accepted)
+        {
+            _logger.LogWarning("Event {EventId} was not accepted by block", @event.Id);
+        }
+    }
+
+    public async Task CompleteAsync()
+    {
+        _logger.LogInformation("Completing EventBus...");
+
+        foreach (var block in _executionBlocks.Values)
+        {
+            block.Complete();
+        }
+
+        await Task.WhenAll(_executionBlocks.Values.Select(b => b.Completion));
+
+        _logger.LogInformation("EventBus completed");
+    }
+
+    public (int QueueA, int QueueB, int QueueC) GetStats()
+    {
+        var queueA = _executionBlocks.ContainsKey(typeof(EventA))
+            ? _executionBlocks[typeof(EventA)].InputCount
+            : 0;
+
+        var queueB = _executionBlocks.ContainsKey(typeof(EventB))
+            ? _executionBlocks[typeof(EventB)].InputCount
+            : 0;
+
+        var queueC = _executionBlocks.ContainsKey(typeof(EventC))
+            ? _executionBlocks[typeof(EventC)].InputCount
+            : 0;
+
+        return (queueA, queueB, queueC);
+    }
+
+    public (int InputCountA, int InputCountB, int InputCountC) GetBlockStats()
+    {
+        var inputA = _executionBlocks.ContainsKey(typeof(EventA))
+            ? _executionBlocks[typeof(EventA)].InputCount
+            : 0;
+
+        var inputB = _executionBlocks.ContainsKey(typeof(EventB))
+            ? _executionBlocks[typeof(EventB)].InputCount
+            : 0;
+
+        var inputC = _executionBlocks.ContainsKey(typeof(EventC))
+            ? _executionBlocks[typeof(EventC)].InputCount
+            : 0;
+
+        return (inputA, inputB, inputC);
+    }
+
+    public Dictionary<string, object> GetDetailedBlockInfo()
+    {
+        var info = new Dictionary<string, object>();
+
+        foreach (var kvp in _executionBlocks)
+        {
+            var block = kvp.Value;
+            info[$"{kvp.Key.Name}_InputCount"] = block.InputCount;
+            info[$"{kvp.Key.Name}_CompletionStatus"] = block.Completion.IsCompleted;
+        }
+
+        return info;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+
+        _cts.Cancel();
+        _cts.Dispose();
+
+        foreach (var block in _executionBlocks.Values)
+        {
+            block.Complete();
+        }
+
+        _disposed = true;
+    }
+}
+-----------------
+// Версия интенсивная с расширенным мониторингом
+// Program.cs
+
+using WorkerEventBus;
+using WorkerEventBus.Handlers;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+// Настройка логирования для цветного вывода в консоль
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole(options =>
+{
+    options.FormatterName = "simple";
+    options.LogToStandardErrorThreshold = LogLevel.Warning;
+});
+
+// Регистрируем обработчики
+builder.Services.AddSingleton<HandlerA>();
+builder.Services.AddSingleton<HandlerB>();
+builder.Services.AddSingleton<HandlerC>();
+
+// Регистрируем EventBus как Singleton
+builder.Services.AddSingleton<EventBus>();
+
+// Регистрируем Worker
+builder.Services.AddHostedService<Worker>();
+
+var host = builder.Build();
+
+// Настройка цветов консоли для лучшего визуального восприятия
+Console.Title = "EventBus with TPL Dataflow - Enhanced Monitoring";
+Console.BackgroundColor = ConsoleColor.Black;
+Console.ForegroundColor = ConsoleColor.White;
+
+// Вывод приветственного баннера
+Console.WriteLine();
+Console.WriteLine("╔════════════════════════════════════════════════════════════════════════════╗");
+Console.WriteLine("║                    EVENT BUS WITH TPL DATAFLOAD                            ║");
+Console.WriteLine("║                         ENHANCED MONITORING MODE                           ║");
+Console.WriteLine("╚════════════════════════════════════════════════════════════════════════════╝");
+Console.WriteLine();
+
+await host.RunAsync();

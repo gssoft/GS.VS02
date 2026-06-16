@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="EventBus.Core/EventBus.Core.csproj" />
+  <Project Path="EventHubWorkerService/EventHubWorkerService.csproj" />
+</Solution>

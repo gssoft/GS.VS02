@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Giga.txt" />
+    <File Path="Notes.txt" />
+    <File Path="Reffs.txt" />
+    <File Path="Text.txt" />
+  </Folder>
+  <Project Path="QuoteGeneratorWorker/QuoteGeneratorWorker.csproj" />
+  <Project Path="QuoteGeneratorWorker01/QuoteGeneratorWorker01.csproj" />
+</Solution>

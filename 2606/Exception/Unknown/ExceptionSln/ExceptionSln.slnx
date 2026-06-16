@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="CA_Exception01/CA_Exception01.csproj" />
+  <Project Path="CA_Exception02/CA_Exception02.csproj" />
+  <Project Path="CA_Exception03/CA_Exception03.csproj" />
+  <Project Path="CA_Exception04/CA_Exception04.csproj" />
+  <Project Path="WorkerService01/WorkerService01.csproj" />
+</Solution>

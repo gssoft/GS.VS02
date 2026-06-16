@@ -1,0 +1,297 @@
+﻿---------------------------------------
+26.06.03
+---------------------------------------
+https://chat.qwen.ai/s/3187068e-a269-4d30-85aa-1cf82ba05e20?fev=0.2.57
+---------------------------------------
+EventBus.Core
+---------------------------------------
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+	<ConsoleOutputEncoding>utf-8</ConsoleOutputEncoding>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+  </ItemGroup>
+
+</Project>
+---------------------------------------
+// Abstractions/IEventBus.cs
+---------------------------------------
+namespace EventBus.Abstractions;
+
+/// <summary>
+/// Медиа-стиль API для публикации событий. 
+/// Возвращает управление мгновенно после записи во входной буфер.
+/// </summary>
+public interface IEventBus
+{
+    ValueTask PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
+        where TEvent : class;
+}
+-----------------------------------------
+// Abstractions/IHandler.cs
+-----------------------------------------
+
+namespace EventBus.Abstractions;
+
+/// <summary>
+/// Интерфейс обработчика события. Выполняется строго в контексте подписчика.
+/// </summary>
+public interface IHandler<in TEvent> where TEvent : class
+{
+    Task HandleAsync(TEvent @event, CancellationToken cancellationToken);
+}
+-------------------------------------------
+// Core/ChannelEventBus.cs
+-------------------------------------------
+
+using System.Collections.Concurrent;
+using System.Threading.Channels;
+using EventBus.Abstractions;
+using Microsoft.Extensions.Logging;
+
+namespace EventBus.Core;
+
+public sealed class ChannelEventBus : IEventBus, IAsyncDisposable
+{
+    private readonly Channel<object> _inboundChannel;
+
+    // Храним не писатели, а делегаты типа Action<object>
+    // Это обходит проблему инвариантности ChannelWriter<T>
+    private readonly ConcurrentDictionary<Type, List<Action<object>>> _subscribers = new();
+
+    private readonly ILogger<ChannelEventBus> _logger;
+    private readonly CancellationTokenSource _shutdownCts = new();
+    private readonly Task _routingTask;
+    private bool _disposed;
+
+    public ChannelEventBus(ILogger<ChannelEventBus> logger)
+    {
+        _logger = logger;
+        _inboundChannel = Channel.CreateUnbounded<object>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false,
+            AllowSynchronousContinuations = false
+        });
+
+        _routingTask = Task.Run(() => RouteMessagesAsync(_shutdownCts.Token), CancellationToken.None);
+    }
+
+    public async ValueTask PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default) where TEvent : class
+    {
+        ThrowIfDisposed();
+        await _inboundChannel.Writer.WriteAsync(@event, cancellationToken);
+    }
+
+    /// <summary>
+    /// Подписка канала сервиса на тип события.
+    /// Вызывается в конструкторе BackgroundService.
+    /// </summary>
+    public void Subscribe<TEvent>(ChannelWriter<TEvent> targetWriter) where TEvent : class
+    {
+        ThrowIfDisposed();
+
+        // Создаём делегат, который захватывает типизированный writer
+        // и безопасно приводит сообщение к нужному типу
+        Action<object> writerAction = (msg) =>
+        {
+            if (msg is TEvent typedEvent)
+            {
+                // TryWrite — неблокирующий. Если канал полон — возвращает false.
+                // Это защищает роутер от медленных подписчиков.
+                if (!targetWriter.TryWrite(typedEvent))
+                {
+                    _logger?.LogWarning("Subscriber buffer full for {EventType}. Message dropped.", typeof(TEvent).Name);
+                }
+            }
+        };
+
+        var list = _subscribers.GetOrAdd(typeof(TEvent), _ => new());
+
+        lock (list)
+        {
+            // Избегаем дубликатов подписок
+            if (!list.Contains(writerAction))
+                list.Add(writerAction);
+        }
+    }
+
+    private async Task RouteMessagesAsync(CancellationToken ct)
+    {
+        try
+        {
+            await foreach (var message in _inboundChannel.Reader.ReadAllAsync(ct))
+            {
+                var messageType = message.GetType();
+
+                if (!_subscribers.TryGetValue(messageType, out var targets))
+                    continue;
+
+                // Делаем снимок списка, чтобы не блокировать долгие переборы
+                List<Action<object>> snapshot;
+                lock (targets) snapshot = targets.ToList();
+
+                foreach (var writerAction in snapshot)
+                {
+                    try
+                    {
+                        // Выполняем делегат — запись в целевой канал
+                        writerAction(message);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to route message to subscriber for {EventType}", messageType.Name);
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Ожидаемое завершение при остановке хоста
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error in message routing loop");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        _shutdownCts.Cancel();
+        _inboundChannel.Writer.Complete();
+
+        try
+        {
+            await _routingTask.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Игнорируем ожидаемую отмену
+        }
+
+        _shutdownCts.Dispose();
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(ChannelEventBus));
+    }
+}
+----------------------------------------------------------------------------------
+// Extensions/ServiceCollectionExtensions.cs
+----------------------------------------------------------------------------------
+
+using System.Threading.Channels;
+using EventBus.Abstractions;
+using EventBus.Core;
+using EventBus.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace EventBus.Extensions;
+
+public static class ServiceCollectionExtensions
+{
+    /// <summary>Регистрирует шину событий.</summary>
+    public static IServiceCollection AddChannelEventBus(this IServiceCollection services)
+    {
+        services.AddSingleton<IEventBus, ChannelEventBus>();
+        services.AddSingleton<ChannelEventBus>(); // Для доступа к .Subscribe()
+        return services;
+    }
+
+    /// <summary>
+    /// Регистрирует канал, сервис-подписчик и автоматически настраивает буфер.
+    /// </summary>
+    public static IServiceCollection AddSubscriber<TEvent, TService>(
+        this IServiceCollection services,
+        int bufferSize = 1000,
+        BoundedChannelFullMode fullMode = BoundedChannelFullMode.DropOldest)
+        where TEvent : class
+        where TService : EventSubscriberService<TEvent>
+    {
+        services.AddSingleton<Channel<TEvent>>(_ =>
+            Channel.CreateBounded<TEvent>(new BoundedChannelOptions(bufferSize)
+            {
+                FullMode = fullMode,
+                SingleReader = true,
+                SingleWriter = false
+            }));
+
+        services.AddHostedService<TService>();
+        return services;
+    }
+}
+--------------------------------------------------------------------------------
+// Hosting/EventSubscriberService.cs
+--------------------------------------------------------------------------------
+
+using System.Threading.Channels;
+using EventBus.Abstractions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace EventBus.Hosting;
+
+/// <summary>
+/// Базовый класс для подписчиков. Читает из изолированного канала и вызывает обработчик в своём контексте.
+/// </summary>
+public abstract class EventSubscriberService<TEvent> : BackgroundService where TEvent : class
+{
+    private readonly ChannelReader<TEvent> _reader;
+    private readonly ILogger _logger;
+    private readonly IHandler<TEvent>? _handler;
+
+    protected EventSubscriberService(
+        Channel<TEvent> channel,
+        ILogger logger,
+        IHandler<TEvent>? handler = null)
+    {
+        _reader = channel.Reader;
+        _logger = logger;
+        _handler = handler;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("Subscriber {ServiceName} started.", GetType().Name);
+
+        try
+        {
+            await foreach (var @event in _reader.ReadAllAsync(stoppingToken))
+            {
+                try
+                {
+                    if (_handler != null)
+                        await _handler.HandleAsync(@event, stoppingToken);
+                    else
+                        await HandleAsync(@event, stoppingToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogError(ex, "Error processing event {EventType}.", typeof(TEvent).Name);
+                    // Ошибка не ломает цикл чтения. Сервис продолжает работать.
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Subscriber {ServiceName} stopped gracefully.", GetType().Name);
+        }
+    }
+
+    /// <summary>Переопределяйте, если не используете DI-хендлер.</summary>
+    protected virtual Task HandleAsync(TEvent @event, CancellationToken cancellationToken) => Task.CompletedTask;
+}
+-----------------------------------------------------------------------------

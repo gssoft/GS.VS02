@@ -1,0 +1,30 @@
+<Solution>
+  <Folder Name="/Images/">
+    <File Path="2026-05-28_22-31-56_NamePipeSln_Startup.png" />
+  </Folder>
+  <Folder Name="/PipePoolQuoteServer/">
+    <Project Path="CaUniClient/CaUniClient.csproj" Id="f4f78ca8-0d13-487e-b8a6-cdd17f3329fe" />
+    <Project Path="CaUniClient02/CaUniClient02.csproj" Id="d585875d-e9f9-47c3-bc96-99e4bf12c774" />
+    <Project Path="CaUniClient021/CaUniClient021.csproj" Id="44b24a80-3cd8-4fa3-b8b8-acb0bcc1ab16" />
+    <Project Path="CaUniClient022/CaUniClient022.csproj" Id="55b668ad-7a7b-4c2e-86ea-f42f8d72c9c3" />
+    <Project Path="CaUniClient023/CaUniClient023.csproj" Id="5bffdad3-fa6f-4385-b7e4-d12eac5df504" />
+    <Project Path="CaUniClient024/CaUniClient024.csproj" Id="8f81715b-3431-4040-aae2-bc796b144276" />
+    <Project Path="PipePoolQuoteServer/PipePoolQuoteServer.csproj" Id="d2ba8c32-8c59-47ad-9c67-72bd232a789a" />
+    <Project Path="PipePoolQuoteServer02/PipePoolQuoteServer02.csproj" Id="fd84985c-d519-4caa-a2a8-5c46fa42da89" />
+    <Project Path="PipePoolQuoteServer03/PipePoolQuoteServer03.csproj" Id="d63eed6b-9ac6-4ef3-9629-b84d9faf4aa7" />
+    <Project Path="QuotesClientRazor01/QuotesClientRazor01.csproj" Id="aa70a825-7188-40ec-b0d3-ccd0e7587de2" />
+  </Folder>
+  <Folder Name="/WebQuotes/">
+    <Project Path="QuotesClientA/QuotesClientA.csproj" Id="312a3b2d-b38b-4196-ab5e-b5e6cf3495b4" />
+    <Project Path="QuotesClientB/QuotesClientB.csproj" Id="e95df535-8917-4efc-8679-a6b381b32860" />
+    <Project Path="WebQuoteServer01/WebQuoteServer01.csproj" Id="cfed5dea-9a91-496c-9ccd-ef6f088979b5" />
+  </Folder>
+  <Project Path="NamedPipesApp01/NamedPipesApp01.csproj" />
+  <Project Path="NamedPipesRazorApp02/NamedPipesRazorApp02.csproj" />
+  <Project Path="NamedPipesRazorApp03/NamedPipesRazorApp03.csproj" />
+  <Project Path="NamedPipesRazorApp04/NamedPipesRazorApp04.csproj" />
+  <Project Path="NamedPipesRazorApp05/NamedPipesRazorApp05.csproj" />
+  <Project Path="NamedPipesRazorApp08/NamedPipesRazorApp08.csproj" />
+  <Project Path="NamedPipesRazorApp081/NamedPipesRazorApp081.csproj" Id="deb53768-9376-411e-884a-47ba18fd2849" />
+  <Project Path="NamedPipesRazorApp082/NamedPipesRazorApp082.csproj" Id="9a7d4b30-77e1-4133-a5d2-391b9ce11ca9" />
+</Solution>

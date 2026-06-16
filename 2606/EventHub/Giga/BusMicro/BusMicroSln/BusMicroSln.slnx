@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="BusMicro01/BusMicro01.csproj" />
+  <Project Path="BusMicro02/BusMicro02.csproj" />
+  <Project Path="CA_BusMicro01/CA_BusMicro01.csproj" />
+  <Project Path="CA_BusMicro02/CA_BusMicro02.csproj" />
+  <Project Path="TradingWorker01/TradingWorker01.csproj" />
+</Solution>

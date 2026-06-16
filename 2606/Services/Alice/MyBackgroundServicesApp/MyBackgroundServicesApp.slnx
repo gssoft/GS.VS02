@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Text/">
+    <File Path="AliceProj_260606.txt" />
+    <File Path="CancelationToken.txt" />
+    <File Path="Code.txt" />
+    <File Path="Reffs.txt" />
+  </Folder>
+  <Project Path="MyBackgroundServicesApp/MyBackgroundServicesApp.csproj" />
+</Solution>

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Giga.txt" />
+    <File Path="Refs.txt" />
+  </Folder>
+  <Project Path="ConsoleApp1/ConsoleEventApp01.csproj" />
+  <Project Path="EventHub01/EventHub01.csproj" />
+  <Project Path="EventHub02/EventHub02.csproj" />
+  <Project Path="EventHub03/EventHub03.csproj" />
+  <Project Path="EventHub04/EventHub04.csproj" />
+</Solution>
