@@ -4,6 +4,7 @@
     <File Path="CancelationToken.txt" />
     <File Path="Code.txt" />
     <File Path="Reffs.txt" />
+    <File Path="SpecialTokens.txt" />
   </Folder>
   <Project Path="MyBackgroundServicesApp/MyBackgroundServicesApp.csproj" />
 </Solution>

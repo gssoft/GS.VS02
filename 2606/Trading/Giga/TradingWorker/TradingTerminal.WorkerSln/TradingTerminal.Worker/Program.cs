@@ -14,12 +14,14 @@ builder.Services.AddSingleton<PortfolioManagementService>();
 builder.Services.AddSingleton<UiUpdateService>();
 
 
+
 // --- 3. РЕГИСТРАЦИЯ ФОНОВЫХ РАБОТНИКОВ (Background Workers) ---
 // Работники управляют жизненным циклом блоков Dataflow.
 builder.Services.AddHostedService<MarketDataGeneratorService>();
 builder.Services.AddHostedService<OrderExecutionBackgroundWorker>();
 builder.Services.AddHostedService<PortfolioManagementBackgroundWorker>();
 builder.Services.AddHostedService<UiUpdateBackgroundWorker>();
+
 // 26.06.16
 // builder.Services.AddHostedService<UiUpdateBackgroundWorker>();
 
@@ -67,6 +69,7 @@ dataBufferBlock.LinkTo(dataBroadcaster, linkOptions);
 // Передаем созданные блоки и токен отмены в наши фоновые сервисы через лямбда-выражения.
 builder.Services.AddSingleton(dataBufferBlock); // Регистрируем источник как синглтон
 builder.Services.AddSingleton(uiUpdateBlock);
+
 // 26.06.16
 // builder.Services.AddSingleton(uiUpdateBlock);
 

@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/Text/">
     <File Path="Code.txt" />
+    <File Path="CoseReview.txt" />
     <File Path="Descr.txt" />
     <File Path="Epilog.txt" />
     <File Path="Reffs.txt" />
