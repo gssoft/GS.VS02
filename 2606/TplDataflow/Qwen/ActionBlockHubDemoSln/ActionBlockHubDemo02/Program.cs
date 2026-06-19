@@ -13,6 +13,9 @@ builder.ConfigureServices((hostContext, services) =>
 {
     services.AddHostedService<DataProcessingService>();
 
+    // РЕГИСТРИРУЕМ НАШ НОВЫЙ СЕРВИС МОНИТОРИНГА
+    services.AddHostedService<MetricsService>();
+
     services.AddTransient<Func<string, Func<MyDataType, Task>>>(serviceProvider => key =>
     {
         var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
@@ -22,13 +25,26 @@ builder.ConfigureServices((hostContext, services) =>
     });
 
     // РЕГИСТРИРУЕМ ИНТЕРФЕЙС IActionBlockHub
+    //services.AddSingleton<IActionBlockHub<string, MyDataType>>(serviceProvider =>
+    //{
+    //    var handlerFactory = serviceProvider.GetRequiredService<Func<string, Func<MyDataType, Task>>>();
+    //    var keys = new List<string> { "A", "B", "C" };
+    //    var blockOptions = new ExecutionDataflowBlockOptions { BoundedCapacity = 100, MaxDegreeOfParallelism = 1 };
+
+    //    return new ActionBlockHub<string, MyDataType>(keys, handlerFactory, blockOptions);
+    //});
+
+    // РЕГИСТРИРУЕМ ИНТЕРФЕЙС IActionBlockHub
     services.AddSingleton<IActionBlockHub<string, MyDataType>>(serviceProvider =>
     {
         var handlerFactory = serviceProvider.GetRequiredService<Func<string, Func<MyDataType, Task>>>();
+        // Получаем логгер для самого ActionBlockHub
+        var logger = serviceProvider.GetRequiredService<ILogger<ActionBlockHub<string, MyDataType>>>();
+
         var keys = new List<string> { "A", "B", "C" };
         var blockOptions = new ExecutionDataflowBlockOptions { BoundedCapacity = 100, MaxDegreeOfParallelism = 1 };
 
-        return new ActionBlockHub<string, MyDataType>(keys, handlerFactory, blockOptions);
+        return new ActionBlockHub<string, MyDataType>(keys, handlerFactory, logger, blockOptions);
     });
 
     // РЕГИСТРИРУЕМ ИНТЕРФЕЙС IBroadcastHub

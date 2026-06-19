@@ -48,7 +48,6 @@ namespace ActionBlockHubDemo.Services
             _broadcastHub = broadcastHub;
         }
 
-
         private int _counter = 0;
         private void SendData(object? state)
         {

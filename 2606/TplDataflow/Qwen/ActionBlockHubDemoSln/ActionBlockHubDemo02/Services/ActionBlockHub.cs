@@ -10,15 +10,24 @@ using System.Threading.Tasks.Dataflow;
 namespace ActionBlockHubDemo.Services
 {
     // 26.06.19
-
     // 1. Добавляем реализацию интерфейса
     public class ActionBlockHub<TKey, TMessage> : IActionBlockHub<TKey, TMessage> where TKey : notnull
     {
         private readonly ConcurrentDictionary<TKey, (ActionBlock<TMessage> Block, Task Completion)> _blocks = new();
         private readonly ConcurrentDictionary<TKey, Func<TMessage, Task>> _handlers = new();
 
-        public ActionBlockHub(IEnumerable<TKey> keys, Func<TKey, Func<TMessage, Task>> handlerFactory, ExecutionDataflowBlockOptions? blockOptions = null)
+        // Словарь для хранения счетчиков по каждому ключу
+        private readonly ConcurrentDictionary<TKey, (long Processed, long Errors)> _counters = new();
+
+        private readonly ILogger _logger; // Добавляем логгер
+
+        public ActionBlockHub(IEnumerable<TKey> keys,
+            Func<TKey, Func<TMessage, Task>> handlerFactory,
+            ILogger logger,
+            ExecutionDataflowBlockOptions? blockOptions = null)
         {
+            _logger = logger;
+
             if (keys == null || !keys.Any())
                 throw new ArgumentException("Список ключей не может быть пустым.", nameof(keys));
 
@@ -26,27 +35,31 @@ namespace ActionBlockHubDemo.Services
 
             foreach (var key in keys)
             {
+                _counters[key] = (0, 0); // Инициализируем счетчики
                 var handler = handlerFactory(key);
-                _handlers[key] = handler;
 
-                // ВАЖНО: Оборачиваем вызов в try-catch, чтобы при ошибке блок не перешел в состояние Faulted
-                // и не остановил всю обработку.
                 var block = new ActionBlock<TMessage>(async msg =>
                 {
                     try
                     {
                         await handler(msg).ConfigureAwait(false);
+                        _counters.AddOrUpdate(key, (1, 0), (_, c) => (c.Processed + 1, c.Errors));
                     }
                     catch (Exception ex)
                     {
-                        // Здесь можно залогировать ошибку, если передать ILogger в ActionBlockHub
-                        Console.WriteLine($"Ошибка в обработчике для ключа {key}: {ex.Message}");
+                        // Теперь ошибка красиво пишется в общий лог приложения
+                        _logger.LogError(ex, "Ошибка в обработчике для ключа '{Key}' при обработке сообщения.", key);
+                        _counters.AddOrUpdate(key, (0, 1), (_, c) => (c.Processed, c.Errors + 1));
                     }
                 }, options);
 
                 _blocks[key] = (block, block.Completion);
             }
         }
+
+        public long GetProcessedCount(TKey key) => _counters.TryGetValue(key, out var c) ? c.Processed : 0;
+        public long GetErrorCount(TKey key) => _counters.TryGetValue(key, out var c) ? c.Errors : 0;
+        
 
         public Task PublishAsync(TKey key, TMessage message)
         {
@@ -75,6 +88,8 @@ namespace ActionBlockHubDemo.Services
         }
 
         public Task Completion => Task.WhenAll(_blocks.Values.Select(bi => bi.Completion));
+
+
     }
 }
 

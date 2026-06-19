@@ -16,4 +16,8 @@ public interface IActionBlockHub<TKey, TMessage> where TKey : notnull
     ITargetBlock<TMessage> GetTargetBlock(TKey key); // Метод для получения блока, чтобы на него можно было подписаться
     void Complete();
     Task Completion { get; }
+
+    // Метрики
+    long GetProcessedCount(TKey key);
+    long GetErrorCount(TKey key);
 }
