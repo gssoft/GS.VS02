@@ -2,6 +2,7 @@
 using ActionBlockHubDemo.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace ActionBlockHubDemo.Services
 {
@@ -19,26 +20,44 @@ namespace ActionBlockHubDemo.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            // Небольшая задержка при старте, чтобы не мешать логам инициализации
-            await Task.Delay(2000, stoppingToken);
-
-            _logger.LogInformation("MetricsService запущен. Начинаем мониторинг...");
-
-            while (!stoppingToken.IsCancellationRequested)
+            try
             {
-                foreach (var key in _keys)
+                // Небольшая задержка при старте, чтобы не мешать логам инициализации
+                await Task.Delay(2000, stoppingToken);
+
+                _logger.LogInformation("MetricsService запущен. Начинаем мониторинг...");
+
+                while (!stoppingToken.IsCancellationRequested)
                 {
-                    var processed = _actionHub.GetProcessedCount(key);
-                    var errors = _actionHub.GetErrorCount(key);
+                    try
+                    {
+                        foreach (var key in _keys)
+                        {
+                            var processed = _actionHub.GetProcessedCount(key);
+                            var errors = _actionHub.GetErrorCount(key);
 
-                    // Используем структурированное логирование
-                    _logger.LogInformation(
-                        "📊 Метрика [{Key}]: Успешно = {Processed}, Ошибок = {Errors}",
-                        key, processed, errors);
+                            // Используем структурированное логирование
+                            _logger.LogInformation(
+                                "📊 Метрика [{Key}]: Успешно = {Processed}, Ошибок = {Errors}",
+                                key, processed, errors);
+                        }
+
+                        // Пауза между выводами статистики (например, каждые 3 секунды)
+                        await Task.Delay(5000, stoppingToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _logger.LogWarning("Metricservice: Operation will be stop due to the StoppingToken Request");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"MetricsService: Exception occurred {ex.Message}");
+                    }
                 }
-
-                // Пауза между выводами статистики (например, каждые 3 секунды)
-                await Task.Delay(3000, stoppingToken);
+            }
+            finally
+            {
+                _logger.LogInformation("MetricsService is shutting down gracefully...");
             }
         }
     }
