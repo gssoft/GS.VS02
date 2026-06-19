@@ -16,6 +16,7 @@ namespace ActionBlockHubDemo.Services
         private readonly string _handlerName;
         private readonly ILogger<DataHandler> _logger;
 
+
         public DataHandler(string handlerName, ILogger<DataHandler> logger)
         {
             _handlerName = handlerName;
@@ -40,12 +41,17 @@ namespace ActionBlockHubDemo.Services
         private readonly ILogger<DataProcessingService> _logger;
         // ИЗМЕНЕНИЕ: Используем интерфейс IBroadcastHub
         private readonly IBroadcastHub<string, MyDataType> _broadcastHub;
+        private readonly IActionBlockHub<string, MyDataType> _actionHub;
+
         private Timer? _timer;
 
-        public DataProcessingService(ILogger<DataProcessingService> logger, IBroadcastHub<string, MyDataType> broadcastHub)
+        public DataProcessingService(ILogger<DataProcessingService> logger,
+            IBroadcastHub<string, MyDataType> broadcastHub,
+            IActionBlockHub<string, MyDataType> actionHub)
         {
             _logger = logger;
             _broadcastHub = broadcastHub;
+            _actionHub = actionHub;
         }
 
         private int _counter = 0;
@@ -80,15 +86,35 @@ namespace ActionBlockHubDemo.Services
             _logger.LogInformation("DataProcessingService is stopping.");
             _timer?.Change(Timeout.Infinite, 0);
 
-            // Теперь мы можем корректно завершить работу и дождаться обработки всех сообщений
             _broadcastHub.Complete();
+            await _broadcastHub.Completion; // Ждем, пока все очереди опустеют
 
-            // Ждем, пока BroadcastBlock завершится, а благодаря PropagateCompletion, 
-            // сигнал уйдет дальше в ActionBlock.
-            await _broadcastHub.Completion;
+            // --- ИТОГОВЫЙ ОТЧЕТ ---
+            _logger.LogInformation("=== ИТОГОВАЯ СТАТИСТИКА ЗА СЕАНС ==================");
+            foreach (var key in new[] { "A", "B", "C" })
+            {
+                _logger.LogInformation("🏁 [{Key}]: Всего обработано = {Count}, Ошибок = {Errors}",
+                    key, _actionHub.GetProcessedCount(key), _actionHub.GetErrorCount(key));
+            }
+            _logger.LogInformation("====================================================");
 
             _logger.LogInformation("Сервис остановлен. Все сообщения обработаны.");
         }
+
+        //public async Task StopAsync1(CancellationToken cancellationToken)
+        //{
+        //    _logger.LogInformation("DataProcessingService is stopping.");
+        //    _timer?.Change(Timeout.Infinite, 0);
+
+        //    // Теперь мы можем корректно завершить работу и дождаться обработки всех сообщений
+        //    _broadcastHub.Complete();
+
+        //    // Ждем, пока BroadcastBlock завершится, а благодаря PropagateCompletion, 
+        //    // сигнал уйдет дальше в ActionBlock.
+        //    await _broadcastHub.Completion;
+
+        //    _logger.LogInformation("Сервис остановлен. Все сообщения обработаны.");
+        //}
 
         //public async Task StopAsync(CancellationToken cancellationToken)
         //{

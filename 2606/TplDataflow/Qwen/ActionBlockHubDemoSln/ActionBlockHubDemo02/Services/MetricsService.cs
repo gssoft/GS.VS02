@@ -3,6 +3,7 @@ using ActionBlockHubDemo.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Linq.Expressions;
 
 namespace ActionBlockHubDemo.Services
 {
@@ -48,12 +49,17 @@ namespace ActionBlockHubDemo.Services
                     catch (OperationCanceledException)
                     {
                         _logger.LogWarning("Metricservice: Operation will be stop due to the StoppingToken Request");
+                        break;
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, $"MetricsService: Exception occurred {ex.Message}");
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"MetricsService: Exception occurred {ex.Message}");
             }
             finally
             {
