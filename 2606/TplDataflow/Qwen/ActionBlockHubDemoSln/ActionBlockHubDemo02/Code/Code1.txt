@@ -1,0 +1,447 @@
+﻿26.06.19, Qwen
+----------------------
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-ActionBlockHubDemo02-40956175-08a8-4556-a53f-27ed25918609</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+  </ItemGroup>
+</Project>
+------------------------
+// Interfaces/Interfaces.cs
+
+using System.Threading.Tasks.Dataflow;
+
+public interface IBroadcastHub<TKey, TMessage> where TKey : notnull
+{
+    Task PublishAsync(TKey key, TMessage message);
+    IDisposable LinkTo(TKey key, ITargetBlock<TMessage> targetBlock, DataflowLinkOptions? linkOptions = null);
+    void Complete();
+    Task Completion { get; }
+}
+
+public interface IActionBlockHub<TKey, TMessage> where TKey : notnull
+{
+    Task PublishAsync(TKey key, TMessage message);
+    ITargetBlock<TMessage> GetTargetBlock(TKey key); // Метод для получения блока, чтобы на него можно было подписаться
+    void Complete();
+    Task Completion { get; }
+
+    // Метрики
+    long GetProcessedCount(TKey key);
+    long GetErrorCount(TKey key);
+}
+--------------------------
+// Models/MyDataTypes.cs
+
+namespace ActionBlockHubDemo.Models
+{
+    public class MyDataType
+    {
+        public required string Key { get; set; } // Ключ для маршрутизации (A, B, C)
+        public int Id { get; set; }
+        public required string Source { get; set; }
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+        public override string ToString()
+        {
+            return $"Id: {Id}, Key: {Key}, Source: {Source}, Time: {Timestamp:HH:mm:ss.fff}";
+        }
+    }
+}
+--------------------------------
+// Services/ActionBlockHub.cs
+
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
+
+namespace ActionBlockHubDemo.Services
+{
+    // 26.06.19
+    // 1. Добавляем реализацию интерфейса
+    public class ActionBlockHub<TKey, TMessage> : IActionBlockHub<TKey, TMessage> where TKey : notnull
+    {
+        private readonly ConcurrentDictionary<TKey, (ActionBlock<TMessage> Block, Task Completion)> _blocks = new();
+        private readonly ConcurrentDictionary<TKey, Func<TMessage, Task>> _handlers = new();
+
+        // Словарь для хранения счетчиков по каждому ключу
+        private readonly ConcurrentDictionary<TKey, (long Processed, long Errors)> _counters = new();
+
+        private readonly ILogger _logger; // Добавляем логгер
+
+        public ActionBlockHub(IEnumerable<TKey> keys,
+            Func<TKey, Func<TMessage, Task>> handlerFactory,
+            ILogger logger,
+            ExecutionDataflowBlockOptions? blockOptions = null)
+        {
+            _logger = logger;
+
+            if (keys == null || !keys.Any())
+                throw new ArgumentException("Список ключей не может быть пустым.", nameof(keys));
+
+            var options = blockOptions ?? new ExecutionDataflowBlockOptions();
+
+            foreach (var key in keys)
+            {
+                _counters[key] = (0, 0); // Инициализируем счетчики
+                var handler = handlerFactory(key);
+
+                var block = new ActionBlock<TMessage>(async msg =>
+                {
+                    try
+                    {
+                        await handler(msg).ConfigureAwait(false);
+                        _counters.AddOrUpdate(key, (1, 0), (_, c) => (c.Processed + 1, c.Errors));
+                    }
+                    catch (Exception ex)
+                    {
+                        // Теперь ошибка красиво пишется в общий лог приложения
+                        _logger.LogError(ex, "Ошибка в обработчике для ключа '{Key}' при обработке сообщения.", key);
+                        _counters.AddOrUpdate(key, (0, 1), (_, c) => (c.Processed, c.Errors + 1));
+                    }
+                }, options);
+
+                _blocks[key] = (block, block.Completion);
+            }
+        }
+
+        public long GetProcessedCount(TKey key) => _counters.TryGetValue(key, out var c) ? c.Processed : 0;
+        public long GetErrorCount(TKey key) => _counters.TryGetValue(key, out var c) ? c.Errors : 0;
+        
+
+        public Task PublishAsync(TKey key, TMessage message)
+        {
+            if (_blocks.TryGetValue(key, out var blockInfo))
+            {
+                if (!blockInfo.Block.Post(message))
+                    throw new InvalidOperationException($"Невозможно опубликовать сообщение. Блок для ключа '{key}' завершен.");
+                return Task.CompletedTask;
+            }
+            throw new KeyNotFoundException($"Канал с ключом '{key}' не найден.");
+        }
+
+        // 2. Добавляем метод для получения целевого блока (нужен для LinkTo)
+        public ITargetBlock<TMessage> GetTargetBlock(TKey key)
+        {
+            if (_blocks.TryGetValue(key, out var blockInfo))
+                return blockInfo.Block;
+
+            throw new KeyNotFoundException($"Блок для ключа '{key}' не найден.");
+        }
+
+        public void Complete()
+        {
+            foreach (var (_, blockInfo) in _blocks)
+                blockInfo.Block.Complete();
+        }
+
+        public Task Completion => Task.WhenAll(_blocks.Values.Select(bi => bi.Completion));
+
+
+    }
+}
+------------------------------
+// Services/BroadcastHub.cs
+
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
+
+namespace ActionBlockHubDemo.Services
+{
+    // 1. Добавляем реализацию интерфейса
+    public class BroadcastHub<TKey, TMessage> : IBroadcastHub<TKey, TMessage> where TKey : notnull
+    {
+        private readonly ConcurrentDictionary<TKey, BroadcastBlock<TMessage>> _broadcastBlocks = new();
+
+        public BroadcastHub(IEnumerable<TKey> keys)
+        {
+            if (keys == null || !keys.Any())
+                throw new ArgumentException("Список ключей не может быть пустым.", nameof(keys));
+
+            foreach (var key in keys)
+                _broadcastBlocks[key] = new BroadcastBlock<TMessage>(null);
+        }
+
+        public Task PublishAsync(TKey key, TMessage message)
+        {
+            if (_broadcastBlocks.TryGetValue(key, out var block))
+                return block.SendAsync(message);
+
+            throw new KeyNotFoundException($"Канал с ключом '{key}' не найден.");
+        }
+
+        public IDisposable LinkTo(TKey key, ITargetBlock<TMessage> targetBlock, DataflowLinkOptions? linkOptions = null)
+        {
+            if (_broadcastBlocks.TryGetValue(key, out var sourceBlock))
+            {
+                // Используем переданные опции (например, PropagateCompletion) или дефолтные
+                return sourceBlock.LinkTo(targetBlock, linkOptions ?? new DataflowLinkOptions());
+            }
+            throw new KeyNotFoundException($"Канал с ключом '{key}' не найден.");
+        }
+
+        // 2. Добавляем методы для корректного завершения (Graceful Shutdown)
+        public void Complete()
+        {
+            foreach (var block in _broadcastBlocks.Values)
+                block.Complete();
+        }
+
+        public Task Completion => Task.WhenAll(_broadcastBlocks.Values.Select(b => b.Completion));
+    }
+}
+----------------------------------------
+// ------------------------------------------
+// Services/DataProcessingService.cs
+
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using ActionBlockHubDemo.Models;
+using Microsoft.Extensions.Hosting; // Обязательно IHostedService
+using Microsoft.Extensions.Logging;
+
+namespace ActionBlockHubDemo.Services
+{
+    // Этот класс будет нашим "хэндлером". Он может иметь зависимости, состояние и т.д.
+    public class DataHandler
+    {
+        private readonly string _handlerName;
+        private readonly ILogger<DataHandler> _logger;
+
+
+        public DataHandler(string handlerName, ILogger<DataHandler> logger)
+        {
+            _handlerName = handlerName;
+            _logger = logger;
+        }
+
+        public async Task HandleAsync(MyDataType data)
+        {
+            _logger.LogInformation($"[{_handlerName}] НАЧАЛО обработки: {data}");
+
+            // Имитация тяжелой работы (I/O bound)
+            await Task.Delay(500);
+
+            _logger.LogInformation($"[{_handlerName}] КОНЕЦ обработки: {data}");
+        }
+    }
+
+    // --- ИЗМЕНЕННЫЙ DataProcessingService ---
+
+    public class DataProcessingService : IHostedService
+    {
+        private readonly ILogger<DataProcessingService> _logger;
+        // ИЗМЕНЕНИЕ: Используем интерфейс IBroadcastHub
+        private readonly IBroadcastHub<string, MyDataType> _broadcastHub;
+        private readonly IActionBlockHub<string, MyDataType> _actionHub;
+
+        private Timer? _timer;
+
+        public DataProcessingService(ILogger<DataProcessingService> logger,
+            IBroadcastHub<string, MyDataType> broadcastHub,
+            IActionBlockHub<string, MyDataType> actionHub)
+        {
+            _logger = logger;
+            _broadcastHub = broadcastHub;
+            _actionHub = actionHub;
+        }
+
+        private int _counter = 0;
+        private void SendData(object? state)
+        {
+            _counter++;
+
+            // Создаем и отправляем сообщения для каждого "канала"
+            // ИЗМЕНЕНИЕ: Используем _broadcastHub вместо _actionBlockHub
+            var dataA = new MyDataType { Id = _counter, Key = "A", Source = "Генерация" };
+            var dataB = new MyDataType { Id = _counter, Key = "B", Source = "Генерация" };
+            var dataC = new MyDataType { Id = _counter, Key = "C", Source = "Генерация" };
+
+            // Публикуем через BroadcastHub
+            _broadcastHub.PublishAsync("A", dataA);
+            _broadcastHub.PublishAsync("B", dataB);
+            _broadcastHub.PublishAsync("C", dataC);
+
+            _logger.LogInformation($"Сгенерированы сообщения #{_counter} для A, B и C");
+        }
+
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            _logger.LogInformation("DataProcessingService is starting.");
+            // Таймер будет "генерировать" данные каждую секунду
+            _timer = new Timer(SendData, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+            return Task.CompletedTask;
+        }
+
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            _logger.LogInformation("DataProcessingService is stopping.");
+            _timer?.Change(Timeout.Infinite, 0);
+
+            _broadcastHub.Complete();
+            await _broadcastHub.Completion; // Ждем, пока все очереди опустеют
+
+            // --- ИТОГОВЫЙ ОТЧЕТ ---
+            _logger.LogInformation("=== ИТОГОВАЯ СТАТИСТИКА ЗА СЕАНС ==================");
+            foreach (var key in new[] { "A", "B", "C" })
+            {
+                _logger.LogInformation("🏁 [{Key}]: Всего обработано = {Count}, Ошибок = {Errors}",
+                    key, _actionHub.GetProcessedCount(key), _actionHub.GetErrorCount(key));
+            }
+            _logger.LogInformation("====================================================");
+
+            _logger.LogInformation("Сервис остановлен. Все сообщения обработаны.");
+        }
+    }   
+}
+-------------------------------------
+// Services/MetricsService.cs
+
+using ActionBlockHubDemo.Models;
+using ActionBlockHubDemo.Services;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Linq.Expressions;
+
+namespace ActionBlockHubDemo.Services
+{
+    public class MetricsService : BackgroundService
+    {
+        private readonly ILogger<MetricsService> _logger;
+        private readonly IActionBlockHub<string, MyDataType> _actionHub;
+        private readonly IEnumerable<string> _keys = new[] { "A", "B", "C" };
+
+        public MetricsService(ILogger<MetricsService> logger, IActionBlockHub<string, MyDataType> actionHub)
+        {
+            _logger = logger;
+            _actionHub = actionHub;
+        }
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            try
+            {
+                // Небольшая задержка при старте, чтобы не мешать логам инициализации
+                await Task.Delay(2000, stoppingToken);
+
+                _logger.LogInformation("MetricsService запущен. Начинаем мониторинг...");
+
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        foreach (var key in _keys)
+                        {
+                            var processed = _actionHub.GetProcessedCount(key);
+                            var errors = _actionHub.GetErrorCount(key);
+
+                            // Используем структурированное логирование
+                            _logger.LogInformation(
+                                "📊 Метрика [{Key}]: Успешно = {Processed}, Ошибок = {Errors}",
+                                key, processed, errors);
+                        }
+
+                        // Пауза между выводами статистики (например, каждые 3 секунды)
+                        await Task.Delay(5000, stoppingToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _logger.LogWarning("Metricservice: Operation will be stop due to the StoppingToken Request");
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"MetricsService: Exception occurred {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"MetricsService: Exception occurred {ex.Message}");
+            }
+            finally
+            {
+                _logger.LogInformation("MetricsService is shutting down gracefully...");
+            }
+        }
+    }
+}
+--------------------------------------
+// Program.cs
+
+using ActionBlockHubDemo.Models;
+using ActionBlockHubDemo.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using System.Threading.Tasks.Dataflow;
+
+var builder = Host.CreateDefaultBuilder(args);
+
+builder.ConfigureServices((hostContext, services) =>
+{
+    services.AddHostedService<DataProcessingService>();
+
+    // РЕГИСТРИРУЕМ НАШ НОВЫЙ СЕРВИС МОНИТОРИНГА
+    services.AddHostedService<MetricsService>();
+
+    services.AddTransient<Func<string, Func<MyDataType, Task>>>(serviceProvider => key =>
+    {
+        var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+        var logger = loggerFactory.CreateLogger<DataHandler>();
+        var dataHandler = new DataHandler(key, logger);
+        return dataHandler.HandleAsync;
+    });
+
+    // РЕГИСТРИРУЕМ ИНТЕРФЕЙС IActionBlockHub
+    services.AddSingleton<IActionBlockHub<string, MyDataType>>(serviceProvider =>
+    {
+        var handlerFactory = serviceProvider.GetRequiredService<Func<string, Func<MyDataType, Task>>>();
+        // Получаем логгер для самого ActionBlockHub
+        var logger = serviceProvider.GetRequiredService<ILogger<ActionBlockHub<string, MyDataType>>>();
+
+        var keys = new List<string> { "A", "B", "C" };
+        var blockOptions = new ExecutionDataflowBlockOptions { BoundedCapacity = 100, MaxDegreeOfParallelism = 1 };
+
+        return new ActionBlockHub<string, MyDataType>(keys, handlerFactory, logger, blockOptions);
+    });
+
+    // РЕГИСТРИРУЕМ ИНТЕРФЕЙС IBroadcastHub
+    services.AddSingleton<IBroadcastHub<string, MyDataType>>(sp =>
+        new BroadcastHub<string, MyDataType>(new List<string> { "A", "B", "C" }));
+});
+
+// ... логирование ...
+
+var host = builder.Build();  // !!!!! Ошибка
+
+// Теперь эта строка отработает успешно!
+var actionHub = host.Services.GetRequiredService<IActionBlockHub<string, MyDataType>>();
+var broadcastHub = host.Services.GetRequiredService<IBroadcastHub<string, MyDataType>>();
+
+// Связываем хабы
+foreach (var key in new[] { "A", "B", "C" })
+{
+    broadcastHub.LinkTo(key, actionHub.GetTargetBlock(key), new DataflowLinkOptions { PropagateCompletion = true });
+}
+
+await host.RunAsync();
+-------------------------------------------
+
+
+
