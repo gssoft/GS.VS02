@@ -1,0 +1,177 @@
+﻿1. Критическая ошибка: Task.CompletedTask в PublishAsync
+csharp
+public Task PublishAsync(TKey key, TMessage message)
+{
+    if (_blocks.TryGetValue(key, out var blockInfo))
+    {
+        if (!blockInfo.Block.Post(message))
+            throw new InvalidOperationException(...);
+        return Task.CompletedTask; // ❌ Возвращаем завершённую задачу, хотя сообщение ещё не обработано
+    }
+    throw new KeyNotFoundException(...);
+}
+Решение:
+
+csharp
+public async Task PublishAsync(TKey key, TMessage message)
+{
+    if (_blocks.TryGetValue(key, out var blockInfo))
+    {
+        if (!await blockInfo.Block.SendAsync(message))
+            throw new InvalidOperationException($"Невозможно опубликовать сообщение. Блок для ключа '{key}' завершен или переполнен.");
+    }
+    else
+        throw new KeyNotFoundException($"Канал с ключом '{key}' не найден.");
+}
+2. Проблема в генерации данных (не ожидается завершение)
+csharp
+private void SendData(object? state)
+{
+    // ...
+    _broadcastHub.PublishAsync("A", dataA); // ❌ Не ожидаем завершения
+    _broadcastHub.PublishAsync("B", dataB);
+    _broadcastHub.PublishAsync("C", dataC);
+}
+Решение:
+
+csharp
+private async void SendData(object? state)
+{
+    try
+    {
+        _counter++;
+        var dataA = new MyDataType { Id = _counter, Key = "A", Source = "Генерация" };
+        var dataB = new MyDataType { Id = _counter, Key = "B", Source = "Генерация" };
+        var dataC = new MyDataType { Id = _counter, Key = "C", Source = "Генерация" };
+
+        await Task.WhenAll(
+            _broadcastHub.PublishAsync("A", dataA),
+            _broadcastHub.PublishAsync("B", dataB),
+            _broadcastHub.PublishAsync("C", dataC)
+        );
+
+        _logger.LogInformation($"Сгенерированы сообщения #{_counter} для A, B и C");
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Ошибка при отправке данных");
+    }
+}
+3. Отсутствие Task.CompletedTask в методе BroadcastHub.PublishAsync
+csharp
+public Task PublishAsync(TKey key, TMessage message)
+{
+    if (_broadcastBlocks.TryGetValue(key, out var block))
+        return block.SendAsync(message); // ✅ Правильно, возвращаем Task
+    throw new KeyNotFoundException(...);
+}
+Здесь всё верно, в отличие от ActionBlockHub.
+
+4. Проблема с PropagateCompletion и множественными подписчиками
+csharp
+broadcastHub.LinkTo(key, actionHub.GetTargetBlock(key), 
+    new DataflowLinkOptions { PropagateCompletion = true });
+Когда BroadcastHub вызывает Complete(), это автоматически завершит ActionBlock, что правильно. Но нужно убедиться, что ActionBlockHub.Complete() тоже вызывается (или убрать, если полагаемся на propagation).
+
+Рекомендация: Убрать вызов _broadcastHub.Complete() в StopAsync, так как propagation сделает это автоматически:
+
+csharp
+public async Task StopAsync(CancellationToken cancellationToken)
+{
+    _logger.LogInformation("DataProcessingService is stopping.");
+    _timer?.Change(Timeout.Infinite, 0);
+
+    // Завершаем ActionBlockHub (он распространит завершение на BroadcastHub через propagation)
+    _actionHub.Complete();
+    await _actionHub.Completion;
+
+    // ... вывод статистики ...
+}
+5. Потенциальная гонка данных в DataProcessingService
+Если StopAsync вызывается во время выполнения SendData, может возникнуть исключение. Добавьте CancellationToken или флаг:
+
+csharp
+private volatile bool _isStopping;
+
+private async void SendData(object? state)
+{
+    if (_isStopping) return;
+    // ...
+}
+
+public async Task StopAsync(CancellationToken cancellationToken)
+{
+    _isStopping = true;
+    // ...
+}
+📊 Полный исправленный код ключевых частей
+csharp
+// Services/ActionBlockHub.cs (исправленный метод)
+public async Task PublishAsync(TKey key, TMessage message)
+{
+    if (_blocks.TryGetValue(key, out var blockInfo))
+    {
+        if (!await blockInfo.Block.SendAsync(message))
+            throw new InvalidOperationException(
+                $"Невозможно опубликовать сообщение. Блок для ключа '{key}' завершен или переполнен.");
+    }
+    else
+        throw new KeyNotFoundException($"Канал с ключом '{key}' не найден.");
+}
+
+// Services/DataProcessingService.cs (исправленная генерация)
+private int _counter = 0;
+private volatile bool _isStopping;
+
+private async void SendData(object? state)
+{
+    if (_isStopping) return;
+    
+    try
+    {
+        _counter++;
+        var dataA = new MyDataType { Id = _counter, Key = "A", Source = "Генерация" };
+        var dataB = new MyDataType { Id = _counter, Key = "B", Source = "Генерация" };
+        var dataC = new MyDataType { Id = _counter, Key = "C", Source = "Генерация" };
+
+        await Task.WhenAll(
+            _broadcastHub.PublishAsync("A", dataA),
+            _broadcastHub.PublishAsync("B", dataB),
+            _broadcastHub.PublishAsync("C", dataC)
+        );
+
+        _logger.LogInformation($"Сгенерированы сообщения #{_counter} для A, B и C");
+    }
+    catch (Exception ex) when (ex is not OperationCanceledException)
+    {
+        _logger.LogError(ex, "Ошибка при отправке данных");
+    }
+}
+
+public async Task StopAsync(CancellationToken cancellationToken)
+{
+    _logger.LogInformation("DataProcessingService is stopping.");
+    _isStopping = true;
+    _timer?.Change(Timeout.Infinite, 0);
+
+    _actionHub.Complete(); // Завершаем ActionBlockHub
+    await _actionHub.Completion; // Ждем обработки всех сообщений
+
+    // ИТОГОВЫЙ ОТЧЕТ
+    _logger.LogInformation("=== ИТОГОВАЯ СТАТИСТИКА ЗА СЕАНС ==================");
+    foreach (var key in new[] { "A", "B", "C" })
+    {
+        _logger.LogInformation("🏁 [{Key}]: Всего обработано = {Count}, Ошибок = {Errors}",
+            key, _actionHub.GetProcessedCount(key), _actionHub.GetErrorCount(key));
+    }
+    _logger.LogInformation("====================================================");
+}
+✅ Архитектурные замечания
+Хорошая идея с разделением BroadcastHub и ActionBlockHub — это даёт гибкость.
+
+Метрики через отдельный сервис — правильный подход для production.
+
+Использование BoundedCapacity = 100 — защита от переполнения памяти.
+
+В целом, архитектура хорошая, нужно лишь исправить асинхронные вызовы и добавить защиту от гонок при остановке.
+

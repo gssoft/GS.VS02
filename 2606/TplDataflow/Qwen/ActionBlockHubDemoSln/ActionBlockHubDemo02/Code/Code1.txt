@@ -38,7 +38,7 @@ public interface IActionBlockHub<TKey, TMessage> where TKey : notnull
     long GetErrorCount(TKey key);
 }
 --------------------------
-// Models/MyDataTypes.cs
+// Models/MyDataType.cs
 
 namespace ActionBlockHubDemo.Models
 {
@@ -442,6 +442,4 @@ foreach (var key in new[] { "A", "B", "C" })
 
 await host.RunAsync();
 -------------------------------------------
-
-
 

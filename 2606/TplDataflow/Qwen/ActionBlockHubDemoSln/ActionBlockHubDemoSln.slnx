@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="ActionBlockHubDemo01/ActionBlockHubDemo01.csproj" />
   <Project Path="ActionBlockHubDemo02/ActionBlockHubDemo02.csproj" />
+  <Project Path="ActionBlockHubDemo03/ActionBlockHubDemo03.csproj" Id="9297c2b8-4047-483b-b08e-8df28e71aac1" />
 </Solution>
