@@ -2,4 +2,6 @@
   <Project Path="ActionBlockHubDemo01/ActionBlockHubDemo01.csproj" />
   <Project Path="ActionBlockHubDemo02/ActionBlockHubDemo02.csproj" />
   <Project Path="ActionBlockHubDemo03/ActionBlockHubDemo03.csproj" Id="9297c2b8-4047-483b-b08e-8df28e71aac1" />
+  <Project Path="TestProject01/TestProject01.csproj" Id="c2425ddd-7828-4e8c-a8dc-207321fbb3de" />
+  <Project Path="TestProject03/TestProject03.csproj" Id="fe5dd51c-28cc-4a5a-9160-d6e48707ce9d" />
 </Solution>

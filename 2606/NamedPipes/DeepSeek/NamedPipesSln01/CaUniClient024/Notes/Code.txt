@@ -1,4 +1,21 @@
-﻿// Program.cs
+﻿26.06.20
+-----------------------------------
+Client
+------------------------------------
+D:\Projects\VS02\2606\NamedPipes\DeepSeek\NamedPipesSln01\CaUniClient024\CaUniClient024.csproj
+------------------------------------
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
+------------------------------------
+// Program.cs
 
 using System.IO.Pipes;
 using System.Text.Json;
@@ -206,4 +223,4 @@ class Program
         public string[] Tickers { get; set; } = Array.Empty<string>();
     }
 }
-
+-----------------------------------------------------------------------
