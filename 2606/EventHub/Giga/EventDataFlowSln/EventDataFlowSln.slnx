@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="EventDataFlow01/EventDataFlow01.csproj" />
+  <Project Path="EventDataFlow02/EventDataFlow02.csproj" />
+</Solution>

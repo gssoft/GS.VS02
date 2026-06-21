@@ -1,5 +1,6 @@
 ﻿// MyWorker.cs
 
+using EmailService01;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -10,6 +11,7 @@ using System.Threading.Tasks;
 // Наследуемся от BackgroundService, чтобы получить готовую инфраструктуру для фоновой задачи.
 public class MyWorker : BackgroundService
 {
+    private const string Message = "MyWorker: ";
     private readonly ILogger<MyWorker> _logger;
     private readonly IEmailSender _emailSender;
 
@@ -48,11 +50,12 @@ public class MyWorker : BackgroundService
                 catch (OperationCanceledException)
                 {
                     // Логируем, если была отменена сама операция публикации.
-                    _logger.LogWarning("Publishing of event  was cancelled.");
+                    _logger.LogWarning("Publishing of event was cancelled by StoppingToken.");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex.Message, "Error occurred while publishing event .");
+                    _logger.LogError(message: ex.Message, 
+                        args: "Error occurred while publishing event .");
                 }
             }
 
@@ -60,7 +63,9 @@ public class MyWorker : BackgroundService
         }
         finally
         {
-            _logger.LogInformation("Worker has been stopped.");
+            _logger.LogInformation(
+                message: Message,
+                args: "Worker has been stopped.");
         }
     }
 }
