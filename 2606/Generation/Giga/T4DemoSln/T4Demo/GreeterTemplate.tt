@@ -1,0 +1,30 @@
+﻿<#@ template debug="false" hostspecific="true" language="C#" #>
+<#@ output extension=".generated.cs" #>
+
+<#@ assembly name="System.Runtime.dll" #>
+<#@ assembly name="netstandard.dll" #>
+<#@ assembly name="System.Collections.dll" #>
+<#@ assembly name="System.Memory.dll" #>
+
+<#
+var names = new string[] { "Иван", "Мария" };
+
+foreach(var name in names)
+{
+#> 
+
+public class Greeter_<#= name #>
+{
+public void SayHello()
+{
+Console.WriteLine("Привет, <#= name #>!");
+}
+}
+
+<#
+}
+#>
+
+
+
+

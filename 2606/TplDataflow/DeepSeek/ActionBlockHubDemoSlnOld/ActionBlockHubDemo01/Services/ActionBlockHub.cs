@@ -13,7 +13,7 @@ namespace ActionBlockHubDemo.Services
     // Это убирает предупреждения CS8714 и гарантирует, что ключи не будут null.
     public class ActionBlockHub<TKey, TMessage> where TKey : notnull
     {
-        private readonly ConcurrentDictionary<TKey, (ActionBlock<TMessage> Block, Task Completion) > _blocks = new();
+        private readonly ConcurrentDictionary<TKey, (ActionBlock<TMessage> Block, Task Completion)> _blocks = new();
         private readonly ConcurrentDictionary<TKey, Func<TMessage, Task>> _handlers = new();
 
         public ActionBlockHub(IEnumerable<TKey> keys, Func<TKey, Func<TMessage, Task>> handlerFactory)

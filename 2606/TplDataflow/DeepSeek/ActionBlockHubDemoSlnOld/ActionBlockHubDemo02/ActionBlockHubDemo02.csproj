@@ -1,10 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
+<Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>dotnet-ActionBlockHubDemo01-ffecea26-fb82-4e58-a7b1-dd924b657bd6</UserSecretsId>
+    <UserSecretsId>dotnet-ActionBlockHubDemo02-40956175-08a8-4556-a53f-27ed25918609</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

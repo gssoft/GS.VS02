@@ -59,7 +59,7 @@ public class MyWorker : BackgroundService
                 }
             }
 
-            _logger.LogInformation("Worker has been stopped.");
+            _logger.LogInformation("Worker try to stopped.");
         }
         finally
         {
