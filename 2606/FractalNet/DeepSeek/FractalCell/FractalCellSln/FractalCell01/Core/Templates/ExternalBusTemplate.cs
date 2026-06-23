@@ -1,4 +1,6 @@
-﻿// Шаблон внешней шины
+﻿// Core/Templates/ExternalBusTemplate.cs
+// Шаблон внешней шины
+
 public abstract class ExternalBusTemplate : IExternalBus
 {
     protected readonly BusConfiguration Config;

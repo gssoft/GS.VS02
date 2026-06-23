@@ -1,4 +1,7 @@
-﻿// Шаблон типовой ячейки
+﻿
+// Core/Templates/FractalCellTemplate.cs
+// Шаблон типовой ячейки
+
 public abstract class FractalCellTemplate<TInternalBus, TExternalBus>
     : BackgroundService
     where TInternalBus : IInternalBus

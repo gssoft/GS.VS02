@@ -1,4 +1,6 @@
-﻿public interface IInternalBus
+﻿// Core/Interface/IInternalBus.cs
+
+public interface IInternalBus
 {
     string BusId { get; }
     Task PublishAsync<TEvent>(TEvent @event) where TEvent : IApplicationEvent;

@@ -1,4 +1,6 @@
-﻿public class ChannelFractalCell : FractalCellTemplate<ChannelInternalBus, ChannelExternalBus>
+﻿// Implementations/Channels/ChannelFractalCell.cs
+
+public class ChannelFractalCell : FractalCellTemplate<ChannelInternalBus, ChannelExternalBus>
 {
     private readonly List<ChannelBackgroundService> _services = new();
 

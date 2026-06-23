@@ -1,3 +1,6 @@
 <Solution>
+  <Project Path="CA_FractalBlock01/CA_FractalBlock01.csproj" Id="99d5ad24-ccf9-48da-a85c-b77e8ccdee50" />
+  <Project Path="FractalBlock01/FractalBlock01.csproj" Id="924a3398-9ee7-4bf9-8600-c0b2a10845a2" />
   <Project Path="FractalCell01/FractalCell01.csproj" />
+  <Project Path="FractalCell02/FractalCell02.csproj" Id="74732680-d67c-406b-a4d8-f186e22bde56" />
 </Solution>

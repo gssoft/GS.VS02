@@ -1,4 +1,6 @@
-﻿using System.Threading.Channels;
+﻿// // Implementations/Channels/ChannelInternalBus.cs
+
+using System.Threading.Channels;
 
 public class ChannelInternalBus : InternalBusTemplate
 {

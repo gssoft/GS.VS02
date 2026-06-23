@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Hosting/CellFactory.cs
+
+using System;
 using System.Collections.Generic;
 using System.Text;
 

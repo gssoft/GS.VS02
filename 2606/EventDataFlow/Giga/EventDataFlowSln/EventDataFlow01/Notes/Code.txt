@@ -1,0 +1,24 @@
+﻿26.06.20
+----------------------------------------
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-EventDataFlow01-5e4f5fb4-acde-461b-a932-697fecab4059</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
+  </ItemGroup>
+</Project>
+------------------------------------------------
+// IApplicationEvent.cs
+public interface IApplicationEvent { }
+
+// Пример события
+public record UserRegisteredEvent(string Username) : IApplicationEvent;
+-------------------------------------------------
