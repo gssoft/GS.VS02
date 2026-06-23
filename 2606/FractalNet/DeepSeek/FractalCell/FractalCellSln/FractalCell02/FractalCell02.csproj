@@ -12,14 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Core\Configuration\" />
-    <Folder Include="Core\Contracts\" />
-    <Folder Include="Core\Interfaces\" />
-    <Folder Include="Core\Templates\" />
     <Folder Include="Hosting\" />
-    <Folder Include="Implementations\Channels\" />
-    <Folder Include="Implementations\TplDataflow\" />
-    <Folder Include="Models\" />
     <Folder Include="Templates\" />
   </ItemGroup>
 </Project>
