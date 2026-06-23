@@ -1,4 +1,6 @@
-﻿public record BusConfiguration
+﻿// Core/Contracts/BusConfiguration.cs
+
+public record BusConfiguration
 {
     public int Capacity { get; init; } = 1000;
     public int MaxParallelism { get; init; } = 4;

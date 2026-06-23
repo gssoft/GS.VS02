@@ -1,4 +1,6 @@
-﻿public class Unsubscriber : IDisposable
+﻿// Core/Common/Unsubscriber.cs
+
+public class Unsubscriber : IDisposable
 {
     private readonly Action _unsubscribeAction;
     private bool _disposed;

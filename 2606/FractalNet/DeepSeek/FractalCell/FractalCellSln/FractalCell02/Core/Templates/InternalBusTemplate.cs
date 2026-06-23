@@ -1,4 +1,6 @@
-﻿// Шаблон внутренней шины
+﻿// Core/Templates/InternalBusTemplate.cs
+
+// Шаблон внутренней шины
 public abstract class InternalBusTemplate : IInternalBus
 {
     protected readonly BusConfiguration Config;

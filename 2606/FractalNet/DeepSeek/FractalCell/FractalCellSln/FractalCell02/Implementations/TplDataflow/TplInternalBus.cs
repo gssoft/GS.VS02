@@ -1,4 +1,6 @@
-﻿using System.Threading.Tasks.Dataflow;
+﻿// Implementations/TplDataflow/TplInternalBus.cs
+
+using System.Threading.Tasks.Dataflow;
 
 public class TplInternalBus : InternalBusTemplate
 {

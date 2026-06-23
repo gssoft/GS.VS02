@@ -1,4 +1,6 @@
-﻿public interface IExternalBus
+﻿// Core/Interfaces/IExternalBus.cs
+
+public interface IExternalBus
 {
     string BusId { get; }
     Task ConnectToHubAsync(IFractalEventHub hub, string cellId);

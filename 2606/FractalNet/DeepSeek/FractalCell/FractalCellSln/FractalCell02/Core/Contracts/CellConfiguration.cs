@@ -1,4 +1,5 @@
-﻿public record CellConfiguration
+﻿// Core/Contracts/CellConfiguration.cs
+public record CellConfiguration
 {
     public string CellId { get; init; } = string.Empty;
   //  public CellAddress? Address { get; init; }

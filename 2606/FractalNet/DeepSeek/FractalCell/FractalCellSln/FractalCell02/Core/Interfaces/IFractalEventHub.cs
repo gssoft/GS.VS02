@@ -1,4 +1,5 @@
 ﻿// Interface/IFractalEventHub.cs
+
 using System.Threading.Channels;
 
 public interface IFractalEventHub

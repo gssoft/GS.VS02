@@ -1,4 +1,6 @@
-﻿using System.Threading.Tasks.Dataflow;
+﻿// Implementations/TplDataflow/TplFractalCell.cs
+
+using System.Threading.Tasks.Dataflow;
 
 public class TplFractalCell : FractalCellTemplate<TplInternalBus, TplExternalBus>
 {

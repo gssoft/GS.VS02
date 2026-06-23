@@ -1,4 +1,6 @@
-﻿using System.Threading.Tasks.Dataflow;
+﻿// Implementations/TplDataflow/TplExternalBus.cs
+
+using System.Threading.Tasks.Dataflow;
 
 public class TplExternalBus : ExternalBusTemplate
 {

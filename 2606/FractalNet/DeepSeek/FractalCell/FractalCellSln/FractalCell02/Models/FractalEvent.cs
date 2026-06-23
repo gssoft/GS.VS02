@@ -1,4 +1,4 @@
-﻿// Core/Model/FractalEvent.cs - событие для перехода между ячейками фрактала
+﻿// Model/FractalEvent.cs - событие для перехода между ячейками фрактала
 public record FractalEvent(
     string EventId,
     DateTime Timestamp,
