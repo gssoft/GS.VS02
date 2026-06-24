@@ -1,0 +1,12 @@
+﻿using FractalCell.Core.Interfaces;
+using Microsoft.Extensions.Hosting;
+
+namespace FractalCell.Core.Interfaces;
+
+public interface IFractalCell : IHostedService
+{
+    string CellId { get; }
+    IInternalBus InternalBus { get; }
+    IExternalBus ExternalBus { get; }
+    Task InitializeAsync();
+}
