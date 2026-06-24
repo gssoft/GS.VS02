@@ -1,5 +1,5 @@
-﻿using System.Collections.Concurrent;
-using System.Threading.Channels;
+﻿using System.Threading.Channels;
+using System.Collections.Concurrent;
 using FractalCell02.Core.Common;
 using FractalCell02.Core.Configuration;
 using FractalCell02.Core.Interfaces;
@@ -61,28 +61,65 @@ public class ChannelInternalBus : InternalBusTemplate
             }
         });
     }
-
     public override async Task StartAsync(CancellationToken ct)
     {
-        await foreach (var @event in _channel.Reader.ReadAllAsync(ct))
+        // Запускаем обработку событий в фоне, НЕ блокируем
+        _ = Task.Run(async () =>
         {
-            var eventType = @event.GetType();
-
-            if (_handlers.TryGetValue(eventType, out var handlers))
+            try
             {
-                var handlersCopy = handlers.ToList();
+                await foreach (var @event in _channel.Reader.ReadAllAsync(ct))
+                {
+                    var eventType = @event.GetType();
 
-                if (handlersCopy.Count == 1)
-                {
-                    await handlersCopy[0](@event);
-                }
-                else if (handlersCopy.Count > 1)
-                {
-                    await Task.WhenAll(handlersCopy.Select(h => h(@event)));
+                    if (_handlers.TryGetValue(eventType, out var handlers))
+                    {
+                        var handlersCopy = handlers.ToList();
+
+                        if (handlersCopy.Count == 1)
+                        {
+                            await handlersCopy[0](@event);
+                        }
+                        else if (handlersCopy.Count > 1)
+                        {
+                            await Task.WhenAll(handlersCopy.Select(h => h(@event)));
+                        }
+                    }
                 }
             }
-        }
+            catch (OperationCanceledException)
+            {
+                // Нормальное завершение
+            }
+            catch (Exception ex)
+            {
+                // Логируем ошибку
+            }
+        }, ct);
+
+        await Task.CompletedTask;
     }
+    //public override async Task StartAsync(CancellationToken ct)
+    //{
+    //    await foreach (var @event in _channel.Reader.ReadAllAsync(ct))
+    //    {
+    //        var eventType = @event.GetType();
+
+    //        if (_handlers.TryGetValue(eventType, out var handlers))
+    //        {
+    //            var handlersCopy = handlers.ToList();
+
+    //            if (handlersCopy.Count == 1)
+    //            {
+    //                await handlersCopy[0](@event);
+    //            }
+    //            else if (handlersCopy.Count > 1)
+    //            {
+    //                await Task.WhenAll(handlersCopy.Select(h => h(@event)));
+    //            }
+    //        }
+    //    }
+    //}
 
     public override Task StopAsync()
     {
