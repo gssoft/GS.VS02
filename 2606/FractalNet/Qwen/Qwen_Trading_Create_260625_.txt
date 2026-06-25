@@ -1,0 +1,1629 @@
+Шаг 5: Создаем трейдинговые события
+Создайте папку Trading/Events/ и файл Trading/Events/TradingEvents.cs:
+using FractalCell02.Core.Interfaces;
+
+namespace FractalCell02.Trading.Events;
+
+public enum OrderSide { Buy, Sell }
+public enum OrderType { Market, Limit }
+public enum OrderStatus { Pending, Filled, Cancelled, PartiallyFilled }
+
+/// <summary>
+/// Котировка (Тик) - генерируется MarketDataProvider и рассылается всем
+/// </summary>
+public record QuoteEvent(
+    string EventId,
+    DateTime Timestamp,
+    string Symbol,
+    decimal Bid,
+    decimal Ask,
+    decimal Last,
+    long Volume
+) : IApplicationEvent
+{
+    public decimal MidPrice => (Bid + Ask) / 2m;
+    public decimal Spread => Ask - Bid;
+}
+
+/// <summary>
+/// Заявка на создание ордера - приходит от клиента/UI
+/// </summary>
+public record CreateOrderCommand(
+    string EventId,
+    DateTime Timestamp,
+    string ClientId,
+    string Symbol,
+    decimal Price,
+    decimal Quantity,
+    OrderSide Side,
+    OrderType Type
+) : IApplicationEvent;
+
+/// <summary>
+/// Ордер (Заявка) - создается OrderGateway и отправляется в MatchingEngine
+/// </summary>
+public record OrderEvent(
+    string EventId,
+    DateTime Timestamp,
+    string OrderId,
+    string ClientId,
+    string Symbol,
+    decimal Price,
+    decimal Quantity,
+    decimal FilledQuantity,
+    OrderSide Side,
+    OrderType Type,
+    OrderStatus Status
+) : IApplicationEvent
+{
+    public decimal RemainingQuantity => Quantity - FilledQuantity;
+    public bool IsFilled => FilledQuantity >= Quantity;
+}
+
+/// <summary>
+/// Сделка (Trade) - создается MatchingEngine при исполнении ордера
+/// </summary>
+public record TradeEvent(
+    string EventId,
+    DateTime Timestamp,
+    string TradeId,
+    string OrderId,
+    string ClientId,
+    string Symbol,
+    decimal Price,
+    decimal Quantity,
+    OrderSide Side
+) : IApplicationEvent
+{
+    public decimal TotalCost => Price * Quantity;
+}
+
+/// <summary>
+/// Обновление позиции - отправляется Portfolio после обработки Trade
+/// </summary>
+public record PositionUpdateEvent(
+    string EventId,
+    DateTime Timestamp,
+    string ClientId,
+    string Symbol,
+    decimal Position,
+    decimal AveragePrice,
+    decimal RealizedPnL,
+    decimal UnrealizedPnL
+) : IApplicationEvent;
+
+/// <summary>
+/// Отмена ордера
+/// </summary>
+public record CancelOrderCommand(
+    string EventId,
+    DateTime Timestamp,
+    string OrderId,
+    string ClientId
+) : IApplicationEvent;
+----------
+Шаг 6: Создаем трейдинговые поведения
+Создайте папку Trading/Behaviors/ и следующие файлы:
+Trading/Behaviors/QuoteGeneratorBehavior.cs:
+using FractalCell02.Core.Behaviors;
+using FractalCell02.Core.Interfaces;
+using FractalCell02.Trading.Events;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCell02.Trading.Behaviors;
+
+/// <summary>
+/// Генератор котировок - симулирует рыночные данные
+/// </summary>
+public class QuoteGeneratorBehavior : ICellBehavior
+{
+    private readonly string _symbol;
+    private decimal _currentPrice;
+    private readonly Random _random = new();
+    private readonly decimal _volatility;
+    private readonly int _delayMs;
+    private Task? _generatorTask;
+
+    public QuoteGeneratorBehavior(
+        string symbol,
+        decimal startPrice,
+        decimal volatility = 0.01m,
+        int delayMs = 500)
+    {
+        _symbol = symbol;
+        _currentPrice = startPrice;
+        _volatility = volatility;
+        _delayMs = delayMs;
+    }
+
+    public Task OnStartAsync(ICellContext context)
+    {
+        context.Logger.LogInformation(
+            "📈 QuoteGenerator starting for {Symbol} at price {Price}",
+            _symbol, _currentPrice);
+
+        _generatorTask = Task.Run(async () =>
+        {
+            while (!context.StoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    // Random Walk с mean reversion
+                    var change = (decimal)(_random.NextDouble() - 0.5) * _volatility * _currentPrice;
+                    _currentPrice += change;
+                    _currentPrice = Math.Max(_currentPrice, 0.01m);
+
+                    var spread = _currentPrice * 0.001m; // 0.1% спред
+                    var volume = _random.Next(100, 10000);
+
+                    var quote = new QuoteEvent(
+                        EventId: Guid.NewGuid().ToString(),
+                        Timestamp: DateTime.UtcNow,
+                        Symbol: _symbol,
+                        Bid: _currentPrice - spread,
+                        Ask: _currentPrice + spread,
+                        Last: _currentPrice,
+                        Volume: volume
+                    );
+
+                    // Broadcast всем заинтересованным
+                    await context.ExternalBus.BroadcastAsync(quote);
+
+                    context.Logger.LogDebug(
+                        "📊 Quote: {Symbol} Bid={Bid:F2} Ask={Ask:F2} Last={Last:F2}",
+                        _symbol, quote.Bid, quote.Ask, quote.Last);
+
+                    await Task.Delay(_delayMs, context.StoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    context.Logger.LogError(ex, "Error generating quote");
+                    await Task.Delay(1000, context.StoppingToken);
+                }
+            }
+        }, context.StoppingToken);
+
+        return Task.CompletedTask;
+    }
+
+    public Task OnMessageAsync(IApplicationEvent @event, ICellContext context)
+    {
+        // Генератор котировок не обрабатывает входящие сообщения
+        return Task.CompletedTask;
+    }
+
+    public async Task OnStopAsync(ICellContext context)
+    {
+        context.Logger.LogInformation("📉 QuoteGenerator stopping for {Symbol}", _symbol);
+        
+        if (_generatorTask != null)
+        {
+            try
+            {
+                await _generatorTask.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+            catch (OperationCanceledException)
+            {
+                // Нормально
+            }
+        }
+    }
+}
+-------------------------------
+Trading/Behaviors/OrderGatewayBehavior.cs:
+using FractalCell02.Core.Behaviors;
+using FractalCell02.Core.Interfaces;
+using FractalCell02.Trading.Events;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCell02.Trading.Behaviors;
+
+/// <summary>
+/// Шлюз для приема ордеров от клиентов и отправки их в MatchingEngine
+/// </summary>
+public class OrderGatewayBehavior : ICellBehavior
+{
+    private readonly string _matchingEngineCellId;
+
+    public OrderGatewayBehavior(string matchingEngineCellId)
+    {
+        _matchingEngineCellId = matchingEngineCellId;
+    }
+
+    public Task OnStartAsync(ICellContext context)
+    {
+        context.Logger.LogInformation(
+            "🚪 OrderGateway started, routing to MatchingEngine: {Target}",
+            _matchingEngineCellId);
+
+        // Подписываемся на команды создания ордеров
+        context.InternalBus.Subscribe<CreateOrderCommand>(cmd => HandleCreateOrder(cmd, context));
+        context.InternalBus.Subscribe<CancelOrderCommand>(cmd => HandleCancelOrder(cmd, context));
+
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleCreateOrder(CreateOrderCommand cmd, ICellContext context)
+    {
+        context.Logger.LogInformation(
+            "📝 Creating order: {ClientId} {Side} {Quantity} {Symbol} @ {Price} ({Type})",
+            cmd.ClientId, cmd.Side, cmd.Quantity, cmd.Symbol, cmd.Price, cmd.Type);
+
+        var order = new OrderEvent(
+            EventId: Guid.NewGuid().ToString(),
+            Timestamp: DateTime.UtcNow,
+            OrderId: Guid.NewGuid().ToString(),
+            ClientId: cmd.ClientId,
+            Symbol: cmd.Symbol,
+            Price: cmd.Price,
+            Quantity: cmd.Quantity,
+            FilledQuantity: 0m,
+            Side: cmd.Side,
+            Type: cmd.Type,
+            Status: OrderStatus.Pending
+        );
+
+        // Отправляем ордер в MatchingEngine
+        await context.ExternalBus.SendToCellAsync(_matchingEngineCellId, order);
+
+        context.Logger.LogInformation(
+            "✅ Order {OrderId} sent to MatchingEngine",
+            order.OrderId);
+    }
+
+    private async Task HandleCancelOrder(CancelOrderCommand cmd, ICellContext context)
+    {
+        context.Logger.LogInformation(
+            "❌ Cancel order request: {OrderId} for {ClientId}",
+            cmd.OrderId, cmd.ClientId);
+
+        // В реальной системе здесь была бы логика отмены
+        // Пока просто логируем
+        await Task.CompletedTask;
+    }
+
+    public Task OnMessageAsync(IApplicationEvent @event, ICellContext context)
+    {
+        // Обработка других типов событий если нужно
+        return Task.CompletedTask;
+    }
+
+    public Task OnStopAsync(ICellContext context)
+    {
+        context.Logger.LogInformation("🚪 OrderGateway stopping");
+        return Task.CompletedTask;
+    }
+}
+--------------
+Trading/Behaviors/MatchingEngineBehavior.cs:
+------------------
+using FractalCell02.Core.Behaviors;
+using FractalCell02.Core.Interfaces;
+using FractalCell02.Trading.Events;
+using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
+
+namespace FractalCell02.Trading.Behaviors;
+
+/// <summary>
+/// Движок сопоставления ордеров (Matching Engine)
+/// Хранит стакан заявок и исполняет ордера при пересечении с котировками
+/// </summary>
+public class MatchingEngineBehavior : ICellBehavior
+{
+    // Стакан лимитных ордеров по символам
+    private readonly ConcurrentDictionary<string, List<OrderEvent>> _orderBook = new();
+    
+    // Последние котировки по символам
+    private readonly ConcurrentDictionary<string, QuoteEvent> _latestQuotes = new();
+
+    public Task OnStartAsync(ICellContext context)
+    {
+        context.Logger.LogInformation("⚙️ MatchingEngine started");
+
+        // Подписываемся на котировки и ордера
+        context.InternalBus.Subscribe<QuoteEvent>(quote => HandleQuote(quote, context));
+        context.InternalBus.Subscribe<OrderEvent>(order => HandleOrder(order, context));
+
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleOrder(OrderEvent order, ICellContext context)
+    {
+        context.Logger.LogInformation(
+            "📥 MatchingEngine received order {OrderId}: {Side} {Quantity} {Symbol} @ {Price}",
+            order.OrderId, order.Side, order.Quantity, order.Symbol, order.Price);
+
+        if (order.Type == OrderType.Market)
+        {
+            // Market ордер исполняется сразу по текущей котировке
+            await TryExecuteMarketOrder(order, context);
+        }
+        else
+        {
+            // Limit ордер попадает в стакан
+            var book = _orderBook.GetOrAdd(order.Symbol, _ => new List<OrderEvent>());
+            lock (book)
+            {
+                book.Add(order);
+            }
+            context.Logger.LogInformation(
+                "📚 Limit order {OrderId} added to order book for {Symbol}",
+                order.OrderId, order.Symbol);
+        }
+    }
+
+    private async Task HandleQuote(QuoteEvent quote, ICellContext context)
+    {
+        _latestQuotes[quote.Symbol] = quote;
+
+        context.Logger.LogDebug(
+            "📊 MatchingEngine received quote for {Symbol}: Bid={Bid:F2} Ask={Ask:F2}",
+            quote.Symbol, quote.Bid, quote.Ask);
+
+        // Проверяем, не исполнились ли лимитные ордера
+        await TryExecuteLimitOrders(quote, context);
+    }
+
+    private async Task TryExecuteMarketOrder(OrderEvent order, ICellContext context)
+    {
+        if (!_latestQuotes.TryGetValue(order.Symbol, out var quote))
+        {
+            context.Logger.LogWarning(
+                "⚠️ No quote available for {Symbol}, cannot execute market order",
+                order.Symbol);
+            return;
+        }
+
+        // Market Buy исполняется по Ask, Market Sell по Bid
+        var executionPrice = order.Side == OrderSide.Buy ? quote.Ask : quote.Bid;
+
+        await ExecuteTrade(order, executionPrice, order.Quantity, context);
+    }
+
+    private async Task TryExecuteLimitOrders(QuoteEvent quote, ICellContext context)
+    {
+        if (!_orderBook.TryGetValue(quote.Symbol, out var book))
+            return;
+
+        List<OrderEvent> filledOrders = new();
+
+        lock (book)
+        {
+            foreach (var order in book.ToList())
+            {
+                bool shouldExecute = false;
+
+                if (order.Side == OrderSide.Buy && quote.Ask <= order.Price)
+                {
+                    // Buy Limit исполнился (Ask упал до или ниже цены ордера)
+                    shouldExecute = true;
+                }
+                else if (order.Side == OrderSide.Sell && quote.Bid >= order.Price)
+                {
+                    // Sell Limit исполнился (Bid поднялся до или выше цены ордера)
+                    shouldExecute = true;
+                }
+
+                if (shouldExecute)
+                {
+                    filledOrders.Add(order);
+                    book.Remove(order);
+                }
+            }
+        }
+
+        // Исполняем заполненные ордера
+        foreach (var order in filledOrders)
+        {
+            context.Logger.LogInformation(
+                "✅ Limit order {OrderId} executed at price {Price}",
+                order.OrderId, order.Price);
+
+            await ExecuteTrade(order, order.Price, order.Quantity, context);
+        }
+    }
+
+    private async Task ExecuteTrade(
+        OrderEvent order,
+        decimal executionPrice,
+        decimal quantity,
+        ICellContext context)
+    {
+        var trade = new TradeEvent(
+            EventId: Guid.NewGuid().ToString(),
+            Timestamp: DateTime.UtcNow,
+            TradeId: Guid.NewGuid().ToString(),
+            OrderId: order.OrderId,
+            ClientId: order.ClientId,
+            Symbol: order.Symbol,
+            Price: executionPrice,
+            Quantity: quantity,
+            Side: order.Side
+        );
+
+        context.Logger.LogInformation(
+            "💹 Trade executed: {TradeId} - {ClientId} {Side} {Quantity} {Symbol} @ {Price}",
+            trade.TradeId, trade.ClientId, trade.Side, trade.Quantity, trade.Symbol, trade.Price);
+
+        // Отправляем Trade конкретному клиенту (в его Portfolio)
+        await context.ExternalBus.SendToCellAsync(order.ClientId, trade);
+
+        // Также можно отправить обновление ордера (статус Filled)
+        var filledOrder = order with
+        {
+            EventId = Guid.NewGuid().ToString(),
+            Timestamp = DateTime.UtcNow,
+            FilledQuantity = quantity,
+            Status = OrderStatus.Filled
+        };
+
+        await context.ExternalBus.SendToCellAsync(order.ClientId, filledOrder);
+    }
+
+    public Task OnMessageAsync(IApplicationEvent @event, ICellContext context)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task OnStopAsync(ICellContext context)
+    {
+        context.Logger.LogInformation("⚙️ MatchingEngine stopping");
+        
+        var totalOrders = _orderBook.Values.Sum(b => b.Count);
+        context.Logger.LogInformation(
+            "📊 Order book stats: {Symbols} symbols, {Orders} pending orders",
+            _orderBook.Count, totalOrders);
+
+        return Task.CompletedTask;
+    }
+}
+--------------------------------------------
+Trading/Behaviors/PortfolioBehavior.cs:
+-----------------------
+using FractalCell02.Core.Behaviors;
+using FractalCell02.Core.Interfaces;
+using FractalCell02.Trading.Events;
+using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
+
+namespace FractalCell02.Trading.Behaviors;
+
+/// <summary>
+/// Портфель клиента - управляет позициями и балансом
+/// </summary>
+public class PortfolioBehavior : ICellBehavior
+{
+    private decimal _cash;
+    private readonly ConcurrentDictionary<string, Position> _positions = new();
+    private readonly string _clientId;
+
+    private record Position(
+        string Symbol,
+        decimal Quantity,
+        decimal AveragePrice,
+        decimal RealizedPnL
+    )
+    {
+        public decimal UnrealizedPnL(decimal currentPrice) =>
+            Quantity * (currentPrice - AveragePrice);
+    }
+
+    public PortfolioBehavior(string clientId, decimal initialCash = 100000m)
+    {
+        _clientId = clientId;
+        _cash = initialCash;
+    }
+
+    public Task OnStartAsync(ICellContext context)
+    {
+        context.Logger.LogInformation(
+            "💼 Portfolio started for {ClientId} with cash {Cash:C}",
+            _clientId, _cash);
+
+        // Подписываемся на сделки и обновления ордеров
+        context.InternalBus.Subscribe<TradeEvent>(trade => HandleTrade(trade, context));
+        context.InternalBus.Subscribe<OrderEvent>(order => HandleOrderUpdate(order, context));
+
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleTrade(TradeEvent trade, ICellContext context)
+    {
+        context.Logger.LogInformation(
+            "💹 Portfolio received trade: {Side} {Quantity} {Symbol} @ {Price}",
+            trade.Side, trade.Quantity, trade.Symbol, trade.Price);
+
+        var position = _positions.GetOrAdd(trade.Symbol, 
+            _ => new Position(trade.Symbol, 0m, 0m, 0m));
+
+        var cost = trade.Price * trade.Quantity;
+
+        if (trade.Side == OrderSide.Buy)
+        {
+            // Покупка: списываем кэш, увеличиваем позицию
+            if (_cash < cost)
+            {
+                context.Logger.LogWarning(
+                    "⚠️ Insufficient cash for trade. Required: {Cost:C}, Available: {Cash:C}",
+                    cost, _cash);
+                return;
+            }
+
+            _cash -= cost;
+
+            lock (position)
+            {
+                var newQuantity = position.Quantity + trade.Quantity;
+                var newAvgPrice = ((position.Quantity * position.AveragePrice) + cost) / newQuantity;
+                
+                _positions[trade.Symbol] = position with
+                {
+                    Quantity = newQuantity,
+                    AveragePrice = newAvgPrice
+                };
+            }
+        }
+        else // Sell
+        {
+            // Продажа: добавляем кэш, уменьшаем позицию
+            _cash += cost;
+
+            lock (position)
+            {
+                if (position.Quantity < trade.Quantity)
+                {
+                    context.Logger.LogWarning(
+                        "⚠️ Insufficient position for sell. Required: {Required}, Available: {Available}",
+                        trade.Quantity, position.Quantity);
+                    return;
+                }
+
+                var realizedPnL = (trade.Price - position.AveragePrice) * trade.Quantity;
+                var newQuantity = position.Quantity - trade.Quantity;
+
+                _positions[trade.Symbol] = position with
+                {
+                    Quantity = newQuantity,
+                    RealizedPnL = position.RealizedPnL + realizedPnL
+                };
+
+                context.Logger.LogInformation(
+                    "💰 Realized P&L: {PnL:C} on {Symbol}",
+                    realizedPnL, trade.Symbol);
+            }
+        }
+
+        // Логируем состояние портфеля
+        LogPortfolioState(context);
+
+        // Отправляем обновление позиции (опционально)
+        var currentPosition = _positions[trade.Symbol];
+        var update = new PositionUpdateEvent(
+            EventId: Guid.NewGuid().ToString(),
+            Timestamp: DateTime.UtcNow,
+            ClientId: _clientId,
+            Symbol: trade.Symbol,
+            Position: currentPosition.Quantity,
+            AveragePrice: currentPosition.AveragePrice,
+            RealizedPnL: currentPosition.RealizedPnL,
+            UnrealizedPnL: 0m // Можно рассчитать если есть текущая котировка
+        );
+
+        await context.ExternalBus.BroadcastAsync(update);
+    }
+
+    private Task HandleOrderUpdate(OrderEvent order, ICellContext context)
+    {
+        context.Logger.LogDebug(
+            "📋 Order update: {OrderId} status {Status}",
+            order.OrderId, order.Status);
+
+        return Task.CompletedTask;
+    }
+
+    private void LogPortfolioState(ICellContext context)
+    {
+        context.Logger.LogInformation(
+            "💼 Portfolio state - Cash: {Cash:C}, Positions: {Count}",
+            _cash, _positions.Count);
+
+        foreach (var pos in _positions.Values.Where(p => p.Quantity != 0))
+        {
+            context.Logger.LogInformation(
+                "📊 {Symbol}: Qty={Quantity}, AvgPrice={AvgPrice:F2}, RealizedPnL={PnL:C}",
+                pos.Symbol, pos.Quantity, pos.AveragePrice, pos.RealizedPnL);
+        }
+    }
+
+    public Task OnMessageAsync(IApplicationEvent @event, ICellContext context)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task OnStopAsync(ICellContext context)
+    {
+        context.Logger.LogInformation("💼 Portfolio stopping for {ClientId}", _clientId);
+        LogPortfolioState(context);
+        return Task.CompletedTask;
+    }
+}
+--------------------------
+Шаг 7: Обновляем Worker для трейдинговой топологии
+Замените содержимое Worker.cs:
+using FractalCell02.Core;
+using FractalCell02.Core.Configuration;
+using FractalCell02.Core.Interfaces;
+using FractalCell02.Trading.Behaviors;
+using FractalCell02.Trading.Events;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCell02;
+
+public class Worker : BackgroundService
+{
+    private readonly ILogger<Worker> _logger;
+    private readonly IFractalEventHub _hub;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly List<IFractalCell> _cells = new();
+
+    public Worker(
+        ILogger<Worker> logger,
+        IFractalEventHub hub,
+        ILoggerFactory loggerFactory)
+    {
+        _logger = logger;
+        _hub = hub;
+        _loggerFactory = loggerFactory;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("🚀 Worker (Orchestrator) started");
+
+        try
+        {
+            await InitializeTradingSystemAsync(stoppingToken);
+            _logger.LogInformation("✅ Trading system initialized. Starting simulation...");
+
+            // Запускаем симуляцию торговли
+            await SimulateTradingAsync(stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("👋 Worker stopping due to cancellation");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Critical worker error");
+        }
+        finally
+        {
+            _logger.LogInformation("🏁 Worker (Orchestrator) finished");
+        }
+    }
+
+    private async Task InitializeTradingSystemAsync(CancellationToken ct)
+    {
+        _logger.LogInformation("🏗️ Initializing trading system...");
+
+        // 1. Генератор котировок (Market Data Provider)
+        var quoteGenerator = await CreateCellAsync(
+            "QuoteGenerator-AAPL",
+            new QuoteGeneratorBehavior("AAPL", 150.00m, 0.02m, 1000),
+            ct);
+        _cells.Add(quoteGenerator);
+
+        // 2. Matching Engine (Исполнитель ордеров)
+        var matchingEngine = await CreateCellAsync(
+            "MatchingEngine",
+            new MatchingEngineBehavior(),
+            ct);
+        _cells.Add(matchingEngine);
+
+        // 3. Order Gateway (Шлюз для приема ордеров)
+        var orderGateway = await CreateCellAsync(
+            "OrderGateway",
+            new OrderGatewayBehavior("MatchingEngine"),
+            ct);
+        _cells.Add(orderGateway);
+
+        // 4. Портфели клиентов
+        var portfolio1 = await CreateCellAsync(
+            "Client-Alice",
+            new PortfolioBehavior("Client-Alice", 100000m),
+            ct);
+        _cells.Add(portfolio1);
+
+        var portfolio2 = await CreateCellAsync(
+            "Client-Bob",
+            new PortfolioBehavior("Client-Bob", 50000m),
+            ct);
+        _cells.Add(portfolio2);
+
+        _logger.LogInformation("🔍 System cells: {Count}", _cells.Count);
+        foreach (var cell in _cells)
+        {
+            _logger.LogInformation("🔍 Cell: {CellId}", cell.CellId);
+        }
+
+        _logger.LogInformation("▶️ Starting all cells...");
+        await Task.WhenAll(_cells.Select(c => c.StartAsync(ct)));
+        _logger.LogInformation("✅ Trading system initialized with {Count} cells", _cells.Count);
+    }
+
+    private async Task SimulateTradingAsync(CancellationToken ct)
+    {
+        var random = new Random();
+        var orderGateway = _cells.First(c => c.CellId == "OrderGateway");
+        var clients = new[] { "Client-Alice", "Client-Bob" };
+        var symbols = new[] { "AAPL" };
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                // Ждем немного между ордерами
+                await Task.Delay(TimeSpan.FromSeconds(3), ct);
+
+                // Генерируем случайный ордер
+                var client = clients[random.Next(clients.Length)];
+                var symbol = symbols[random.Next(symbols.Length)];
+                var side = random.Next(2) == 0 ? OrderSide.Buy : OrderSide.Sell;
+                var type = random.Next(2) == 0 ? OrderType.Market : OrderType.Limit;
+                var price = 150m + (decimal)(random.NextDouble() - 0.5) * 10m;
+                var quantity = random.Next(10, 100);
+
+                var command = new CreateOrderCommand(
+                    EventId: Guid.NewGuid().ToString(),
+                    Timestamp: DateTime.UtcNow,
+                    ClientId: client,
+                    Symbol: symbol,
+                    Price: price,
+                    Quantity: quantity,
+                    Side: side,
+                    Type: type
+                );
+
+                _logger.LogInformation(
+                    "📤 Sending order: {Client} {Side} {Quantity} {Symbol} @ {Price:F2} ({Type})",
+                    client, side, quantity, symbol, price, type);
+
+                await orderGateway.ExternalBus.SendToCellAsync("OrderGateway", command);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error in trading simulation");
+                await Task.Delay(TimeSpan.FromSeconds(5), ct);
+            }
+        }
+    }
+
+    private async Task<IFractalCell> CreateCellAsync<TBehavior>(
+        string cellId,
+        TBehavior behavior,
+        CancellationToken ct) where TBehavior : class, FractalCell02.Core.Behaviors.ICellBehavior
+    {
+        var config = new FractalCellConfiguration
+        {
+            CellId = cellId,
+            BackgroundServiceCount = 2,
+            InternalBusType = BusType.Channels,
+            ExternalBusType = BusType.Channels,
+            BusSettings = new BusSettings
+            {
+                Capacity = 1000,
+                MaxParallelism = 4
+            }
+        };
+
+        var cell = await FractalCellFactory.CreateAsync(config, _hub, _loggerFactory, behavior, ct);
+        _logger.LogInformation("📦 Cell {CellId} created with behavior {Behavior}", 
+            cellId, typeof(TBehavior).Name);
+        return cell;
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("🛑 Stopping all cells...");
+        await Task.WhenAll(_cells.Select(c => c.StopAsync(cancellationToken)));
+        _logger.LogInformation("✅ All cells stopped");
+        await base.StopAsync(cancellationToken);
+    }
+}
+---------------------------------
+Теперь у вас полностью рабочая трейдинговая система! Запускайте проект и смотрите, как:
+QuoteGenerator генерирует котировки AAPL
+OrderGateway принимает ордера от симуляции
+MatchingEngine сопоставляет ордера с котировками и генерирует сделки
+Portfolio (Alice и Bob) получают сделки и обновляют свои позиции
+Попробуйте запустить и расскажите, что получилось! 🚀
+______________________________________________________________________
+----------------------------------------------------------------------
+ответ2
+------------------------
+Отлично, продолжаем! Сейчас создадим полную трейдинговую систему поверх вашей архитектуры.
+Шаг 5: Трейдинговые события
+Создайте файл Trading/Events/TradingEvents.cs:
+--------------------------
+using FractalCell02.Core.Interfaces;
+
+namespace FractalCell02.Trading.Events;
+
+public enum OrderSide { Buy, Sell }
+public enum OrderType { Market, Limit }
+
+/// <summary>
+/// Котировка (Тик) — рассылается генератором всем через Broadcast
+/// </summary>
+public record QuoteEvent(
+    string EventId,
+    DateTime Timestamp,
+    string Symbol,
+    decimal Bid,
+    decimal Ask,
+    string SourceCellId = ""
+) : IApplicationEvent;
+
+/// <summary>
+/// Заявка на торговлю — отправляется клиентом в MatchingEngine
+/// </summary>
+public record OrderEvent(
+    string EventId,
+    DateTime Timestamp,
+    string OrderId,
+    string ClientCellId,     // CellId портфеля-отправителя
+    string Symbol,
+    decimal Price,
+    decimal Quantity,
+    OrderSide Side,
+    OrderType Type,
+    string TargetCellId = ""  // CellId MatchingEngine
+) : IApplicationEvent;
+
+/// <summary>
+/// Сделка — генерируется MatchingEngine при исполнении ордера
+/// </summary>
+public record TradeEvent(
+    string EventId,
+    DateTime Timestamp,
+    string TradeId,
+    string OrderId,
+    string ClientCellId,
+    string Symbol,
+    decimal ExecutedPrice,
+    decimal Quantity,
+    OrderSide Side,
+    string SourceCellId = ""
+) : IApplicationEvent;
+
+/// <summary>
+/// Обновление позиции — отправляется портфелем самому себе (или в лог)
+/// </summary>
+public record PositionUpdateEvent(
+    string EventId,
+    DateTime Timestamp,
+    string ClientCellId,
+    string Symbol,
+    decimal NewQuantity,
+    decimal AveragePrice,
+    decimal CashBalance
+) : IApplicationEvent;
+----------------------
+Шаг 6: Поведение — Генератор Котировок
+Создайте файл Trading/Behaviors/QuoteGeneratorBehavior.cs:
+--------------------------
+using FractalCell02.Core.Behaviors;
+using FractalCell02.Core.Interfaces;
+using FractalCell02.Trading.Events;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCell02.Trading.Behaviors;
+
+/// <summary>
+/// Генератор котировок: каждые N мс генерирует новый тик с Random Walk
+/// и рассылает всем через Broadcast
+/// </summary>
+public class QuoteGeneratorBehavior : ICellBehavior
+{
+    private readonly string _symbol;
+    private decimal _currentMidPrice;
+    private readonly decimal _spread;
+    private readonly int _intervalMs;
+    private readonly Random _random = new();
+
+    public QuoteGeneratorBehavior(
+        string symbol,
+        decimal startPrice,
+        decimal spread = 0.05m,
+        int intervalMs = 500)
+    {
+        _symbol = symbol;
+        _currentMidPrice = startPrice;
+        _spread = spread;
+        _intervalMs = intervalMs;
+    }
+
+    public Task OnStartAsync(ICellContext context)
+    {
+        context.Logger.LogInformation(
+            "📈 QuoteGenerator started for {Symbol} at {Price}",
+            _symbol, _currentMidPrice);
+
+        // Запускаем фоновую генерацию тиков
+        _ = Task.Run(async () =>
+        {
+            while (!context.StoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    // Random Walk: движение цены ±0.50
+                    var delta = (decimal)(_random.NextDouble() - 0.5) * 1.0m;
+                    _currentMidPrice = Math.Max(1.0m, _currentMidPrice + delta);
+
+                    var bid = Math.Round(_currentMidPrice - _spread, 2);
+                    var ask = Math.Round(_currentMidPrice + _spread, 2);
+
+                    var quote = new QuoteEvent(
+                        EventId: $"quote-{Guid.NewGuid():N}"[..16],
+                        Timestamp: DateTime.UtcNow,
+                        Symbol: _symbol,
+                        Bid: bid,
+                        Ask: ask,
+                        SourceCellId: context.CellId);
+
+                    // Broadcast всем ячейкам
+                    await context.ExternalBus.BroadcastAsync(quote);
+
+                    context.Logger.LogDebug(
+                        "📈 [{Symbol}] Bid={Bid} Ask={Ask}",
+                        _symbol, bid, ask);
+
+                    await Task.Delay(_intervalMs, context.StoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    context.Logger.LogError(ex, "Error generating quote");
+                    await Task.Delay(1000, context.StoppingToken);
+                }
+            }
+        }, context.StoppingToken);
+
+        return Task.CompletedTask;
+    }
+
+    // Генератор не реагирует на входящие события
+    public Task OnMessageAsync(IApplicationEvent @event, ICellContext context)
+        => Task.CompletedTask;
+
+    public Task OnStopAsync(ICellContext context)
+    {
+        context.Logger.LogInformation("📈 QuoteGenerator stopped");
+        return Task.CompletedTask;
+    }
+}
+----------------------------------
+Шаг 7: Поведение — Исполнитель Ордеров (Matching Engine)
+Создайте файл Trading/Behaviors/MatchingEngineBehavior.cs:
+---------------------------
+using FractalCell02.Core.Behaviors;
+using FractalCell02.Core.Interfaces;
+using FractalCell02.Trading.Events;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCell02.Trading.Behaviors;
+
+/// <summary>
+/// Движок исполнения ордеров: хранит стакан заявок,
+/// при каждой новой котировке проверяет пересечение,
+/// генерирует TradeEvent и отправляет его портфелю клиента
+/// </summary>
+public class MatchingEngineBehavior : ICellBehavior
+{
+    private readonly string _symbol;
+    private readonly List<OrderEvent> _pendingOrders = new();
+    private readonly object _lock = new();
+
+    private decimal _lastBid;
+    private decimal _lastAsk;
+    private int _tradeCount;
+
+    public MatchingEngineBehavior(string symbol)
+    {
+        _symbol = symbol;
+    }
+
+    public Task OnStartAsync(ICellContext context)
+    {
+        context.Logger.LogInformation(
+            "⚙️ MatchingEngine started for {Symbol}", _symbol);
+        return Task.CompletedTask;
+    }
+
+    public async Task OnMessageAsync(IApplicationEvent @event, ICellContext context)
+    {
+        switch (@event)
+        {
+            case QuoteEvent quote when quote.Symbol == _symbol:
+                await HandleQuote(quote, context);
+                break;
+
+            case OrderEvent order when order.Symbol == _symbol:
+                await HandleOrder(order, context);
+                break;
+        }
+    }
+
+    private async Task HandleQuote(QuoteEvent quote, ICellContext context)
+    {
+        _lastBid = quote.Bid;
+        _lastAsk = quote.Ask;
+
+        context.Logger.LogDebug(
+            "⚙️ [ME] New quote: Bid={Bid} Ask={Ask}, pending orders: {Count}",
+            _lastBid, _lastAsk, _pendingOrders.Count);
+
+        // Проверяем лимитные ордера на исполнение
+        List<OrderEvent> filled;
+        lock (_lock)
+        {
+            filled = _pendingOrders.Where(o => IsExecutable(o)).ToList();
+            foreach (var order in filled)
+            {
+                _pendingOrders.Remove(order);
+            }
+        }
+
+        foreach (var order in filled)
+        {
+            await ExecuteTrade(order, context);
+        }
+    }
+
+    private async Task HandleOrder(OrderEvent order, ICellContext context)
+    {
+        context.Logger.LogInformation(
+            "📝 [ME] New order: {Side} {Qty} {Symbol} @ {Price} ({Type}) from {Client}",
+            order.Side, order.Quantity, order.Symbol, order.Price,
+            order.Type, order.ClientCellId);
+
+        if (order.Type == OrderType.Market)
+        {
+            // Маркет-ордер исполняется сразу по текущей цене
+            var execPrice = order.Side == OrderSide.Buy ? _lastAsk : _lastBid;
+            if (execPrice > 0)
+            {
+                await ExecuteTrade(order, context, execPrice);
+            }
+            else
+            {
+                context.Logger.LogWarning(
+                    "⚠️ [ME] Cannot execute market order — no quotes yet");
+            }
+        }
+        else
+        {
+            // Лимитный ордер — проверяем немедленное исполнение
+            if (IsExecutable(order))
+            {
+                await ExecuteTrade(order, context);
+            }
+            else
+            {
+                lock (_lock)
+                {
+                    _pendingOrders.Add(order);
+                }
+                context.Logger.LogInformation(
+                    "📋 [ME] Order {OrderId} added to book. Pending: {Count}",
+                    order.OrderId, _pendingOrders.Count);
+            }
+        }
+    }
+
+    private bool IsExecutable(OrderEvent order)
+    {
+        if (_lastBid == 0 && _lastAsk == 0) return false;
+
+        return order.Side switch
+        {
+            // Buy: исполняется если Ask <= лимитная цена
+            OrderSide.Buy => _lastAsk <= order.Price,
+            // Sell: исполняется если Bid >= лимитная цена
+            OrderSide.Sell => _lastBid >= order.Price,
+            _ => false
+        };
+    }
+
+    private async Task ExecuteTrade(OrderEvent order, ICellContext context, decimal? overridePrice = null)
+    {
+        var execPrice = overridePrice ?? order.Price;
+        _tradeCount++;
+
+        var trade = new TradeEvent(
+            EventId: $"trade-{Guid.NewGuid():N}"[..16],
+            Timestamp: DateTime.UtcNow,
+            TradeId: $"T{_tradeCount:D5}",
+            OrderId: order.OrderId,
+            ClientCellId: order.ClientCellId,
+            Symbol: order.Symbol,
+            ExecutedPrice: execPrice,
+            Quantity: order.Quantity,
+            Side: order.Side,
+            SourceCellId: context.CellId);
+
+        context.Logger.LogInformation(
+            "✅ [ME] TRADE EXECUTED: {TradeId} | {Side} {Qty} {Symbol} @ {Price} → {Client}",
+            trade.TradeId, trade.Side, trade.Quantity, trade.Symbol,
+            trade.ExecutedPrice, trade.ClientCellId);
+
+        // Отправляем Trade конкретному портфелю клиента
+        await context.ExternalBus.SendToCellAsync(order.ClientCellId, trade);
+    }
+
+    public Task OnStopAsync(ICellContext context)
+    {
+        context.Logger.LogInformation(
+            "⚙️ MatchingEngine stopped. Total trades: {Count}, Pending: {Pending}",
+            _tradeCount, _pendingOrders.Count);
+        return Task.CompletedTask;
+    }
+}
+------------------
+Шаг 8: Поведение — Портфель Клиента
+Создайте файл Trading/Behaviors/PortfolioBehavior.cs:
+------------------
+using FractalCell02.Core.Behaviors;
+using FractalCell02.Core.Interfaces;
+using FractalCell02.Trading.Events;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCell02.Trading.Behaviors;
+
+/// <summary>
+/// Портфель клиента: отслеживает кэш, позиции и P&L.
+/// Получает TradeEvent и обновляет внутреннее состояние.
+/// Может генерировать новые OrderEvent на основе стратегии.
+/// </summary>
+public class PortfolioBehavior : ICellBehavior
+{
+    private readonly string _clientName;
+    private readonly string _matchingEngineCellId;
+
+    private decimal _cash;
+    private readonly Dictionary<string, Position> _positions = new();
+    private int _orderSequence;
+
+    public record Position(string Symbol, decimal Quantity, decimal AveragePrice);
+
+    public PortfolioBehavior(
+        string clientName,
+        decimal initialCash,
+        string matchingEngineCellId)
+    {
+        _clientName = clientName;
+        _cash = initialCash;
+        _matchingEngineCellId = matchingEngineCellId;
+    }
+
+    public Task OnStartAsync(ICellContext context)
+    {
+        context.Logger.LogInformation(
+            "💼 [{Client}] Portfolio started. Cash: {Cash:C}",
+            _clientName, _cash);
+        return Task.CompletedTask;
+    }
+
+    public async Task OnMessageAsync(IApplicationEvent @event, ICellContext context)
+    {
+        switch (@event)
+        {
+            case TradeEvent trade:
+                await HandleTrade(trade, context);
+                break;
+
+            case QuoteEvent quote:
+                // Портфель может реагировать на котировки (автостратегия)
+                await EvaluateStrategy(quote, context);
+                break;
+        }
+    }
+
+    private Task HandleTrade(TradeEvent trade, ICellContext context)
+    {
+        var cost = trade.ExecutedPrice * trade.Quantity;
+
+        if (trade.Side == OrderSide.Buy)
+        {
+            if (_cash < cost)
+            {
+                context.Logger.LogWarning(
+                    "⚠️ [{Client}] Insufficient cash for trade {TradeId}. Need {Cost:C}, have {Cash:C}",
+                    _clientName, trade.TradeId, cost, _cash);
+                return Task.CompletedTask;
+            }
+
+            _cash -= cost;
+            UpdatePosition(trade.Symbol, trade.Quantity, trade.ExecutedPrice);
+        }
+        else // Sell
+        {
+            _cash += cost;
+            UpdatePosition(trade.Symbol, -trade.Quantity, trade.ExecutedPrice);
+        }
+
+        var pos = _positions.GetValueOrDefault(trade.Symbol);
+
+        context.Logger.LogInformation(
+            "💼 [{Client}] TRADE CONFIRMED: {TradeId} | {Side} {Qty} {Symbol} @ {Price} | " +
+            "Cash: {Cash:C} | Position: {PosQty} @ {PosAvg:C}",
+            _clientName, trade.TradeId, trade.Side, trade.Quantity,
+            trade.Symbol, trade.ExecutedPrice,
+            _cash, pos?.Quantity ?? 0, pos?.AveragePrice ?? 0);
+
+        return Task.CompletedTask;
+    }
+
+    private void UpdatePosition(string symbol, decimal quantityDelta, decimal price)
+    {
+        if (_positions.TryGetValue(symbol, out var existing))
+        {
+            var newQty = existing.Quantity + quantityDelta;
+            if (newQty == 0)
+            {
+                _positions.Remove(symbol);
+            }
+            else
+            {
+                var newAvg = quantityDelta > 0
+                    ? (existing.AveragePrice * existing.Quantity + price * quantityDelta) / newQty
+                    : existing.AveragePrice;
+
+                _positions[symbol] = new Position(symbol, newQty, Math.Round(newAvg, 4));
+            }
+        }
+        else if (quantityDelta > 0)
+        {
+            _positions[symbol] = new Position(symbol, quantityDelta, price);
+        }
+    }
+
+    /// <summary>
+    /// Простая стратегия: если цена упала ниже порога — покупаем
+    /// </summary>
+    private async Task EvaluateStrategy(QuoteEvent quote, ICellContext context)
+    {
+        // Демо-стратегия: каждая 10-я котировка отправляет ордер
+        _orderSequence++;
+        if (_orderSequence % 10 != 0) return;
+
+        // Покупаем только если есть деньги
+        if (_cash < quote.Ask * 10) return;
+
+        _orderSequence++;
+        var order = new OrderEvent(
+            EventId: $"order-{Guid.NewGuid():N}"[..16],
+            Timestamp: DateTime.UtcNow,
+            OrderId: $"O{_clientName}-{_orderSequence:D4}",
+            ClientCellId: context.CellId,
+            Symbol: quote.Symbol,
+            Price: quote.Ask,
+            Quantity: 10,
+            Side: OrderSide.Buy,
+            OrderType: OrderType.Limit,
+            TargetCellId: _matchingEngineCellId);
+
+        context.Logger.LogInformation(
+            "📤 [{Client}] AUTO-ORDER: Buy {Qty} {Symbol} @ {Price}",
+            _clientName, order.Quantity, order.Symbol, order.Price);
+
+        await context.ExternalBus.SendToCellAsync(_matchingEngineCellId, order);
+    }
+
+    public Task OnStopAsync(ICellContext context)
+    {
+        context.Logger.LogInformation(
+            "💼 [{Client}] Portfolio stopped. Cash: {Cash:C}, Positions: {Count}",
+            _clientName, _cash, _positions.Count);
+
+        foreach (var (symbol, pos) in _positions)
+        {
+            context.Logger.LogInformation(
+                "📊 [{Client}] Final position: {Qty} {Symbol} @ {Avg:C}",
+                _clientName, pos.Quantity, symbol, pos.AveragePrice);
+        }
+
+        return Task.CompletedTask;
+    }
+}
+------------------------
+Шаг 9: Обновляем Worker.cs — Трейдинговый Оркестратор
+using FractalCell02.Core;
+using FractalCell02.Core.Behaviors;
+using FractalCell02.Core.Configuration;
+using FractalCell02.Core.Interfaces;
+using FractalCell02.Trading.Behaviors;
+using FractalCell02.Trading.Events;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCell02;
+
+public class Worker : BackgroundService
+{
+    private readonly ILogger<Worker> _logger;
+    private readonly IFractalEventHub _hub;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly List<IFractalCell> _cells = new();
+
+    public Worker(
+        ILogger<Worker> logger,
+        IFractalEventHub hub,
+        ILoggerFactory loggerFactory)
+    {
+        _logger = logger;
+        _hub = hub;
+        _loggerFactory = loggerFactory;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("🚀 Trading Orchestrator started");
+
+        try
+        {
+            await InitializeTradingSystemAsync(stoppingToken);
+
+            _logger.LogInformation("✅ Trading system initialized. Starting simulation...");
+
+            // Даем системе время на запуск генератора котировок
+            await Task.Delay(2000, stoppingToken);
+
+            // Запускаем цикл отправки ордеров
+            await RunOrderSimulationAsync(stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("👋 Orchestrator stopping");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Critical orchestrator error");
+        }
+        finally
+        {
+            _logger.LogInformation("🏁 Orchestrator finished");
+        }
+    }
+
+    private async Task InitializeTradingSystemAsync(CancellationToken ct)
+    {
+        _logger.LogInformation("🏗️ Building trading topology...");
+
+        // ═══════════════════════════════════════════════
+        // 1. Генератор котировок (Broadcasts QuoteEvents)
+        // ═══════════════════════════════════════════════
+        var quoteCell = await CreateCellAsync(
+            cellId: "QuoteGen-AAPL",
+            behavior: new QuoteGeneratorBehavior(
+                symbol: "AAPL",
+                startPrice: 185.00m,
+                spread: 0.05m,
+                intervalMs: 500),
+            ct);
+
+        // ═══════════════════════════════════════════════
+        // 2. Matching Engine (Исполнитель ордеров)
+        // ═══════════════════════════════════════════════
+        var matchingEngineCell = await CreateCellAsync(
+            cellId: "MatchingEngine-AAPL",
+            behavior: new MatchingEngineBehavior(symbol: "AAPL"),
+            ct);
+
+        // ═══════════════════════════════════════════════
+        // 3. Портфели клиентов
+        // ═══════════════════════════════════════════════
+        var portfolioA = await CreateCellAsync(
+            cellId: "Portfolio-ClientA",
+            behavior: new PortfolioBehavior(
+                clientName: "Alice",
+                initialCash: 100_000m,
+                matchingEngineCellId: "MatchingEngine-AAPL"),
+            ct);
+
+        var portfolioB = await CreateCellAsync(
+            cellId: "Portfolio-ClientB",
+            behavior: new PortfolioBehavior(
+                clientName: "Bob",
+                initialCash: 250_000m,
+                matchingEngineCellId: "MatchingEngine-AAPL"),
+            ct);
+
+        // Запускаем все ячейки
+        _logger.LogInformation("▶️ Starting all trading cells...");
+        foreach (var cell in _cells)
+        {
+            await cell.StartAsync(ct);
+        }
+
+        _logger.LogInformation(
+            "✅ Trading topology: {Cells}",
+            string.Join(" ↔ ", _cells.Select(c => c.CellId)));
+    }
+
+    /// <summary>
+    /// Симуляция: оркестратор периодически отправляет ордера
+    /// от имени клиентов в MatchingEngine
+    /// </summary>
+    private async Task RunOrderSimulationAsync(CancellationToken ct)
+    {
+        var random = new Random(42); // Детерминированный для воспроизводимости
+        var orderNum = 0;
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(3), ct);
+
+                orderNum++;
+                var isBuy = random.Next(2) == 0;
+                var clientCellId = orderNum % 2 == 0
+                    ? "Portfolio-ClientA"
+                    : "Portfolio-ClientB";
+                var clientName = orderNum % 2 == 0 ? "Alice" : "Bob";
+
+                // Лимитная цена: ~185 ± 2
+                var limitPrice = Math.Round(183m + (decimal)random.NextDouble() * 4m, 2);
+                var quantity = (random.Next(5) + 1) * 10; // 10, 20, 30, 40, 50
+
+                var order = new OrderEvent(
+                    EventId: $"order-{Guid.NewGuid():N}"[..16],
+                    Timestamp: DateTime.UtcNow,
+                    OrderId: $"SIM-{orderNum:D4}",
+                    ClientCellId: clientCellId,
+                    Symbol: "AAPL",
+                    Price: limitPrice,
+                    Quantity: quantity,
+                    Side: isBuy ? OrderSide.Buy : OrderSide.Sell,
+                    OrderType: OrderType.Limit,
+                    TargetCellId: "MatchingEngine-AAPL");
+
+                _logger.LogInformation(
+                    "📤 [ORCH] {Client} places order: {Side} {Qty} AAPL @ {Price} (Limit)",
+                    clientName, order.Side, order.Quantity, order.Price);
+
+                // Отправляем ордер в MatchingEngine
+                await _hub.PublishAsync("MatchingEngine-AAPL", order);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in order simulation");
+            }
+        }
+    }
+
+    private async Task<IFractalCell> CreateCellAsync(
+        string cellId,
+        ICellBehavior behavior,
+        CancellationToken ct)
+    {
+        var config = new FractalCellConfiguration
+        {
+            CellId = cellId,
+            BackgroundServiceCount = 1,
+            InternalBusType = BusType.Channels,
+            ExternalBusType = BusType.Channels,
+            BusSettings = new BusSettings
+            {
+                Capacity = 5000,
+                MaxParallelism = 2
+            }
+        };
+
+        var cell = await FractalCellFactory.CreateAsync(
+            config, _hub, _loggerFactory, behavior, ct);
+
+        _cells.Add(cell);
+
+        _logger.LogInformation("📦 Cell {CellId} created ({Behavior})",
+            cellId, behavior.GetType().Name);
+
+        return cell;
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("🛑 Stopping all trading cells...");
+
+        foreach (var cell in _cells)
+        {
+            await cell.StopAsync(cancellationToken);
+        }
+
+        _logger.LogInformation("✅ All trading cells stopped");
+        await base.StopAsync(cancellationToken);
+    }
+}
+----------------
+Новые файлы (создать):
+--------------
+├── Trading/
+│   ├── Events/
+│   │   └── TradingEvents.cs         ← Шаг 5
+│   └── Behaviors/
+│       ├── QuoteGeneratorBehavior.cs ← Шаг 6
+│       ├── MatchingEngineBehavior.cs ← Шаг 7
+│       └── PortfolioBehavior.cs      ← Шаг 8
+├── Core/
+│   └── Behaviors/
+│       └── ICellBehavior.cs          ← из предыдущего сообщения (Шаг 1)
+-------------------
+Обновлённые файлы (заменить):
+├── Core/Templates/FractalCellTemplate.cs     ← из предыдущего сообщения (Шаг 2)
+├── Core/FractalCellFactory.cs                ← из предыдущего сообщения (Шаг 4)
+├── Implementations/Channels/ChannelFractalCell.cs ← из предыдущего сообщения (Шаг 3)
+├── Worker.cs                                 ← Шаг 9 (выше)
+------------------------------------------------
+Неизменные файлы (оставить как есть):
+-----------------------------------------------
+
+├── Core/Interfaces/*                         ← без изменений
+├── Core/Configuration/*                      ← без изменений
+├── Core/Templates/ExternalBusTemplate.cs     ← без изменений
+├── Core/Templates/InternalBusTemplate.cs     ← без изменений
+├── Implementations/Channels/ChannelExternalBus.cs  ← без изменений
+├── Implementations/Channels/ChannelInternalBus.cs  ← без изменений
+├── Implementations/FractalEventHub.cs        ← без изменений
+├── Model/FractalEvent.cs                     ← без изменений
+├── Program.cs                                ← без изменений
+---------------
+T=0s    🚀 Система запускается
+        📈 QuoteGen начинает генерировать AAPL @ ~185.00
+
+T=0.5s  📈 [AAPL] Bid=184.95 Ask=185.05  → Broadcast → все получают
+T=1.0s  📈 [AAPL] Bid=185.10 Ask=185.20  → Broadcast
+T=1.5s  📈 [AAPL] Bid=184.85 Ask=184.95  → Broadcast
+
+T=2.0s  📤 [ORCH] Alice places order: Buy 30 AAPL @ 184.90 (Limit)
+        ⚙️ [ME] Order SIM-0001 added to book. Pending: 1
+            (Ask=184.95 > 184.90 → не исполняется, ждёт)
+
+T=2.5s  📈 [AAPL] Bid=184.70 Ask=184.80  → Broadcast
+        ⚙️ [ME] Ask=184.80 ≤ 184.90 → EXECUTED!
+        ✅ [ME] TRADE: T00001 | Buy 30 AAPL @ 184.90 → Portfolio-ClientA
+        💼 [Alice] TRADE CONFIRMED: T00001 | Cash: 94,453.00 | Position: 30 @ 184.90
+
+T=3.0s  📤 [ORCH] Bob places order: Sell 20 AAPL @ 185.50 (Limit)
+        ⚙️ [ME] Order added to book (Bid < 185.50 → ждёт)
+
+T=4.5s  📈 [AAPL] Bid=185.60 Ask=185.70
+        ⚙️ [ME] Bid=185.60 ≥ 185.50 → EXECUTED!
+        ✅ [ME] TRADE: T00002 | Sell 20 AAPL @ 185.50 → Portfolio-ClientB
+        💼 [Bob] TRADE CONFIRMED: T00002 | Cash: 253,710.00
+
+...и так далее, бесконечно живой рынок 🏛️
+-------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------
+Второй вариант.
+---------------------------------------------------------------------------------------------------------------------------
+
+
+

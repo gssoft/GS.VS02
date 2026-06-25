@@ -1,0 +1,514 @@
+T4 Templates (.tt) — это генераторы исходного кода в Visual Studio и .NET!
+
+Что такое T4 (Text Template Transformation Toolkit):
+Это технология, которая позволяет автоматически генерировать C# код на основе шаблонов. Вы пишете шаблон с логикой, а Visual Studio генерирует готовый .cs файл.
+
+Простой пример T4 шаблона:
+ChannelCellTemplate.tt — ШАБЛОН:
+t4
+<#@ template debug="true" hostspecific="true" language="C#" #>
+<#@ output extension=".generated.cs" #>
+<#@ parameter name="CellName" type="System.String" #>
+<#@ parameter name="Capacity" type="System.Int32" #>
+<#
+    // Это C# код, который выполняется во время генерации
+    string className = $"{CellName}ChannelCell";
+    string busClassName = $"{CellName}ChannelBus";
+#>
+// Автоматически сгенерированный код из шаблона ChannelCellTemplate.tt
+// Время генерации: <#= DateTime.Now #>
+
+using System;
+using System.Threading.Tasks;
+
+namespace FractalCell.Generated
+{
+    public class <#= className #> : FractalCellTemplate<ChannelInternalBus, ChannelExternalBus>
+    {
+        private readonly int _capacity = <#= Capacity #>;
+        
+        public <#= className #>(
+            CellConfiguration configuration,
+            ChannelInternalBus internalBus,
+            ChannelExternalBus externalBus)
+            : base(configuration, internalBus, externalBus)
+        {
+        }
+
+        protected override IEnumerable<BackgroundService> CreateBackgroundServices()
+        {
+            for (int i = 0; i < Configuration.BackgroundServiceCount; i++)
+            {
+                yield return new ChannelBackgroundService(
+                    $"<#= CellName #>-worker-{i}",
+                    InternalBus,
+                    Logger,
+                    Configuration);
+            }
+        }
+
+        protected override void ConfigureHandlers()
+        {
+            InternalBus.Subscribe<FractalEvent>(async fractalEvent =>
+            {
+                Logger.LogInformation("<#= CellName #> received: {EventType}", 
+                    fractalEvent.EventType);
+                
+                // Специфичная логика для <#= CellName #>
+                await Process<#= CellName #>EventAsync(fractalEvent);
+            });
+        }
+
+        private async Task Process<#= CellName #>EventAsync(FractalEvent @event)
+        {
+            // Кастомная обработка для этой ячейки
+            Logger.LogInformation("Processing in <#= CellName #> cell with capacity <#= Capacity #>");
+            
+            switch (@event.EventType)
+            {
+                case "<#= CellName #>DataProcess":
+                    // Специфичная обработка
+                    break;
+                default:
+                    await ExternalBus.SendToCellAsync(@event.TargetCellId, @event);
+                    break;
+            }
+        }
+    }
+}
+Что получится при генерации:
+При запуске шаблона с параметрами CellName = "Stratosphere" и Capacity = 5000 сгенерируется:
+
+ChannelCellTemplate.generated.cs — РЕЗУЛЬТАТ:
+csharp
+// Автоматически сгенерированный код из шаблона ChannelCellTemplate.tt
+// Время генерации: 22.06.2026 15:30:00
+
+using System;
+using System.Threading.Tasks;
+
+namespace FractalCell.Generated
+{
+    public class StratosphereChannelCell : FractalCellTemplate<ChannelInternalBus, ChannelExternalBus>
+    {
+        private readonly int _capacity = 5000;
+        
+        public StratosphereChannelCell(
+            CellConfiguration configuration,
+            ChannelInternalBus internalBus,
+            ChannelExternalBus externalBus)
+            : base(configuration, internalBus, externalBus)
+        {
+        }
+
+        protected override IEnumerable<BackgroundService> CreateBackgroundServices()
+        {
+            for (int i = 0; i < Configuration.BackgroundServiceCount; i++)
+            {
+                yield return new ChannelBackgroundService(
+                    $"Stratosphere-worker-{i}",
+                    InternalBus,
+                    Logger,
+                    Configuration);
+            }
+        }
+
+        protected override void ConfigureHandlers()
+        {
+            InternalBus.Subscribe<FractalEvent>(async fractalEvent =>
+            {
+                Logger.LogInformation("Stratosphere received: {EventType}", 
+                    fractalEvent.EventType);
+                
+                // Специфичная логика для Stratosphere
+                await ProcessStratosphereEventAsync(fractalEvent);
+            });
+        }
+
+        private async Task ProcessStratosphereEventAsync(FractalEvent @event)
+        {
+            // Кастомная обработка для этой ячейки
+            Logger.LogInformation("Processing in Stratosphere cell with capacity 5000");
+            
+            switch (@event.EventType)
+            {
+                case "StratosphereDataProcess":
+                    // Специфичная обработка
+                    break;
+                default:
+                    await ExternalBus.SendToCellAsync(@event.TargetCellId, @event);
+                    break;
+            }
+        }
+    }
+}
+Продвинутый шаблон с конфигурацией из JSON:
+TplCellTemplate.tt:
+t4
+<#@ template debug="true" hostspecific="true" language="C#" #>
+<#@ output extension=".generated.cs" #>
+<#@ assembly name="System.Core" #>
+<#@ assembly name="System.Text.Json" #>
+<#@ import namespace="System.IO" #>
+<#@ import namespace="System.Text.Json" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#
+    // Читаем конфигурацию из JSON файла
+    string configPath = Path.Combine(Path.GetDirectoryName(this.Host.TemplateFile), "cell-config.json");
+    string jsonContent = File.ReadAllText(configPath);
+    
+    var configs = JsonSerializer.Deserialize<List<CellConfig>>(jsonContent);
+    
+    foreach(var config in configs)
+    {
+        GenerateCellClass(config);
+    }
+    
+    void GenerateCellClass(CellConfig config)
+    {
+#>
+// ===== Сгенерировано для ячейки: <#= config.Name #> =====
+
+public class <#= config.Name #>TplFractalCell : FractalCellTemplate<TplInternalBus, TplExternalBus>
+{
+    private readonly int _maxParallelism = <#= config.MaxParallelism #>;
+    private readonly string _region = "<#= config.Region #>";
+    
+    public <#= config.Name #>TplFractalCell(
+        CellConfiguration configuration,
+        TplInternalBus internalBus,
+        TplExternalBus externalBus)
+        : base(configuration, internalBus, externalBus)
+    {
+    }
+
+    protected override IEnumerable<BackgroundService> CreateBackgroundServices()
+    {
+        <# for(int i = 0; i < config.WorkerCount; i++) { #>
+        yield return new TplBackgroundService(
+            new ActionBlock<IApplicationEvent>(
+                async e => await ProcessWorker<#= i #>Async(e),
+                new ExecutionDataflowBlockOptions 
+                { 
+                    MaxDegreeOfParallelism = <#= config.MaxParallelism #>,
+                    BoundedCapacity = <#= config.Capacity #>
+                }),
+            "<#= config.Name #>-worker-<#= i #>",
+            Logger);
+        <# } #>
+    }
+
+    <# for(int i = 0; i < config.WorkerCount; i++) { #>
+    private async Task ProcessWorker<#= i #>Async(IApplicationEvent @event)
+    {
+        Logger.LogInformation("Worker <#= i #> in <#= config.Name #> processing event from region <#= config.Region #>");
+        
+        if (@event is FractalEvent fractalEvent)
+        {
+            switch (fractalEvent.EventType)
+            {
+    <# foreach(var handler in config.Handlers) { #>
+                case "<#= handler.EventType #>":
+                    // <#= handler.Description #>
+                    await Task.Delay(<#= handler.ProcessingDelayMs #>);
+                    break;
+    <# } #>
+            }
+        }
+    }
+    <# } #>
+
+    protected override void ConfigureHandlers()
+    {
+        InternalBus.Subscribe<FractalEvent>(async fractalEvent =>
+        {
+            await ExternalBus.SendToCellAsync(fractalEvent.TargetCellId, fractalEvent);
+        });
+    }
+}
+<#
+    }
+#>
+
+<#+
+// Вспомогательный класс для десериализации
+public class CellConfig
+{
+    public string Name { get; set; }
+    public string Region { get; set; }
+    public int WorkerCount { get; set; }
+    public int MaxParallelism { get; set; }
+    public int Capacity { get; set; }
+    public List<HandlerConfig> Handlers { get; set; }
+}
+
+public class HandlerConfig
+{
+    public string EventType { get; set; }
+    public string Description { get; set; }
+    public int ProcessingDelayMs { get; set; }
+}
+#>
+cell-config.json:
+json
+[
+    {
+        "Name": "Stratosphere",
+        "Region": "north",
+        "WorkerCount": 3,
+        "MaxParallelism": 4,
+        "Capacity": 5000,
+        "Handlers": [
+            {
+                "EventType": "StratosphereDataProcess",
+                "Description": "Обработка данных стратосферы",
+                "ProcessingDelayMs": 100
+            },
+            {
+                "EventType": "Heartbeat",
+                "Description": "Проверка жизнеспособности",
+                "ProcessingDelayMs": 10
+            }
+        ]
+    }
+]
+Как использовать .tt файлы:
+В Visual Studio: Правый клик на .tt файл → "Run Custom Tool"
+
+В командной строке: TextTransform.exe ChannelCellTemplate.tt
+
+В CI/CD: Автоматическая генерация перед сборкой
+
+Преимущества T4 для вашей архитектуры:
+Массовое создание ячеек: Один шаблон → сотни сгенерированных классов
+
+Конфигурация из JSON: Меняете конфиг → перегенерируете код
+
+Типобезопасность: Генерируется строго типизированный C# код
+
+Шаблонизация поведения: Разные .tt для разных паттернов обработки
+
+Это и есть та самая "фабрика фрактальных ячеек" — пишете конфиг, запускаете шаблон, получаете готовые классы! 🚀
+
+При запуске шаблона с параметрами CellName = "Stratosphere" и Capacity = 5000 сгенерируется:
+Где задаются эти параметры ?
+Отличный вопрос! Параметры в T4 шаблонах можно задавать несколькими способами, в зависимости от того, как вы запускаете генерацию.
+
+Способ 1: Передача параметров в коде (Runtime T4)
+Program.cs или скрипт генерации:
+csharp
+using Microsoft.VisualStudio.TextTemplating;
+using System.CodeDom.Compiler;
+
+// Создаем экземпляр шаблона
+var template = new ChannelCellTemplate();
+
+// Создаем сессию и передаем параметры
+var session = new Dictionary<string, object>();
+session["CellName"] = "Stratosphere";
+session["Capacity"] = 5000;
+session["BackgroundServiceCount"] = 3;
+session["EnableLogging"] = true;
+
+// Инициализируем сессию шаблона
+template.Session = session;
+
+// Инициализируем шаблон
+template.Initialize();
+
+// Генерируем код
+string generatedCode = template.TransformText();
+
+// Сохраняем в файл
+File.WriteAllText("Generated/StratosphereChannelCell.generated.cs", generatedCode);
+Способ 2: Через файл конфигурации (Design-time T4)
+ChannelCellTemplate.tt:
+t4
+<#@ template debug="true" hostspecific="true" language="C#" #>
+<#@ output extension=".generated.cs" #>
+<#@ assembly name="System.Core" #>
+<#@ assembly name="System.Text.Json" #>
+<#@ import namespace="System.IO" #>
+<#@ import namespace="System.Text.Json" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#
+    // Читаем параметры из JSON файла
+    string configPath = this.Host.ResolvePath("generation-config.json");
+    string jsonContent = File.ReadAllText(configPath);
+    
+    var configs = JsonSerializer.Deserialize<List<GenerationConfig>>(jsonContent);
+    
+    foreach(var config in configs)
+    {
+        // Используем параметры из конфига
+        string cellName = config.CellName;
+        int capacity = config.Capacity;
+        int workerCount = config.BackgroundServiceCount;
+        
+        // Генерируем код с этими параметрами
+        GenerateClass(cellName, capacity, workerCount);
+    }
+#>
+generation-config.json (лежит рядом с .tt файлом):
+json
+[
+    {
+        "CellName": "Stratosphere",
+        "Capacity": 5000,
+        "BackgroundServiceCount": 3,
+        "MaxParallelism": 4,
+        "Region": "north"
+    },
+    {
+        "CellName": "Troposphere",
+        "Capacity": 3000,
+        "BackgroundServiceCount": 2,
+        "MaxParallelism": 2,
+        "Region": "south"
+    },
+    {
+        "CellName": "Mesosphere",
+        "Capacity": 7000,
+        "BackgroundServiceCount": 5,
+        "MaxParallelism": 8,
+        "Region": "equator"
+    }
+]
+Способ 3: Параметры из переменных окружения
+ChannelCellTemplate.tt:
+t4
+<#@ template debug="true" hostspecific="true" language="C#" #>
+<#@ output extension=".generated.cs" #>
+<#@ import namespace="System" #>
+<#
+    // Читаем параметры из переменных окружения
+    string cellName = Environment.GetEnvironmentVariable("CELL_NAME") ?? "DefaultCell";
+    int capacity = int.Parse(Environment.GetEnvironmentVariable("CELL_CAPACITY") ?? "1000");
+    int workers = int.Parse(Environment.GetEnvironmentVariable("CELL_WORKERS") ?? "2");
+    
+    // Генерируем с этими параметрами
+#>
+Запуск с параметрами:
+
+bash
+# Windows
+set CELL_NAME=Stratosphere
+set CELL_CAPACITY=5000
+set CELL_WORKERS=3
+TextTransform.exe ChannelCellTemplate.tt
+
+# Linux/Mac
+export CELL_NAME=Stratosphere
+export CELL_CAPACITY=5000
+export CELL_WORKERS=3
+mono TextTransform.exe ChannelCellTemplate.tt
+Способ 4: Параметры из командной строки
+Кастомный скрипт генерации generate-cells.ps1:
+powershell
+param(
+    [string]$CellName = "DefaultCell",
+    [int]$Capacity = 1000,
+    [int]$Workers = 2
+)
+
+# Заменяем параметры в шаблоне
+$templateContent = Get-Content "ChannelCellTemplate.tt" -Raw
+$templateContent = $templateContent -replace '\$CellName\$', $CellName
+$templateContent = $templateContent -replace '\$Capacity\$', $Capacity
+$templateContent = $templateContent -replace '\$Workers\$', $Workers
+
+# Сохраняем временный шаблон
+$tempTemplate = "Temp_ChannelCellTemplate.tt"
+$templateContent | Set-Content $tempTemplate
+
+# Генерируем код
+& "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\TextTransform.exe" $tempTemplate
+
+# Переименовываем результат
+Move-Item "Temp_ChannelCellTemplate.generated.cs" "$CellNameChannelCell.generated.cs"
+Remove-Item $tempTemplate
+Запуск:
+
+powershell
+# Генерация для Стратосферы
+.\generate-cells.ps1 -CellName "Stratosphere" -Capacity 5000 -Workers 3
+
+# Генерация для Тропосферы
+.\generate-cells.ps1 -CellName "Troposphere" -Capacity 3000 -Workers 2
+
+# Генерация для Мезосферы
+.\generate-cells.ps1 -CellName "Mesosphere" -Capacity 7000 -Workers 5
+Способ 5: Использование T4 Toolbox (расширенные параметры)
+Установка T4 Toolbox:
+xml
+<PackageReference Include="T4Toolbox" Version="1.0.0" />
+ChannelCellTemplate.tt с T4 Toolbox:
+t4
+<#@ template language="C#" hostspecific="true" #>
+<#@ output extension=".generated.cs" #>
+<#@ include file="T4Toolbox.tt" #>
+<#
+    // Создаем генератор с параметрами
+    var generator = new CellGenerator
+    {
+        CellName = "Stratosphere",
+        Capacity = 5000,
+        WorkerCount = 3
+    };
+    
+    generator.Run();
+#>
+Способ 6: Интерактивный ввод (для отладки)
+ChannelCellTemplate.tt:
+t4
+<#@ template debug="true" hostspecific="true" language="C#" #>
+<#@ output extension=".generated.cs" #>
+<#
+    // При debug=true можно использовать интерактивный ввод
+    string cellName = "Stratosphere";
+    int capacity = 5000;
+    int workers = 3;
+    
+    if (this.Errors.HasErrors == false)
+    {
+        // В режиме отладки можно запросить параметры
+        Console.Write("Enter cell name: ");
+        cellName = Console.ReadLine();
+    }
+#>
+Самый удобный способ для вашего проекта:
+Создайте cell-factory.ps1:
+powershell
+# Конфигурация всех ячеек
+$cells = @(
+    @{Name="Stratosphere"; Capacity=5000; Workers=3; Region="north"},
+    @{Name="Troposphere"; Capacity=3000; Workers=2; Region="south"},
+    @{Name="Mesosphere"; Capacity=7000; Workers=5; Region="equator"},
+    @{Name="Ionosphere"; Capacity=8000; Workers=4; Region="space"}
+)
+
+foreach ($cell in $cells) {
+    Write-Host "Generating $($cell.Name) cell..." -ForegroundColor Green
+    
+    # Создаем временный конфиг для текущей ячейки
+    $config = @{
+        CellName = $cell.Name
+        Capacity = $cell.Capacity
+        BackgroundServiceCount = $cell.Workers
+        Region = $cell.Region
+    }
+    
+    $config | ConvertTo-Json | Set-Content "generation-config.json"
+    
+    # Запускаем генерацию
+    & TextTransform.exe ChannelCellTemplate.tt
+    & TextTransform.exe TplCellTemplate.tt
+    
+    # Переименовываем результаты
+    Move-Item "ChannelCellTemplate.generated.cs" "Generated/$($cell.Name)ChannelCell.cs" -Force
+    Move-Item "TplCellTemplate.generated.cs" "Generated/$($cell.Name)TplCell.cs" -Force
+}
+
+Write-Host "All cells generated!" -ForegroundColor Cyan
+Теперь у вас есть полноценная фабрика для генерации ячеек с разными параметрами! 🏭
+
