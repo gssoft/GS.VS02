@@ -7,4 +7,5 @@
   <Project Path="FractalCell05/FractalCell05.csproj" Id="d31d9375-86e4-4a8f-8f28-b3d2be0da447" />
   <Project Path="FractalCell052/FractalCell052.csproj" Id="c1f7343b-f35d-4120-b17c-e9112e712d58" />
   <Project Path="FractalCell08/FractalCell08.csproj" Id="952ea597-9341-4d79-ac55-d7654218f640" />
+  <Project Path="FractalCellCore01/FractalCellCore01.csproj" Id="a90b4a19-0f77-41f8-a7f9-d16b307089a9" />
 </Solution>
