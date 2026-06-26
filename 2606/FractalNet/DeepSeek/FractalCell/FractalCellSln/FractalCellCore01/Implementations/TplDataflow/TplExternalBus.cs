@@ -1,4 +1,6 @@
-﻿using FractalCellCore.Core.Configuration;
+﻿// Implementations/TplDataflow/TplExternalBus.cs
+
+using FractalCellCore.Core.Configuration;
 using FractalCellCore.Core.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;

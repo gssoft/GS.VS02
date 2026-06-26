@@ -1,4 +1,6 @@
-﻿using FractalCellCore.Core.Interfaces;
+﻿// Core/Interfaces/IExternalBus.cs
+
+using FractalCellCore.Core.Interfaces;
 
 
 namespace FractalCellCore.Core.Interfaces;

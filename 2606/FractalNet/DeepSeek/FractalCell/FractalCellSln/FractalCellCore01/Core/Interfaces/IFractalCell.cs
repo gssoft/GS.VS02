@@ -1,4 +1,6 @@
-﻿using FractalCellCore.Core.Interfaces;
+﻿// Core/Interfaces/IFractalCell.cs
+
+using FractalCellCore.Core.Interfaces;
 using Microsoft.Extensions.Hosting;
 
 namespace FractalCellCore.Core.Interfaces;

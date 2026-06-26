@@ -1,4 +1,6 @@
-﻿using System.Collections.Concurrent;
+﻿// Implementations/FractalEventHub.cs
+
+using System.Collections.Concurrent;
 using System.Threading.Channels;
 
 using FractalCellCore.Core.Configuration;

@@ -1,4 +1,6 @@
-﻿using FractalCellCore.Core.Configuration;
+﻿// Core/FractalCellFactory.cs
+
+using FractalCellCore.Core.Configuration;
 using FractalCellCore.Core.Interfaces;
 using FractalCellCore.Implementations.Channels;
 using FractalCellCore.Implementations.TplDataflow;

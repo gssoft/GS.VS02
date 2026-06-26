@@ -1,4 +1,6 @@
-﻿using FractalCellCore.Core.Configuration;
+﻿// // Core/Templates/nternalBusTemplate.cs
+
+using FractalCellCore.Core.Configuration;
 using FractalCellCore.Core.Interfaces;
 
 namespace FractalCellCore.Core.Templates;

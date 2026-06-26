@@ -1,4 +1,6 @@
-﻿using System.Threading.Channels;
+﻿// Implementations/Channels/ChannelExternalBus.cs
+
+using System.Threading.Channels;
 using FractalCellCore.Core.Configuration;
 using FractalCellCore.Core.Interfaces;
 using FractalCellCore.Core.Templates;

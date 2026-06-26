@@ -1,4 +1,6 @@
-﻿using FractalCellCore.Core.Interfaces;
+﻿// Core/Interfaces/FractalEventHub.cs
+
+using FractalCellCore.Core.Interfaces;
 using System.Threading.Channels;
 
 namespace FractalCellCore.Core.Interfaces;

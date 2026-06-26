@@ -1,4 +1,6 @@
-﻿using FractalCellCore.Core.Templates;
+﻿// Implementations/Channels/ChannelFractalCell.cs
+
+using FractalCellCore.Core.Templates;
 using FractalCellCore.Core.Configuration;
 
 using Microsoft.Extensions.Hosting;

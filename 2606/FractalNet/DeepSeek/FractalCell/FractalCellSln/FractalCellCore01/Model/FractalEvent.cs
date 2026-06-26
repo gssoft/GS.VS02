@@ -1,4 +1,6 @@
-﻿using FractalCellCore.Core.Interfaces;
+﻿// Model/FractalEvent.cs
+
+using FractalCellCore.Core.Interfaces;
 
 namespace FractalCellCore;
 

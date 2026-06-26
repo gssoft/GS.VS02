@@ -1,4 +1,7 @@
-﻿using FractalCellCore.Core.Interfaces;
+﻿// -------------------------------
+// Core/Interfaces/InternalBus.cs
+
+using FractalCellCore.Core.Interfaces;
 
 namespace FractalCellCore.Core.Interfaces;
 

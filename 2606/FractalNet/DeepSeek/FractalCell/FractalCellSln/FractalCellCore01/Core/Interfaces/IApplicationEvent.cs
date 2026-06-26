@@ -1,4 +1,6 @@
-﻿namespace FractalCellCore.Core.Interfaces;
+﻿// Core/Interfaces/IApplicationEvent.cs
+
+namespace FractalCellCore.Core.Interfaces;
 
 public interface IApplicationEvent
 {

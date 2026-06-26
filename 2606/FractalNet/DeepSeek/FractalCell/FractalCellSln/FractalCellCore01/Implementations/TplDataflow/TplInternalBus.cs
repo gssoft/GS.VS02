@@ -1,4 +1,6 @@
-﻿using FractalCellCore.Core.Common;
+﻿// Implementations/TplDataflow/TplInternalBus.cs
+
+using FractalCellCore.Core.Common;
 using FractalCellCore.Core.Configuration;
 using FractalCellCore.Core.Interfaces;
 using FractalCellCore.Core.Templates;

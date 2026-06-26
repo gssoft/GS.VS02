@@ -1,4 +1,6 @@
-﻿using FractalCellCore.Core.Configuration;
+﻿// Core/Templates/ractalCellTemplate.cs
+
+using FractalCellCore.Core.Configuration;
 using FractalCellCore.Core.Interfaces;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

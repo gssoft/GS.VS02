@@ -1,0 +1,494 @@
+﻿26.06.26
+D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln\FractalCellApp01\FractalCellApp01.csproj
+-------------------------------------------------
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-FractalCellApp01-3513ac06-82b3-4045-8a4c-e9bcacfe71bd</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FractalCellCore01\FractalCellCore01.csproj" />
+  </ItemGroup>
+</Project>
+----------------------------------------------------
+// Behaviors/ DataProcessingBehavior.cs
+
+using System.Diagnostics;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellApp.Behaviors;
+
+/// <summary>
+/// Поведение для обработки данных
+/// </summary>
+public class DataProcessingBehavior : EventBehaviorTemplate<FractalEvent>, ILifecycleBehavior
+{
+    private readonly Stopwatch _stopwatch = new();
+    private int _processedCount;
+    private readonly int _maxParallelProcessing;
+
+    public override string BehaviorId => "DataProcessingBehavior";
+
+    public DataProcessingBehavior(
+        ILogger<DataProcessingBehavior>? logger = null,
+        int maxParallelProcessing = 3)
+        : base(logger)
+    {
+        _maxParallelProcessing = maxParallelProcessing;
+    }
+
+    protected override async Task HandleEventAsync(FractalEvent @event)
+    {
+        if (@event.EventType != "ProcessData")
+            return;
+
+        Interlocked.Increment(ref _processedCount);
+
+        _logger?.LogInformation(
+            "📊 [DataProcessing] Processing data: EventId={EventId}, Source={Source}, Payload={Payload}",
+            @event.EventId,
+            @event.SourceCellId,
+            @event.Payload);
+
+        // Имитация обработки данных
+        await Task.Delay(100);
+
+        _logger?.LogInformation(
+            "✅ [DataProcessing] Data processed successfully: {EventId}",
+            @event.EventId);
+    }
+
+    public async Task OnCellStartingAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("🚀 [DataProcessing] Cell starting, resetting counters");
+        Interlocked.Exchange(ref _processedCount, 0);
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStartedAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("✅ [DataProcessing] Cell started, ready to process data");
+        _stopwatch.Start();
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStoppingAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏹️ [DataProcessing] Cell stopping, final stats: {Count} items processed",
+            _processedCount);
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStoppedAsync(CancellationToken ct)
+    {
+        _stopwatch.Stop();
+        _logger?.LogInformation("🏁 [DataProcessing] Cell stopped. Total time: {Elapsed}, Items: {Count}",
+            _stopwatch.Elapsed, _processedCount);
+        await Task.CompletedTask;
+    }
+}
+---------------------------------------------
+// Behaviors/ HeartbeatBehavior.cs
+
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using FractalCellApp;
+
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellApp.Behaviors;
+
+/// <summary>
+/// Поведение для обработки heartbeat-событий
+/// </summary>
+public class HeartbeatBehavior : EventBehaviorTemplate<FractalEvent>
+{
+    private int _heartbeatCount;
+    private readonly TimeSpan _heartbeatInterval;
+
+    public override string BehaviorId => "HeartbeatBehavior";
+
+    public HeartbeatBehavior(ILogger<HeartbeatBehavior>? logger = null, TimeSpan? interval = null)
+        : base(logger)
+    {
+        _heartbeatInterval = interval ?? TimeSpan.FromSeconds(5);
+    }
+
+    protected override async Task HandleEventAsync(FractalEvent @event)
+    {
+        if (@event.EventType != "Heartbeat")
+            return;
+
+        _heartbeatCount++;
+
+        _logger?.LogInformation(
+            "❤️ [Heartbeat] Count: {Count}, Source: {Source}, Target: {Target}, Timestamp: {Timestamp}",
+            _heartbeatCount,
+            @event.SourceCellId,
+            @event.TargetCellId,
+            @event.Timestamp);
+
+        // Если ячейка активна, можно отправить ответный heartbeat
+        if (_heartbeatCount % 3 == 0 && _attachedCell != null)
+        {
+            _logger?.LogInformation("🔄 [Heartbeat] Sending response from {CellId}",
+                _attachedCell.CellId);
+
+            var responseEvent = new FractalEvent(
+                $"response-{DateTime.UtcNow.Ticks}",
+                DateTime.UtcNow,
+                _attachedCell.CellId,
+                @event.SourceCellId,
+                "HeartbeatResponse",
+                new
+                {
+                    ReceivedAt = DateTime.UtcNow,
+                    HeartbeatCount = _heartbeatCount
+                }
+            );
+
+            await _attachedCell.ExternalBus.SendToCellAsync(
+                @event.SourceCellId,
+                responseEvent
+            );
+        }
+    }
+}
+
+--------------------------------------
+// Model/FractalEvent.cs
+
+using FractalCellCore.Core.Interfaces;
+
+namespace FractalCellApp;
+
+/// <summary>
+/// Базовое событие для фрактальной системы
+/// </summary>
+public record FractalEvent : IApplicationEvent
+{
+    public required string EventId { get; init; }
+    public required DateTime Timestamp { get; init; }
+    public required string SourceCellId { get; init; }
+    public required string TargetCellId { get; init; }
+    public required string EventType { get; init; }
+    public required object Payload { get; init; }
+
+    public FractalEvent() { }
+
+    public FractalEvent(
+        string eventId,
+        DateTime timestamp,
+        string sourceCellId,
+        string targetCellId,
+        string eventType,
+        object payload)
+    {
+        EventId = eventId;
+        Timestamp = timestamp;
+        SourceCellId = sourceCellId;
+        TargetCellId = targetCellId;
+        EventType = eventType;
+        Payload = payload;
+    }
+}
+
+/// <summary>
+/// Расширенное событие с дополнительными метаданными
+/// </summary>
+public record ExtendedFractalEvent : FractalEvent
+{
+    public string? CorrelationId { get; init; }
+    public int RetryCount { get; init; } = 0;
+    public Dictionary<string, object> Metadata { get; init; } = new();
+
+    public ExtendedFractalEvent(
+        string eventId,
+        DateTime timestamp,
+        string sourceCellId,
+        string targetCellId,
+        string eventType,
+        object payload,
+        string? correlationId = null,
+        int retryCount = 0,
+        Dictionary<string, object>? metadata = null)
+        : base(eventId, timestamp, sourceCellId, targetCellId, eventType, payload)
+    {
+        CorrelationId = correlationId;
+        RetryCount = retryCount;
+        Metadata = metadata ?? new Dictionary<string, object>();
+    }
+}
+------------------------------------------------------------
+// Worker.cs
+
+using FractalCellApp.Behaviors;
+using FractalCellCore.Core;
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Implementations;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellApp;
+
+public class Worker : BackgroundService
+{
+    private readonly ILogger<Worker> _logger;
+    private readonly IFractalEventHub _hub;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly List<IFractalCell> _cells = new();
+
+    public Worker(
+        ILogger<Worker> logger,
+        IFractalEventHub hub,
+        ILoggerFactory loggerFactory)
+    {
+        _logger = logger;
+        _hub = hub;
+        _loggerFactory = loggerFactory;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("🚀 Worker (Orchestrator) started");
+
+        try
+        {
+            await InitializeSystemAsync(stoppingToken);
+
+            _logger.LogInformation("✅ System initialized with behaviors. Starting orchestration loop...");
+
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await OrchestrateWithBehaviorsAsync(stoppingToken);
+                    await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogInformation("⏹️ Orchestration loop canceled");
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "❌ Error in orchestration loop");
+                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("👋 Worker stopping due to cancellation");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Critical worker error");
+        }
+        finally
+        {
+            _logger.LogInformation("🏁 Worker (Orchestrator) finished");
+        }
+    }
+
+    private async Task InitializeSystemAsync(CancellationToken ct)
+    {
+        _logger.LogInformation("🏗️ Initializing fractal system with behaviors...");
+
+        // Создаем корневую ячейку с поведением Heartbeat
+        var rootCell = await CreateCellWithBehaviorAsync<HeartbeatBehavior>(
+            "Root", 3, ct);
+        _cells.Add(rootCell);
+
+        // Создаем дочерние ячейки с разными поведениями
+        var childConfigs = new[]
+        {
+            ("Child-A", 2, typeof(HeartbeatBehavior)),
+            ("Child-B", 2, typeof(DataProcessingBehavior)),
+            ("Child-C", 1, typeof(DataProcessingBehavior))
+        };
+
+        foreach (var (id, workers, behaviorType) in childConfigs)
+        {
+            var child = await CreateCellWithBehaviorAsync(
+                id, workers, ct, behaviorType);
+            _cells.Add(child);
+        }
+
+        _logger.LogInformation("🔍 System cells: {Count}", _cells.Count);
+        foreach (var cell in _cells)
+        {
+            _logger.LogInformation("🔍 Cell: {CellId}", cell.CellId);
+        }
+
+        _logger.LogInformation("▶️ Starting all cells...");
+        await Task.WhenAll(_cells.Select(c => c.StartAsync(ct)));
+
+        _logger.LogInformation("✅ System initialized with {Count} cells and behaviors", _cells.Count);
+    }
+
+    private async Task<IFractalCell> CreateCellWithBehaviorAsync<TBehavior>(
+        string cellId,
+        int workers,
+        CancellationToken ct,
+        Type? behaviorType = null)
+        where TBehavior : IBehavior, new()
+    {
+        var config = new FractalCellConfiguration
+        {
+            CellId = cellId,
+            BackgroundServiceCount = workers,
+            InternalBusType = BusType.Channels,
+            ExternalBusType = BusType.Channels,
+            BusSettings = new BusSettings
+            {
+                Capacity = 1000,
+                MaxParallelism = 4
+            }
+        };
+
+        // Используем фабрику с поведением
+        var cell = await FractalCellFactory.CreateWithBehaviorAsync<TBehavior>(
+            config, _hub, _loggerFactory, ct: ct);
+
+        _logger.LogInformation("📦 Cell {CellId} created with behavior {BehaviorName} and {Workers} workers",
+            cellId, typeof(TBehavior).Name, workers);
+
+        return cell;
+    }
+
+    private async Task<IFractalCell> CreateCellWithBehaviorAsync(
+        string cellId,
+        int workers,
+        CancellationToken ct,
+        Type behaviorType)
+    {
+        var config = new FractalCellConfiguration
+        {
+            CellId = cellId,
+            BackgroundServiceCount = workers,
+            InternalBusType = BusType.Channels,
+            ExternalBusType = BusType.Channels,
+            BusSettings = new BusSettings
+            {
+                Capacity = 1000,
+                MaxParallelism = 4
+            }
+        };
+
+        // Динамическое создание поведения
+        var behavior = (IBehavior)Activator.CreateInstance(behaviorType, _loggerFactory.CreateLogger(behaviorType))!;
+
+        var cell = await FractalCellFactory.CreateWithBehaviorsAsync(
+            config, _hub, _loggerFactory, new[] { behavior }, ct);
+
+        _logger.LogInformation("📦 Cell {CellId} created with behavior {BehaviorName} and {Workers} workers",
+            cellId, behaviorType.Name, workers);
+
+        return cell;
+    }
+
+    private async Task OrchestrateWithBehaviorsAsync(CancellationToken ct)
+    {
+        if (_cells.Count == 0) return;
+
+        var random = new Random();
+        var rootCell = _cells.First();
+        var targetCell = _cells[random.Next(_cells.Count)];
+
+        var eventTypes = new[] { "Heartbeat", "ProcessData", "Heartbeat" };
+        var eventType = eventTypes[random.Next(eventTypes.Length)];
+
+        var @event = new FractalEvent(
+            $"{eventType.ToLower()}-{DateTime.UtcNow.Ticks}",
+            DateTime.UtcNow,
+            rootCell.CellId,
+            targetCell.CellId,
+            eventType,
+            new
+            {
+                Timestamp = DateTime.UtcNow,
+                Source = "Orchestrator",
+                ActiveCells = _hub.GetActiveCells().Count,
+                Data = eventType == "ProcessData"
+                    ? new { Value = random.Next(100), Priority = random.Next(1, 5) }
+                    : new { Interval = random.Next(1, 10) }
+            }
+        );
+
+        _logger.LogInformation("📤 [ORCHESTRATOR] Sending {EventType} from {Source} to {Target}",
+            eventType, rootCell.CellId, targetCell.CellId);
+
+        await rootCell.ExternalBus.SendToCellAsync(targetCell.CellId, @event);
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("🛑 Stopping all cells...");
+
+        await Task.WhenAll(_cells.Select(c => c.StopAsync(cancellationToken)));
+
+        _logger.LogInformation("✅ All cells stopped");
+        await base.StopAsync(cancellationToken);
+    }
+}
+
+------------------------------------------------------------
+// Program.cs
+
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Implementations;
+using FractalCellApp;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+builder.Logging.SetMinimumLevel(LogLevel.Information);
+
+// Настройка конфигурации
+builder.Services.Configure<FractalCellConfiguration>(
+    builder.Configuration.GetSection("FractalCell"));
+
+// Регистрация Hub
+builder.Services.AddSingleton<IFractalEventHub, InMemoryFractalEventHub>();
+builder.Services.AddSingleton<HubSettings>(sp => new HubSettings
+{
+    ChannelCapacity = 1000,
+    EnablePersistence = false,
+    MessageTimeout = TimeSpan.FromSeconds(30)
+});
+
+// Регистрация Worker с поведением
+builder.Services.AddHostedService<Worker>();
+
+var host = builder.Build();
+
+Console.WriteLine("🚀 Starting Fractal System with Behaviors...");
+Console.WriteLine("ℹ️ Press Ctrl+C to stop");
+Console.WriteLine("🎯 Behaviors: HeartbeatBehavior, DataProcessingBehavior");
+Console.WriteLine("📊 Events: Heartbeat, ProcessData");
+Console.WriteLine();
+
+await host.RunAsync();
+
+Console.WriteLine("✅ Fractal System stopped");
+

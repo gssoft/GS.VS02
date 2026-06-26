@@ -1,4 +1,4 @@
-﻿// File to Add
+﻿// Core/Templates/BehaviorTemplate.cs
 
 using FractalCellCore.Core.Interfaces;
 using Microsoft.Extensions.Logging;

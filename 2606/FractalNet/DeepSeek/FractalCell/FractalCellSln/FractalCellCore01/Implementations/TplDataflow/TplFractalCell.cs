@@ -1,4 +1,6 @@
-﻿using FractalCellCore;
+﻿// Implementations/TplDataflow/TplFractalCell.cs
+
+using FractalCellCore;
 using FractalCellCore.Core.Configuration;
 using FractalCellCore.Core.Interfaces;
 using FractalCellCore.Core.Templates;

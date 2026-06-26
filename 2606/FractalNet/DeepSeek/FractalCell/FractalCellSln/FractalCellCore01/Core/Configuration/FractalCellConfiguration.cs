@@ -1,4 +1,6 @@
-﻿namespace FractalCellCore.Core.Configuration;
+﻿// Core/Configuration/FractalCellConfiguration.cs
+
+namespace FractalCellCore.Core.Configuration;
 
 public record FractalCellConfiguration
 {

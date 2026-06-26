@@ -1,4 +1,6 @@
-﻿namespace FractalCellCore.Core.Common;
+﻿// Core/Common/Unsubscriber.cs
+
+namespace FractalCellCore.Core.Common;
 
 public class Unsubscriber : IDisposable
 {
