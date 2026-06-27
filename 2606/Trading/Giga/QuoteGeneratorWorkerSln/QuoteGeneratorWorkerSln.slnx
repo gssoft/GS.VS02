@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="QuoteGeneratorWorker/QuoteGeneratorWorker.csproj" />
+  <Project Path="QuoteGeneratorWorker01/QuoteGeneratorWorker01.csproj" />
+</Solution>
