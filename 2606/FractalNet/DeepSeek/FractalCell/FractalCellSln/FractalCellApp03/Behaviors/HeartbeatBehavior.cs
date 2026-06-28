@@ -6,6 +6,8 @@ using Microsoft.Extensions.Logging;
 
 namespace FractalCellApp.Behaviors;
 
+// Behaviors/HeartbeatBehavior.cs
+
 /// <summary>
 /// Поведение для обработки heartbeat-событий
 /// </summary>
@@ -16,14 +18,17 @@ public class HeartbeatBehavior : EventBehaviorTemplate<FractalEvent>
 
     public override string BehaviorId => "HeartbeatBehavior";
 
-    // ✅ Добавляем параметр по умолчанию для ILogger
+    // Высокий приоритет (обрабатывается раньше других)
+    public override int Priority => 10;
+
+    // Конструктор с параметрами (для DI)
     public HeartbeatBehavior(ILogger<HeartbeatBehavior>? logger = null, TimeSpan? interval = null)
         : base(logger)
     {
         _heartbeatInterval = interval ?? TimeSpan.FromSeconds(5);
     }
 
-    // ✅ Добавляем конструктор без параметров для Activator.CreateInstance
+    // Конструктор без параметров (для Activator.CreateInstance)
     public HeartbeatBehavior() : this(null, null)
     {
     }
@@ -42,7 +47,7 @@ public class HeartbeatBehavior : EventBehaviorTemplate<FractalEvent>
             @event.TargetCellId,
             @event.Timestamp);
 
-        // Если ячейка активна, можно отправить ответный heartbeat
+        // Каждый третий heartbeat отправляем ответ
         if (_heartbeatCount % 3 == 0 && _attachedCell != null)
         {
             _logger?.LogInformation("🔄 [Heartbeat] Sending response from {CellId}",
