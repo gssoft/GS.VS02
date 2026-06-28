@@ -13,8 +13,6 @@ builder.Services.AddSingleton<OrderExecutionService>();
 builder.Services.AddSingleton<PortfolioManagementService>();
 builder.Services.AddSingleton<UiUpdateService>();
 
-
-
 // --- 3. РЕГИСТРАЦИЯ ФОНОВЫХ РАБОТНИКОВ (Background Workers) ---
 // Работники управляют жизненным циклом блоков Dataflow.
 builder.Services.AddHostedService<MarketDataGeneratorService>();
@@ -58,6 +56,7 @@ var portfolioManagerBlock = new ActionBlock<object>(async data =>
 // Broadcaster для распределения данных по обработчикам
 var linkOptions = new DataflowLinkOptions { PropagateCompletion = true };
 var dataBroadcaster = new BroadcastBlock<object>(null);
+
 dataBroadcaster.LinkTo(uiUpdateBlock, linkOptions);
 dataBroadcaster.LinkTo(orderExecutionBlock, linkOptions);
 dataBroadcaster.LinkTo(portfolioManagerBlock, linkOptions);
@@ -84,12 +83,12 @@ builder.Services.AddSingleton(portfolioManagerBlock);
 //});
 
 // Стандартная регистрация сервиса. Контейнер сам разберется с зависимостями.
-builder.Services.AddHostedService<MarketDataGeneratorService>();
+//builder.Services.AddHostedService<MarketDataGeneratorService>();
 
-// Остальные работники получают свои блоки через стандартный DI
-builder.Services.AddHostedService<OrderExecutionBackgroundWorker>();
-builder.Services.AddHostedService<PortfolioManagementBackgroundWorker>();
-builder.Services.AddHostedService<UiUpdateBackgroundWorker>();
+//// Остальные работники получают свои блоки через стандартный DI
+//builder.Services.AddHostedService<OrderExecutionBackgroundWorker>();
+//builder.Services.AddHostedService<PortfolioManagementBackgroundWorker>();
+//builder.Services.AddHostedService<UiUpdateBackgroundWorker>();
 
 
 // --- ЗАПУСК ПРИЛОЖЕНИЯ ---

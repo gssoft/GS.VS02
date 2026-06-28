@@ -41,7 +41,7 @@ namespace TradingTerminal.Services
 
             // Выводим сформированное сообщение через логгер.
             // Это позволяет централизовать вывод и при необходимости перенаправить его.
-            Console.WriteLine(message);
+            // Console.WriteLine(message);
             _logger.LogInformation(message);
 
             return Task.CompletedTask;

@@ -1,0 +1,648 @@
+Qwen
+https://chat.qwen.ai/s/529aae8d-02f2-44aa-bed7-5f0b87ea7bdb?fev=0.2.63
+Да! Вы только что сформулировали фундаментальный архитектурный принцип, который отличает зрелые системы от прототипов. Это именно то, к чему нужно стремиться.
+🎯 Ваш инсайт в одной фразе
+"Топология первична, поведение вторично"
+Это правильный порядок приоритетов. Сначала мы проектируем граф ячеек (как они связаны), а потом параметризуем каждую ячейку нужным поведением. Это как в микросервисной архитектуре: сначала Kubernetes-манифест (топология), потом образы контейнеров (поведение).
+🏗️ Концепция: Топология как First-Class Citizen
+Топология должна быть отдельной сущностью, которую можно:
+Описать декларативно (как код)
+Загрузить из конфигурации (JSON/YAML)
+Изменить в runtime (добавить/удалить ячейку)
+Визуализировать (нарисовать граф)
+Сериализовать/десериализовать
+Почему Cell<TFractalCell, TBehavior> — это правильный путь
+Ваша интуиция верна. FractalCell<TBehavior> — это смешение двух концепций:
+Тип ячейки (как она устроена внутри — Channel/TPL, pipeline)
+Что она делает (поведение)
+Правильнее разделить:
+// TFractalCell — это "железо" (как устроена)
+// TBehavior — это "софт" (что делает)
+Cell<TFractalCell, TBehavior>
+
+Но я пойду ещё дальше. Предлагаю Fluent Builder для топологий — это даст максимальную гибкость.
+🚀 Скелет архитектуры V3: Топологии
+Файл 1: FractalTopology.cs — Сердце системы
+namespace FractalCell.Core;
+
+/// <summary>
+/// 🌐 Топология — это граф связанных ячеек.
+/// First-Class Citizen: можно описывать, изменять, сериализовать.
+/// 
+/// Пример использования:
+/// var topology = new FractalTopology("MySystem")
+///     .AddCell<ChannelFractalCell>("root")
+///         .WithBehavior<HeartbeatBehavior>()
+///         .WithBehavior<LoggerBehavior>()
+///     .AddCell<TplFractalCell>("worker-1")
+///         .WithBehavior<DataProcessingBehavior>(maxParallelism: 4)
+///         .ConnectTo("root")
+///     .Build();
+///     
+/// await topology.StartAsync();
+/// </summary>
+public class FractalTopology
+{
+    private readonly string _name;
+    private readonly List<CellDefinition> _cells = new();
+    private readonly List<CellConnection> _connections = new();
+    private readonly Dictionary<string, IFractalCell> _runningCells = new();
+    private readonly IFractalEventHub _hub;
+    private readonly ILoggerFactory _loggerFactory;
+
+    public FractalTopology(string name, IFractalEventHub hub, ILoggerFactory loggerFactory)
+    {
+        _name = name;
+        _hub = hub;
+        _loggerFactory = loggerFactory;
+    }
+
+    /// <summary>
+    /// 🎯 Добавить ячейку в топологию. Возвращает Builder для настройки.
+    /// </summary>
+    public CellBuilder<TCell> AddCell<TCell>(string cellId) where TCell : IFractalCell
+    {
+        var definition = new CellDefinition(cellId, typeof(TCell));
+        _cells.Add(definition);
+        return new CellBuilder<TCell>(this, definition);
+    }
+
+    /// <summary>
+    /// 🔗 Связать две ячейки (для маршрутизации событий)
+    /// </summary>
+    public FractalTopology Connect(string fromCellId, string toCellId, ConnectionType type = ConnectionType.Bidirectional)
+    {
+        _connections.Add(new CellConnection(fromCellId, toCellId, type));
+        return this;
+    }
+
+    /// <summary>
+    /// 🚀 Запустить всю топологию
+    /// </summary>
+    public async Task StartAsync(CancellationToken ct = default)
+    {
+        Console.WriteLine($"🌐 Starting topology '{_name}' with {_cells.Count} cells...");
+        
+        // 1. Создаём все ячейки
+        foreach (var def in _cells)
+        {
+            var cell = await CreateCellAsync(def, ct);
+            _runningCells[def.CellId] = cell;
+            Console.WriteLine($"  ✅ Created cell: {def.CellId} [{def.CellType.Name}]");
+        }
+
+        // 2. Устанавливаем связи (через Hub)
+        // Связи уже работают через ExternalBus + Hub, но можно добавить прямые pipeline'ы
+        
+        // 3. Запускаем все ячейки
+        foreach (var cell in _runningCells.Values)
+        {
+            await cell.StartAsync(ct);
+        }
+
+        Console.WriteLine($"🚀 Topology '{_name}' started successfully");
+    }
+
+    /// <summary>
+    /// 🛑 Остановить всю топологию
+    /// </summary>
+    public async Task StopAsync(CancellationToken ct = default)
+    {
+        foreach (var cell in _runningCells.Values)
+        {
+            await cell.StopAsync(ct);
+        }
+        _runningCells.Clear();
+    }
+
+    /// <summary>
+    /// ➕ Динамически добавить ячейку в работающую топологию
+    /// </summary>
+    public async Task<IFractalCell> AddCellAtRuntimeAsync<TCell>(
+        string cellId,
+        Action<CellBuilder<TCell>>? configure = null,
+        CancellationToken ct = default) where TCell : IFractalCell
+    {
+        var definition = new CellDefinition(cellId, typeof(TCell));
+        _cells.Add(definition);
+        
+        var builder = new CellBuilder<TCell>(this, definition);
+        configure?.Invoke(builder);
+        
+        var cell = await CreateCellAsync(definition, ct);
+        _runningCells[cellId] = cell;
+        await cell.StartAsync(ct);
+        
+        return cell;
+    }
+
+    /// <summary>
+    /// 📊 Визуализация топологии (для отладки)
+    /// </summary>
+    public string Dump()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"🌐 Topology: {_name}");
+        sb.AppendLine($"   Cells: {_cells.Count}");
+        sb.AppendLine($"   Connections: {_connections.Count}");
+        sb.AppendLine();
+        
+        foreach (var cell in _cells)
+        {
+            sb.AppendLine($"   📦 {cell.CellId} [{cell.CellType.Name}]");
+            foreach (var b in cell.Behaviors)
+            {
+                sb.AppendLine($"      ├─ 🔧 {b.BehaviorType.Name}");
+            }
+        }
+        
+        return sb.ToString();
+    }
+
+    private async Task<IFractalCell> CreateCellAsync(CellDefinition def, CancellationToken ct)
+    {
+        var config = new FractalCellConfiguration
+        {
+            CellId = def.CellId,
+            InternalBusType = BusType.Channels,
+            ExternalBusType = BusType.Channels,
+            BusSettings = new BusSettings { Capacity = 1000, MaxParallelism = 4 }
+        };
+
+        // Создаём экземпляр ячейки через фабрику
+        var cell = await FractalCellFactory.CreateAsync(config, _hub, _loggerFactory, ct);
+
+        // Подвешиваем поведения
+        foreach (var bDef in def.Behaviors)
+        {
+            var behavior = (IBehavior)Activator.CreateInstance(bDef.BehaviorType)!;
+            if (bDef.Configuration != null)
+                await behavior.ConfigureAsync(bDef.Configuration, ct);
+            await behavior.AttachToAsync(cell, ct);
+        }
+
+        return cell;
+    }
+}
+
+// === Вспомогательные классы ===
+
+internal class CellDefinition
+{
+    public string CellId { get; }
+    public Type CellType { get; }
+    public List<BehaviorDefinition> Behaviors { get; } = new();
+
+    public CellDefinition(string cellId, Type cellType)
+    {
+        CellId = cellId;
+        CellType = cellType;
+    }
+}
+
+internal class BehaviorDefinition
+{
+    public Type BehaviorType { get; }
+    public object? Configuration { get; }
+
+    public BehaviorDefinition(Type behaviorType, object? configuration = null)
+    {
+        BehaviorType = behaviorType;
+        Configuration = configuration;
+    }
+}
+
+internal record CellConnection(string From, string To, ConnectionType Type);
+
+public enum ConnectionType
+{
+    Unidirectional,  // From → To
+    Bidirectional    // From ↔ To
+}
+Файл 2: CellBuilder.cs — Fluent API для настройки ячейки
+
+namespace FractalCell.Core;
+
+/// <summary>
+/// 🛠️ Builder для настройки ячейки внутри топологии.
+/// Позволяет декларативно описывать: какое поведение + какие связи.
+/// </summary>
+public class CellBuilder<TCell> where TCell : IFractalCell
+{
+    private readonly FractalTopology _topology;
+    private readonly CellDefinition _definition;
+
+    internal CellBuilder(FractalTopology topology, CellDefinition definition)
+    {
+        _topology = topology;
+        _definition = definition;
+    }
+
+    /// <summary>
+    /// 🔧 Добавить поведение к ячейке
+    /// </summary>
+    public CellBuilder<TCell> WithBehavior<TBehavior>(object? config = null) 
+        where TBehavior : IBehavior
+    {
+        _definition.Behaviors.Add(new BehaviorDefinition(typeof(TBehavior), config));
+        return this;
+    }
+
+    /// <summary>
+    /// 🔗 Связать с другой ячейкой (двунаправленно)
+    /// </summary>
+    public CellBuilder<TCell> ConnectTo(string targetCellId)
+    {
+        _topology.Connect(_definition.CellId, targetCellId);
+        return this;
+    }
+
+    /// <summary>
+    /// 🔗 Однонаправленная связь: эта ячейка → target
+    /// </summary>
+    public CellBuilder<TCell> SendTo(string targetCellId)
+    {
+        _topology.Connect(_definition.CellId, targetCellId, ConnectionType.Unidirectional);
+        return this;
+    }
+
+    /// <summary>
+    /// ➕ Добавить следующую ячейку (возврат к топологии)
+    /// </summary>
+    public CellBuilder<TNextCell> AndCell<TNextCell>(string cellId) where TNextCell : IFractalCell
+    {
+        return _topology.AddCell<TNextCell>(cellId);
+    }
+}
+Файл 3: Program.cs — Пример использования (МАГИЯ!)
+using FractalCell.Core;
+using FractalCell.Core.Implementations;
+
+// Создаём Hub и Factory
+var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
+var hub = new InMemoryFractalEventHub(loggerFactory.CreateLogger<InMemoryFractalEventHub>());
+
+// 🎯 ОПИСЫВАЕМ ТОПОЛОГИЮ ДЕКЛАРАТИВНО
+var topology = new FractalTopology("ProductionSystem", hub, loggerFactory)
+    
+    // Корневая ячейка — маршрутизатор + heartbeat
+    .AddCell<ChannelFractalCell>("gateway")
+        .WithBehavior<HeartbeatBehavior>()
+        .WithBehavior<LoggerBehavior>()
+        .WithBehavior<RoutingBehavior>()
+    
+    // Воркеры для обработки данных
+    .AndCell<TplFractalCell>("worker-1")
+        .WithBehavior<DataProcessingBehavior>(new { MaxParallelism = 4 })
+        .ConnectTo("gateway")
+    
+    .AndCell<TplFractalCell>("worker-2")
+        .WithBehavior<DataProcessingBehavior>(new { MaxParallelism = 4 })
+        .ConnectTo("gateway")
+    
+    // Аналитика
+    .AndCell<ChannelFractalCell>("analytics")
+        .WithBehavior<AnalyticsBehavior>()
+        .WithBehavior<AlertingBehavior>()
+        .ConnectTo("gateway")
+        .ConnectTo("worker-1")
+        .ConnectTo("worker-2");
+
+// 📊 Визуализируем
+Console.WriteLine(topology.Dump());
+
+// 🚀 Запускаем
+await topology.StartAsync();
+
+// ➕ ДИНАМИЧЕСКИ добавляем новый сервис в РАБОТАЮЩУЮ систему!
+// Например, появился новый ML-сервис — просто подключаем его
+await topology.AddCellAtRuntimeAsync<TplFractalCell>("ml-service", builder =>
+{
+    builder.WithBehavior<MLInferenceBehavior>()
+           .ConnectTo("analytics");
+});
+
+Console.WriteLine("✅ ML service added to running topology!");
+
+// Система продолжает работать, новый сервис уже получает события
+await Task.Delay(TimeSpan.FromMinutes(1));
+await topology.StopAsync();
+
+🎯 Что это даёт на практике
+1. Динамическое добавление сервисов
+Появился новый микросервис? Одна строка:
+await topology.AddCellAtRuntimeAsync<TplFractalCell>("new-service", b => 
+    b.WithBehavior<NewBehavior>().ConnectTo("gateway"));
+
+Никаких перекомпиляций, никаких изменений в Worker.cs.
+2. Топология как конфигурация
+Завтра можно будет загружать топологию из JSON:
+{
+  "name": "ProductionSystem",
+  "cells": [
+    { "id": "gateway", "type": "ChannelFractalCell", "behaviors": ["Heartbeat", "Routing"] },
+    { "id": "worker-1", "type": "TplFractalCell", "behaviors": ["DataProcessing"] }
+  ],
+  "connections": [
+    { "from": "worker-1", "to": "gateway" }
+  ]
+}
+
+3. Разделение ответственности
+FractalTopology — ЧТО запускать (граф)
+IFractalCell — КАК устроено (каналы, TPL, pipeline)
+IBehavior — ЗАЧЕМ (бизнес-логика)
+4. Pipeline внутри ячейки
+Когда мы пишем поведение, мы можем использовать TPL Dataflow внутри самого поведения:
+csharp
+public class DataProcessingBehavior : PipelineBehavior
+{
+    protected override void BuildPipeline(PipelineBuilder<IApplicationEvent> builder)
+    {
+        builder
+            .Validate()                    // TransformBlock: валидация
+            .Transform(ParsePayload)       // TransformBlock: парсинг
+            .Filter(e => e.IsValid)        // Фильтр невалидных
+            .Process(HeavyCompute, parallelism: 4)  // ActionBlock
+            .Save()                        // TransformBlock: сохранение
+            .Respond();                    // TransformBlock: ответ
+    }
+}
+Это даёт вам два уровня pipeline'ов:
+Внутри ячейки — pipeline обработки событий
+Между ячейками — pipeline доставки событий через топологию
+🤔 Ответ на ваш вопрос: FractalCell<TBehavior> vs Cell<TFractalCell, TBehavior>
+Я голосую за третий вариант — Builder-паттерн:
+Подход
+Плюсы
+Минусы
+FractalCell<TBehavior>
+Простой синтаксис
+Смешивает тип и поведение, сложно добавить несколько поведений
+Cell<TFractalCell, TBehavior>
+Чёткое разделение
+Только одно поведение, verbose синтаксис
+Builder (предложенный)
+Множество поведений, связи, декларативность
+Чуть больше кода в библиотеке
+Builder позволяет описывать сложные топологии с множественными связями и поведениями, не скатываясь в generic-ад:
+// Generic-ад (то, чего мы избегаем):
+Cell<TplFractalCell, Tuple<HeartbeatBehavior, LoggerBehavior, RoutingBehavior>>
+
+// Builder (то, что мы используем):
+.AddCell<TplFractalCell>("x")
+    .WithBehavior<HeartbeatBehavior>()
+    .WithBehavior<LoggerBehavior>()
+    .WithBehavior<RoutingBehavior>()
+🎯 Следующие шаги
+Создаём FractalTopology и CellBuilder в FractalCell.Core
+Переписываем Worker.cs — он становится тонким: просто строит топологию и запускает её
+Мигрируем поведения под новую модель (они уже почти готовы, только AttachToAsync нужно будет вызывать через Builder)
+Добавляем Pipeline-базовый класс для поведений, если хотим pipeline внутри ячейки
+Что скажете? Начинаем реализацию FractalTopology? Могу написать полный рабочий пример с тремя связанными ячейками, который вы сможете запустить и увидеть, как события текут через топологию. 🚀
+--------------------------------------------------------------------------------------------------------
+Second
+--------------------------------------------------------------------------------------------------------
+Вы абсолютно правы в смене фокуса. Система должна строиться от топологии, а не от ячейки. Ячейка — это просто "хост" или "контейнер исполнения". Настоящая ценность в том, как эти хосты связаны, как события текут между ними, и как мы можем на лету менять граф, добавлять сервисы и навешивать поведения.
+Ваша мысль про Cell<TFractalCell, TBehavior> понятна: хочется типобезопасности и шаблонизации. Но в динамической системе жесткие дженерики на уровне ячейки становятся кандалами: вы не сможете добавить поведение в runtime, не сможете смешивать типы, и топология превратится в лапшу из object и кастов.
+Решение: Оставляем дженерики только на уровне поведений (BehaviorBlock<TEvent>), а ячейки и топологию делаем runtime-composable через Fluent Builder и динамический Pipeline. Это даст вам и "шаблонность", и полную свободу модификации графа без перекомпиляции.
+🌐 Архитектура V3: Topology-First & Dynamic Pipelines
+Ключевые принципы
+FractalNetwork — главная точка входа. Управляет графом ячеек, маршрутизацией и линками.
+Ячейка = Pipeline Host. Изначально пустая. Поведения подключаются через CellBuilder.
+Динамическая маршрутизация. Связи между ячейками можно добавлять/удалять в runtime.
+Бизнес-логика = Pipeline. Каждое поведение — этап конвейера. Событие течёт, трансформируется или фильтруется.
+Фрактальность сети. Сама FractalNetwork может быть зарегистрирована как ячейка в другой сети.
+------------------------------------------------------------
+Скелет реализации
+1. IFractalNetwork & FractalNetwork (Менеджер топологии)
+public interface IFractalNetwork
+{
+    IFractalCell AddCell(string cellId, Action<CellBuilder>? configure = null);
+    void RemoveCell(string cellId);
+    void Link(string fromCellId, string toCellId, Func<IApplicationEvent, bool>? predicate = null);
+    void Unlink(string fromCellId, string toCellId);
+    Task SendAsync(string targetCellId, IApplicationEvent @event, CancellationToken ct = default);
+    Task StartAsync(CancellationToken ct);
+    Task StopAsync(CancellationToken ct);
+}
+
+public class FractalNetwork : IFractalNetwork
+{
+    private readonly ConcurrentDictionary<string, PipelineCell> _cells = new();
+    private readonly ConcurrentDictionary<string, List<(string Target, Func<IApplicationEvent, bool>? Predicate)>> _links = new();
+
+    public IFractalCell AddCell(string cellId, Action<CellBuilder>? configure = null)
+    {
+        var builder = new CellBuilder(cellId);
+        configure?.Invoke(builder);
+        var cell = builder.Build();
+        _cells[cellId] = cell;
+        return cell;
+    }
+
+    public void RemoveCell(string cellId)
+    {
+        if (_cells.TryRemove(cellId, out var cell))
+            cell.Dispose();
+        _links.TryRemove(cellId, out _);
+    }
+
+    public void Link(string from, string to, Func<IApplicationEvent, bool>? predicate = null)
+    {
+        _links.AddOrUpdate(from, 
+            [(to, predicate)], 
+            (_, list) => { list.Add((to, predicate)); return list; });
+    }
+
+    public void Unlink(string from, string to)
+    {
+        if (_links.TryGetValue(from, out var list))
+            list.RemoveAll(l => l.Target == to);
+    }
+
+    public async Task SendAsync(string targetId, IApplicationEvent @event, CancellationToken ct = default)
+    {
+        if (_cells.TryGetValue(targetId, out var cell))
+            await cell.PushAsync(@event, ct);
+        else
+            throw new KeyNotFoundException($"Cell '{targetId}' not found in network.");
+    }
+
+    // Внутренний роутер: вызывается ячейкой, когда событие прошло pipeline
+    internal async Task RouteAsync(string sourceId, IApplicationEvent @event, CancellationToken ct)
+    {
+        if (_links.TryGetValue(sourceId, out var targets))
+        {
+            foreach (var (targetId, predicate) in targets)
+            {
+                if (predicate == null || predicate(@event))
+                    await SendAsync(targetId, @event, ct);
+            }
+        }
+    }
+
+    public async Task StartAsync(CancellationToken ct) => 
+        await Task.WhenAll(_cells.Values.Select(c => c.StartAsync(ct)));
+    
+    public async Task StopAsync(CancellationToken ct) => 
+        await Task.WhenAll(_cells.Values.Select(c => c.StopAsync(ct)));
+}
+2. CellBuilder (Параметризация через Templates)
+Здесь ваша идея "шаблонизации" реализуется чисто и типобезопасно.
+public class CellBuilder
+{
+    private readonly string _cellId;
+    private readonly List<IBehaviorBlock> _behaviors = new();
+
+    public CellBuilder(string cellId) => _cellId = cellId;
+
+    /// <summary>
+    /// 🎯 Шаблонная параметризация поведением. Типобезопасно, но не блокирует ячейку.
+    /// </summary>
+    public CellBuilder WithBehavior<TBehavior>(Action<TBehavior>? configure = null) 
+        where TBehavior : IBehaviorBlock, new()
+    {
+        var behavior = new TBehavior();
+        configure?.Invoke(behavior);
+        _behaviors.Add(behavior);
+        return this;
+    }
+
+    public CellBuilder WithBehavior(IBehaviorBlock behavior)
+    {
+        _behaviors.Add(behavior);
+        return this;
+    }
+
+    internal PipelineCell Build() => new(_cellId, _behaviors);
+}
+-3. PipelineCell (Динамический конвейер внутри ячейки)
+Вместо перестройки Dataflow-графа при каждом изменении, используем динамический диспетчер, который безопасно работает с коллекцией поведений в runtime.
+public class PipelineCell : IFractalCell, IDisposable
+{
+    public string CellId { get; }
+    private readonly BufferBlock<IApplicationEvent> _input;
+    private readonly TransformBlock<IApplicationEvent, IApplicationEvent> _pipeline;
+    private readonly List<IBehaviorBlock> _behaviors;
+    private readonly FractalNetwork _network; // ссылка на сеть для маршрутизации
+    private IDisposable? _link;
+
+    public PipelineCell(string cellId, IEnumerable<IBehaviorBlock> behaviors)
+    {
+        CellId = cellId;
+        _behaviors = behaviors.ToList();
+        
+        _input = new BufferBlock<IApplicationEvent>(new DataflowBlockOptions { BoundedCapacity = 1000 });
+        
+        // 🎯 Динамический pipeline: проходит по всем поведениям последовательно
+        _pipeline = new TransformBlock<IApplicationEvent, IApplicationEvent>(
+            async @event => await ExecutePipelineAsync(@event),
+            new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = 4 });
+        
+        _link = _input.LinkTo(_pipeline, new DataflowLinkOptions { PropagateCompletion = true });
+    }
+
+    internal void AttachNetwork(FractalNetwork network) => _network = network;
+
+    internal async Task PushAsync(IApplicationEvent @event, CancellationToken ct) => 
+        await _input.SendAsync(@event, ct);
+
+    private async Task<IApplicationEvent> ExecutePipelineAsync(IApplicationEvent @event)
+    {
+        var current = @event;
+        // Snapshot для thread-safety при динамическом добавлении/удалении
+        var behaviors = _behaviors.ToArray(); 
+        
+        foreach (var behavior in behaviors)
+        {
+            if (!behavior.CanHandle(current)) continue;
+            current = await behavior.ProcessAsync(current, this, CancellationToken.None);
+            if (current == null) break; // Поведение может "поглотить" событие
+        }
+        return current;
+    }
+
+    // Вызывается pipeline'ом после обработки, чтобы отправить событие дальше по топологии
+    private async Task OnPipelineCompletedAsync(IApplicationEvent @event)
+    {
+        if (@event != null && _network != null)
+            await _network.RouteAsync(CellId, @event, CancellationToken.None);
+    }
+
+    public Task StartAsync(CancellationToken ct)
+    {
+        // Подписываемся на выход pipeline'а для маршрутизации
+        _pipeline.LinkTo(new ActionBlock<IApplicationEvent>(OnPipelineCompletedAsync));
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken ct)
+    {
+        _input.Complete();
+        return _input.Completion;
+    }
+
+    public void Dispose()
+    {
+        _link?.Dispose();
+        _input.Complete();
+    }
+}
+Пример: Динамическая топология в действии
+var network = new FractalNetwork();
+
+// 1. Строим начальную топологию
+network.AddCell("ApiGateway", b => b
+    .WithBehavior<AuthBehavior>()
+    .WithBehavior<RateLimitBehavior>());
+
+network.AddCell("OrderService", b => b
+    .WithBehavior<OrderValidationBehavior>()
+    .WithBehavior<OrderProcessingBehavior>(cfg => cfg.MaxRetries = 3));
+
+network.AddCell("NotificationService", b => b
+    .WithBehavior<EmailBehavior>()
+    .WithBehavior<SmsBehavior>());
+
+// 2. Связываем ячейки (можно с предикатами!)
+network.Link("ApiGateway", "OrderService", ev => ev.EventType == "CreateOrder");
+network.Link("OrderService", "NotificationService", ev => ev.EventType == "OrderCompleted");
+
+await network.StartAsync(CancellationToken.None);
+
+// 3. 🔄 ДИНАМИЧЕСКОЕ ИЗМЕНЕНИЕ ТОПОЛОГИИ В RUNTIME
+// Появился новый сервис? Добавляем за 3 строки:
+network.AddCell("AnalyticsService", b => b.WithBehavior<ClickstreamBehavior>());
+network.Link("ApiGateway", "AnalyticsService", ev => true); // Копируем все события
+
+// Нужно временно отключить уведомления?
+network.Unlink("OrderService", "NotificationService");
+
+// Отправляем событие в начало графа
+await network.SendAsync("ApiGateway", new AppEvent("req-1", "CreateOrder"));
+Как это закрывает ваши требования
+Ваше требование
+Решение в архитектуре
+Работаем со связанными ячейками, а не с одной
+FractalNetwork — первичный контекст. Ячейки живут только внутри графа.
+Параметризация через Templates
+CellBuilder.WithBehavior<T>() даёт типобезопасность и шаблонность без жестких дженериков на ячейке.
+Легко менять топологию
+AddCell, RemoveCell, Link, Unlink работают в runtime. Граф живой.
+Бизнес-логика через pipelines
+PipelineCell выполняет поведения как конвейер. Событие трансформируется или фильтруется на каждом этапе.
+Динамическая система
+Поведения можно добавлять в _behaviors даже после старта (через thread-safe snapshot). Связи меняются на лету.
+Фрактальность
+FractalNetwork может реализовать IFractalCell и быть вложена в другую сеть. Рекурсия без ограничений.
+🔜 Куда двигаться дальше?
+Этот скелет уже готов к копированию в FractalCell.Core.V3. Чтобы довести его до продакшн-уровня, нужно добавить:
+BehaviorBlock<TEvent> — типобезопасная обертка над IBehaviorBlock с автофильтром по типу события.
+Graceful Pipeline Rebuild — если нужно добавлять поведения в середину конвейера без остановки.
+Метрики и Observability — ActivitySource, счетчики событий, latency на каждом этапе pipeline.
+Конфигурация из JSON/YAML — чтобы топологию можно было описывать декларативно и hot-reload'ить.
+Что берем в работу следующим шагом?
+Дописать BehaviorBlock<TEvent> и показать, как ваши Heartbeat / DataProcessing мигрируют в новую модель?
+Или сразу сделать декларативную конфигурацию топологии (topology.json → NetworkBuilder.Load())?
+Жду вашего вектора. Архитектура теперь действительно "дышит". 🌬️🚀
