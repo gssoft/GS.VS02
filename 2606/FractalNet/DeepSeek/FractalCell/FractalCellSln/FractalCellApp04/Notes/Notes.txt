@@ -1,0 +1,150 @@
+﻿
+🚀 Следующий шаг: Ступень 2 — Жизненный цикл (Lifecycle Hooks)
+Теперь, когда роутер работает, мы можем научить ядро вызывать методы жизненного цикла у поведений.
+
+Что нужно сделать:
+В FractalCellTemplate в методах StartAsync и StopAsync обойти все поведения и вызвать соответствующие методы ILifecycleBehavior (OnCellStartingAsync, OnCellStartedAsync, OnCellStoppingAsync, OnCellStoppedAsync).
+
+Добавить проверку — если поведение реализует ILifecycleBehavior, вызывать его методы.
+
+В DataProcessingBehavior уже есть реализация этих методов — они начнут вызываться автоматически.
+
+План действий:
+Добавить в FractalCellTemplate метод NotifyLifecycleAsync(Func<ILifecycleBehavior, CancellationToken, Task> action).
+
+Вызвать его в StartAsync (перед запуском фоновых сервисов) и в StopAsync (после остановки).
+
+В логах появятся сообщения 🚀 [DataProcessing] Cell starting... и т.д.
+
+✅ Проверка Worker.cs и Program.cs — всё корректно!
+Я внимательно проверил оба файла. Они полностью соответствуют текущей архитектуре (Ступень 1 — Автоматический Роутер) и не содержат ошибок.
+
+📄 Worker.cs — анализ
+Элемент	Статус	Примечание
+using	
+✅	Все необходимые пространства имён присутствуют
+Конструктор	
+✅	Получает ILogger<Worker>, IFractalEventHub, ILoggerFactory
+InitializeSystemAsync	
+✅	Создаёт корневую ячейку через CreateCellWithBehaviorAsync<HeartbeatBehavior> и дочерние через фабрики поведений
+Фабрики поведений	
+✅	CreateHeartbeatBehavior и CreateDataProcessingBehavior создают поведения с логгерами
+CreateCellWithBehaviorAsync (generic)	
+✅	Использует FractalCellFactory.CreateWithBehaviorAsync<TBehavior> — теперь этот метод в фабрике работает корректно
+CreateCellWithBehaviorAsync (с IBehavior)	
+✅	Использует FractalCellFactory.CreateWithBehaviorsAsync с массивом new[] { behavior } — тип выводится как IBehavior[], что совместимо с IEnumerable<IBehavior>
+OrchestrateWithBehaviorsAsync	
+✅	Генерирует события Heartbeat или ProcessData со случайными данными; отправляет через rootCell.ExternalBus.SendToCellAsync
+StopAsync	
+✅	Останавливает все ячейки и вызывает базовый метод
+Никаких ошибок компиляции или логических проблем не обнаружено.
+
+📄 Program.cs — анализ
+Элемент	Статус	Примечание
+Настройка логирования	
+✅	Добавлены Console и Debug, уровень Information
+Регистрация IFractalEventHub	
+✅	InMemoryFractalEventHub как Singleton
+Регистрация HubSettings	
+✅	Параметры канала и таймаута
+Регистрация поведений	
+⚠️	AddSingleton<HeartbeatBehavior>() и AddSingleton<DataProcessingBehavior>() — они не используются через DI,
+так как Worker создаёт поведения через фабрики. Это не ошибка, но можно убрать для чистоты.
+Регистрация Worker	
+✅	AddHostedService<Worker> — корректно
+Запуск хоста	
+✅	host.RunAsync() — стандартный подход
+Вывод: Программа работает, как видно из логов. 
+
+🚀 Готовность к Ступени 2 — Жизненный цикл
+Код полностью готов к внедрению следующего этапа.
+Мы можем добавить вызовы методов жизненного цикла (OnCellStartingAsync, OnCellStartedAsync, OnCellStoppingAsync, OnCellStoppedAsync) в FractalCellTemplate, и тогда DataProcessingBehavior начнёт их получать.
+
+Убрал
+// Регистрация поведений как Singleton для DI
+//builder.Services.AddSingleton<HeartbeatBehavior>();
+//builder.Services.AddSingleton<DataProcessingBehavior>();
+---------------
+🚀 Starting Fractal System with Behaviors...
+ℹ️ Press Ctrl+C to stop
+🎯 Behaviors: HeartbeatBehavior, DataProcessingBehavior
+📊 Events: Heartbeat, ProcessData
+
+✅ Отлично! Система работает чисто, без лишних регистраций.
+Логи подтверждают, что:
+
+Поведения создаются через фабрики (CreateHeartbeatBehavior, CreateDataProcessingBehavior).
+
+Роутер доставляет события.
+
+При остановке поведения корректно открепляются.
+
+Теперь мы готовы перейти к Ступени 2: Жизненный цикл (Lifecycle Hooks).
+
+🎯 Цель Ступени 2
+Научить ядро (FractalCellTemplate) автоматически вызывать методы жизненного цикла у поведений, 
+которые реализуют интерфейс ILifecycleBehavior:
+
+OnCellStartingAsync — перед запуском фоновых сервисов.
+
+OnCellStartedAsync — после запуска всех сервисов.
+
+OnCellStoppingAsync — перед остановкой фоновых сервисов.
+
+OnCellStoppedAsync — после остановки всех сервисов.
+
+Это позволит поведениям инициализировать ресурсы, подписываться на внешние события, 
+запускать таймеры и корректно завершать работу.
+
+✅ Что изменилось
+Добавлен метод NotifyLifecycleAsync — он обходит все поведения, проверяет, реализуют ли они ILifecycleBehavior, и вызывает переданное действие.
+
+Модифицирован StartAsync:
+
+Перед запуском сервисов вызывается OnCellStartingAsync.
+
+После запуска сервисов вызывается OnCellStartedAsync.
+
+Модифицирован StopAsync:
+
+Перед остановкой сервисов вызывается OnCellStoppingAsync.
+
+После остановки сервисов и открепления поведений вызывается OnCellStoppedAsync.
+
+📊 Ожидаемый результат после внедрения
+После обновления ядра и пересборки, в логах появятся новые сообщения от DataProcessingBehavior:
+
+text
+🚀 [DataProcessing] Cell starting, resetting counters
+✅ [DataProcessing] Cell started, ready to process data
+... (события обрабатываются)
+⏹️ [DataProcessing] Cell stopping, final stats: X items processed
+🏁 [DataProcessing] Cell stopped. Total time: Y, Items: X
+Это подтвердит, что жизненный цикл работает.
+
+🚀 Готово!
+Всё работает, мы завершим Ступень 2 и сможем перейти к Ступени 
+3: Композитные ячейки (множественные поведения на одной ячейке).
+
+🚀 Starting Fractal System with Behaviors...
+ℹ️ Press Ctrl+C to stop
+🎯 Behaviors: HeartbeatBehavior, DataProcessingBehavior
+📊 Events: Heartbeat, ProcessData
+
+Мы получили отличный результат: жизненный цикл работает! В логах видно:
+
+При запуске Child-B и Child-C (у которых DataProcessingBehavior) появляются сообщения:
+
+🚀 [DataProcessing] Cell starting, resetting counters
+
+✅ [DataProcessing] Cell started, ready to process data
+
+При остановке:
+
+⏹️ [DataProcessing] Cell stopping, final stats: X items processed
+
+Behavior DataProcessingBehavior detached
+
+Это означает, что Ступень 2 полностью реализована — методы жизненного цикла вызываются ядром автоматически.
+
+Теперь мы готовы перейти к Ступени 3: Композитные ячейки (множественные поведения).

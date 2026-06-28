@@ -1,0 +1,180 @@
+﻿
+Ступень 3: Композитные ячейки (множественные поведения)
+Мы уже заложили основу — роутер умеет обрабатывать несколько поведений, 
+а FractalCellTemplate хранит их в списке. Теперь давайте создадим композитную ячейку,
+которая будет нести сразу два поведения: HeartbeatBehavior и DataProcessingBehavior.
+
+📋 План изменений
+В Worker добавим метод CreateCellWithBehaviorsAsync, который принимает список поведений.
+В InitializeSystemAsync сдела м корневую ячейку (Root) композитной — 
+она будет обрабатывать и Heartbeat, и ProcessData.
+Дочерние ячейки оставим как есть (каждая со своим одним поведением) для сравнения.
+Добавим новое поведение LoggingBehavior (опционально), 
+чтобы показать, как одно поведение может реагировать на все события.
+
+Обновлённый Worker.cs (Ступень 3)
+Что изменилось
+
+Добавлен метод CreateCellWithBehaviorsAsync — принимает перечисление поведений и создаёт ячейку со всеми ими.
+
+Корневая ячейка (Root) теперь создаётся с двумя поведениями:
+
+HeartbeatBehavior (Priority 10)
+
+DataProcessingBehavior (Priority 20)
+
+Дочерние ячейки остались с одним поведением для сравнения.
+
+📊 Ожидаемое поведение
+Когда оркестратор отправляет Heartbeat в Root, его обработает HeartbeatBehavior.
+
+Когда оркестратор отправляет ProcessData в Root, его обработает DataProcessingBehavior.
+
+При этом оба поведения будут работать одновременно, каждое на своих событиях.
+
+Если бы оба поведения могли обрабатывать один и тот же тип события, они бы вызывались по приоритету,
+но в нашем случае они разделены по типам.
+
+🧪 Проверка
+После пересборки и запуска вы увидите в логах:
+
+text
+📦 Cell Root created with behaviors [HeartbeatBehavior, DataProcessingBehavior] and 3 workers
+И при отправке событий в Root:
+
+Для Heartbeat — сработает HeartbeatBehavior.
+
+Для ProcessData — сработает DataProcessingBehavior.
+
+🚀 Дальнейшие шаги (по желанию)
+Добавить новое поведение, например LoggingBehavior, которое ловит все события и логирует их.
+Это продемонстрирует, как одно поведение может быть подписано на все события.
+
+Реализовать конвейерную обработку: 
+несколько поведений обрабатывают одно событие последовательно (например, валидация → логирование → бизнес-логика).
+
+✅ Итог Ступени 3
+Мы научились создавать композитные ячейки с несколькими поведениями. 
+Архитектура готова к любым комбинациям поведений.
+
+Теперь система стала ещё более гибкой и расширяемой. Поздравляю всех! 
+------------------------------------------------------------------------------------------------------------------------
+Разбор логов — что произошло
+Давайте по порядку разберём, 
+что мы видим в логах. Это результат работы Ступени 3 (Композитные ячейки).
+
+1. Создание системы
+text
+🏗️ Initializing fractal system with behaviors...
+Root — создана как композитная ячейка с двумя поведениями:
+
+HeartbeatBehavior
+
+DataProcessingBehavior
+
+Child-A — только HeartbeatBehavior
+
+Child-B — только DataProcessingBehavior
+
+Child-C — только DataProcessingBehavior
+
+2. Добавление поведений в ячейки
+text
+Behavior HeartbeatBehavior added to cell Root
+Behavior DataProcessingBehavior added to cell Root
+Behavior HeartbeatBehavior attached to cell Root
+Behavior DataProcessingBehavior attached to cell Root
+Сначала поведения добавляются в список ячейки.
+
+Затем вызывается AttachToAsync — поведение получает ссылку на ячейку и может использовать её 
+(например, для отправки ответных сообщений).
+
+3. Запуск ячеек и жизненный цикл
+text
+FractalCell Root starting
+🚀 [DataProcessing] Cell starting, resetting counters   ← OnCellStartingAsync
+✅ [DataProcessing] Cell started, ready to process data ← OnCellStartedAsync
+FractalCell Root started successfully with 2 behaviors
+У Root при запуске сработали методы жизненного цикла у DataProcessingBehavior 
+(потому что он реализует ILifecycleBehavior).
+
+У HeartbeatBehavior нет методов жизненного цикла, поэтому для него логов нет.
+
+Аналогично для дочерних ячеек с DataProcessingBehavior.
+
+4. Оркестратор отправляет события
+text
+📤 [ORCHESTRATOR] Sending Heartbeat from Root to Child-B
+📤 [ORCHESTRATOR] Sending ProcessData from Root to Root
+📤 [ORCHESTRATOR] Sending Heartbeat from Root to Child-A
+...
+Оркестратор каждые 3 секунды выбирает случайный тип события 
+(Heartbeat или ProcessData) и случайную ячейку-получатель.
+
+Отправляет событие через внешнюю шину (ExternalBus) корневой ячейки.
+
+5. Как события обрабатываются
+Пример 1: Heartbeat → Child-A
+text
+📤 [ORCHESTRATOR] Sending Heartbeat from Root to Child-A
+❤️ [Heartbeat] Count: 1, Source: Root, Target: Child-A
+Child-A имеет только HeartbeatBehavior, поэтому он получает событие и обрабатывает его (увеличивает счётчик, логирует).
+
+Пример 2: ProcessData → Root
+text
+📤 [ORCHESTRATOR] Sending ProcessData from Root to Root
+📊 [DataProcessing] Processing data: EventId=processdata-...
+✅ [DataProcessing] Data processed successfully
+Root имеет два поведения. HeartbeatBehavior игнорирует ProcessData, а DataProcessingBehavior обрабатывает его.
+
+Пример 3: Heartbeat → Root
+text
+📤 [ORCHESTRATOR] Sending Heartbeat from Root to Root
+❤️ [Heartbeat] Count: 1, Source: Root, Target: Root
+Здесь HeartbeatBehavior обрабатывает, а DataProcessingBehavior игнорирует.
+
+6. Ответные heartbeat-сообщения
+Каждый третий heartbeat вызывает ответное событие HeartbeatResponse:
+
+text
+❤️ [Heartbeat] Count: 3, Source: Root, Target: Root
+🔄 [Heartbeat] Sending response from Root
+📤 [HeartbeatResponse] ... sent to Root
+Это демонстрирует, что поведение может отправлять новые события через ExternalBus.
+
+7. Остановка системы
+При завершении работы:
+
+text
+🛑 Stopping all cells...
+⏹️ [DataProcessing] Cell stopping, final stats: 3 items processed
+🏁 [DataProcessing] Cell stopped. Total time: ...
+У DataProcessingBehavior вызываются OnCellStoppingAsync и OnCellStoppedAsync (жизненный цикл).
+
+Поведения открепляются (Behavior ... detached).
+
+🎯 Что это значит
+Композитная ячейка работает — Root обрабатывает и Heartbeat, и ProcessData разными поведениями.
+
+Роутер правильно направляет события — каждое поведение получает только те события, 
+которые может обработать (через CanHandleAsync).
+
+Жизненный цикл работает — у DataProcessingBehavior вызываются методы OnCellStartingAsync, 
+OnCellStartedAsync, OnCellStoppingAsync, OnCellStoppedAsync.
+
+Поведения могут взаимодействовать — HeartbeatBehavior отправляет ответные события.
+
+📝 Итог
+Мы успешно реализовали все три ступени:
+
+✅ Ступень 1 — Автоматический роутер (поведения получают события).
+
+✅ Ступень 2 — Жизненный цикл (поведения знают о старте/остановке ячейки).
+
+✅ Ступень 3 — Композитные ячейки (одна ячейка с несколькими поведениями).
+
+Теперь наша архитектура готова к любым расширениям. 
+Мы можем добавлять новые поведения, комбинировать их, и система сама позаботится о маршрутизации и жизненном цикле.
+
+Мы можем перейти к следующему этапу — например, 
+добавить поддержку ошибок (IErrorHandlingBehavior) или динамическую загрузку поведений из плагинов.
