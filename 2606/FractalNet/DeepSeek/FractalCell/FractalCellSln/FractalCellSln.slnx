@@ -2,8 +2,10 @@
   <Folder Name="/FractalCellCoreApp/">
     <Project Path="FractalCellApp01/FractalCellApp01.csproj" Id="e77420d3-ff84-48ba-ad88-4ad8a0b446da" />
     <Project Path="FractalCellApp03/FractalCellApp03.csproj" Id="5d4216da-e63d-4def-b96e-a125e6134a5c" />
+    <Project Path="FractalCellApp04/FractalCellApp04.csproj" Id="ba7b6899-0947-4f63-ab1f-af6a3fb12ec5" />
     <Project Path="FractalCellCore01/FractalCellCore01.csproj" Id="a90b4a19-0f77-41f8-a7f9-d16b307089a9" />
     <Project Path="FractalCellCore03/FractalCellCore03.csproj" Id="1ad7d42b-316f-4d9e-bf25-d8630cdbdd42" />
+    <Project Path="FractalCellCore04/FractalCellCore04.csproj" Id="3afe6ea7-00d3-45d6-a50d-20d0b32dc61a" />
   </Folder>
   <Project Path="CA_FractalBlock01/CA_FractalBlock01.csproj" Id="99d5ad24-ccf9-48da-a85c-b77e8ccdee50" />
   <Project Path="FractalBlock01/FractalBlock01.csproj" Id="924a3398-9ee7-4bf9-8600-c0b2a10845a2" />
