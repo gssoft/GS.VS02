@@ -1,8 +1,14 @@
+// FractalCellApp
+// Program.cs
+
 using FractalCellApp;
 using FractalCellApp.Behaviors;
 using FractalCellCore.Core.Configuration;
 using FractalCellCore.Core.Interfaces;
 using FractalCellCore.Implementations;
+using System.Text;
+
+Console.OutputEncoding = Encoding.UTF8;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -25,8 +31,8 @@ builder.Services.AddSingleton<HubSettings>(sp => new HubSettings
 });
 
 // Регистрация поведений как Singleton для DI
-builder.Services.AddSingleton<HeartbeatBehavior>();
-builder.Services.AddSingleton<DataProcessingBehavior>();
+//builder.Services.AddSingleton<HeartbeatBehavior>();
+//builder.Services.AddSingleton<DataProcessingBehavior>();
 
 // Регистрация Worker с поведением
 builder.Services.AddHostedService<Worker>();
