@@ -55,6 +55,7 @@ QuoteGeneratorWorker058.csproj
 Services/QuoteGeneratorService.cs
 Text/Domain.txt
 Text/History.txt
+Text/ProjectProfile.txt
 Text/Reffs.txt
 Text/Tools.txt
 Worker.cs
@@ -427,6 +428,19 @@ Quotes Generation
 File: Text/History.txt
 ================
 26.06.30 - Start
+
+================
+File: Text/ProjectProfile.txt
+================
+Domain					Trading, Quotes Generation
+Concurrency Model		Producer-Consumer
+Implementation			Channels (System.Threading.Channels),
+						ActionBlocks, BroadcastBlock, BlockMonitor
+Background				Processing	Hosted Service (IHostedService)
+Decoupling				High (Producer-Consumer)
+Technology Stack		.NET 10, TPL Dataflow, Channels
+Observability			BlockMonitor, Logging
+Lifecycle Management	Graceful Shutdown
 
 ================
 File: Text/Reffs.txt

@@ -1,0 +1,9 @@
+﻿Domain					Trading, Quotes Generation
+Concurrency Model		Producer-Consumer
+Implementation			Channels (System.Threading.Channels),
+						ActionBlocks, BroadcastBlock, BlockMonitor
+Background				Processing	Hosted Service (IHostedService)
+Decoupling				High (Producer-Consumer)
+Technology Stack		.NET 10, TPL Dataflow, Channels
+Observability			BlockMonitor, Logging
+Lifecycle Management	Graceful Shutdown
