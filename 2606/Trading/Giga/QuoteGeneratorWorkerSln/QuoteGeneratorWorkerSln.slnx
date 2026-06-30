@@ -1,4 +1,7 @@
 <Solution>
   <Project Path="QuoteGeneratorWorker/QuoteGeneratorWorker.csproj" />
   <Project Path="QuoteGeneratorWorker01/QuoteGeneratorWorker01.csproj" />
+  <Project Path="QuoteGeneratorWorker02/QuoteGeneratorWorker02.csproj" Id="753bfb60-af4b-4641-99b9-337c08f528b1" />
+  <Project Path="QuoteGeneratorWorker03/QuoteGeneratorWorker03.csproj" Id="f26c0e1f-dbca-4653-90d7-01fea3f8cbef" />
+  <Project Path="QuoteGeneratorWorker04/QuoteGeneratorWorker04.csproj" Id="d4037f4a-e82d-4486-80ba-6bc80ca3bb46" />
 </Solution>

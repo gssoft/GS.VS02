@@ -1,0 +1,308 @@
+================================================================
+Directory Structure
+================================================================
+appsettings.Development.json
+appsettings.json
+Handlers/ConsoleQuoteHandler.cs
+Handlers/IQuoteHandler.cs
+Models/StockQuote.cs
+Program.cs
+Properties/launchSettings.json
+QuoteGeneratorWorker.csproj
+Services/QuoteGeneratorService.cs
+Worker.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: Handlers/ConsoleQuoteHandler.cs
+================
+// Поместите этот файл в папку Handlers (создайте её, если нет)
+using Microsoft.Extensions.Logging;
+using QuoteGeneratorWorker.Models;
+
+namespace QuoteGeneratorWorker.Handlers;
+
+public class ConsoleQuoteHandler : IQuoteHandler
+{
+    private readonly ILogger<ConsoleQuoteHandler> _logger;
+
+    public ConsoleQuoteHandler(ILogger<ConsoleQuoteHandler> logger)
+    {
+        _logger = logger;
+    }
+
+    public async Task HandleAsync(StockQuote quote, CancellationToken cancellationToken)
+    {
+        // Имитация асинхронной работы (например, записи в БД или вызова API)
+        await Task.Delay(50, cancellationToken);
+
+        // Выводим результат с использованием встроенного логгера
+        _logger.LogInformation("Обработана котировка: {Symbol} - ${Price}", quote.Symbol, quote.Price);
+    }
+}
+
+================
+File: Handlers/IQuoteHandler.cs
+================
+// Поместите этот файл в папку Handlers (создайте её, если нет)
+using QuoteGeneratorWorker.Models;
+
+namespace QuoteGeneratorWorker.Handlers;
+
+public interface IQuoteHandler
+{
+    Task HandleAsync(StockQuote quote, CancellationToken cancellationToken);
+}
+
+================
+File: Models/StockQuote.cs
+================
+// Поместите этот файл в папку Models (создайте её, если нет)
+namespace QuoteGeneratorWorker.Models;
+
+/// <summary>
+/// Котировка финансового инструмента.
+/// </summary>
+public record StockQuote(string Symbol, decimal Price);
+
+================
+File: Program.cs
+================
+// Giga 26.06.04
+// Program.cs
+// -------------------------------------------------------------
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using QuoteGeneratorWorker.Models;
+using QuoteGeneratorWorker.Services;
+using QuoteGeneratorWorker.Handlers;
+
+
+
+var host = Host.CreateDefaultBuilder(args)
+    // Регистрируем наш генератор котировок как фоновый сервис
+    .ConfigureServices((hostContext, services) =>
+    {
+        services.AddHostedService<QuoteGeneratorService>();
+
+        // Регистрируем обработчик, который будет выводить котировки в консоль
+        services.AddTransient<IQuoteHandler, ConsoleQuoteHandler>();
+    })
+    .Build();
+
+await host.RunAsync();
+
+================
+File: Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "QuoteGeneratorWorker": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: QuoteGeneratorWorker.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-QuoteGeneratorWorker-e917d3e2-c6e9-4850-991c-27abdb42df1c</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Text\Cancelation_Token.txt" />
+    <Compile Include="Text\Reffs.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
+  </ItemGroup>
+</Project>
+
+================
+File: Services/QuoteGeneratorService.cs
+================
+// Поместите этот файл в папку Services (создайте её, если нет)
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+using QuoteGeneratorWorker.Handlers;
+using QuoteGeneratorWorker.Models;
+
+namespace QuoteGeneratorWorker.Services;
+
+public class QuoteGeneratorService : BackgroundService
+{
+    private readonly IQuoteHandler _handler;
+    private readonly string[] _symbols = { "GAZP", "SBER", "LKOH", "ROSN", "YNDX", "TCSG", "PLZL", "GMKN", "MOEX", "AFKS" };
+    private readonly Random _random = new();
+    private readonly ILogger<QuoteGeneratorService> _logger;
+
+    public QuoteGeneratorService(IQuoteHandler handler, ILogger<QuoteGeneratorService> logger)
+    {
+        _handler = handler;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        bool isShuttingDown = false;
+        try
+        {
+            _logger.LogInformation("📈 Генератор котировок запущен.");
+            while (!stoppingToken.IsCancellationRequested || !isShuttingDown)
+            {
+                if (!isShuttingDown)
+                {
+                    var quotesBatch = GenerateQuotesBatch();
+                    _logger.LogDebug($"--- Новая порция котировок ({quotesBatch.Count} шт.) ---");
+                    using var processCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                    try
+                    {
+                        await Parallel.ForEachAsync(
+                            quotesBatch,
+                            new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = processCts.Token },
+                            async (quote, token) => await _handler.HandleAsync(quote, token));
+                    }
+                    catch (OperationCanceledException) when (processCts.IsCancellationRequested)
+                    {
+                        _logger.LogWarning("Processing of a batch of quotes was cancelled.");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error occurred while processing a batch of quotes.");
+                    }
+                }
+                if (stoppingToken.IsCancellationRequested && !isShuttingDown)
+                {
+                    _logger.LogInformation("🛑 Signal received to stop the service after current batch.");
+                    isShuttingDown = true;
+                    await Task.Delay(TimeSpan.FromMilliseconds(100));  // timeer was = 100 
+                    continue;
+                }
+                await Task.Delay(TimeSpan.FromSeconds(1)); // // timeer was = 1
+            }
+            _logger.LogInformation("🛑 Генератор котировок остановлен.");
+        }
+        finally
+        {
+            _logger.LogInformation("Сервис QuoteGeneratorService полностью остановлен.");
+        }
+    }
+    // --- НОВАЯ РЕАЛИЗАЦИЯ СТАРТА ---
+    public override async Task StartAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("📈 Генератор котировок готовится к запуску...");
+
+        // Здесь может быть логика инициализации, например:
+        // await InitializeDatabaseConnectionAsync(cancellationToken);
+
+        _logger.LogInformation("🚀 Инициализация завершена. Запуск основного цикла.");
+
+        // Вызываем стандартный старт, который начнет ExecuteAsync
+        await base.StartAsync(cancellationToken);
+    }
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogWarning("⚠️ Получен сигнал об остановке сервиса.");
+
+        // Здесь может быть логика очистки, например:
+        // await SaveFinalStateToDatabaseAsync(cancellationToken);
+        // CloseFileHandles();
+
+        // _logger.LogInformation("🛑 Сервис успешно остановлен.");
+
+        // Вызываем стандартную остановку
+        await base.StopAsync(cancellationToken);
+    }
+
+    private List<StockQuote> GenerateQuotesBatch()
+    {
+        // Локальная функция для генерации одной цены.
+        // Использует Random.Next(int, int) для работы с целыми числами,
+        // что точнее для финансовых расчетов, чем NextDouble().
+        decimal GeneratePrice()
+        {
+            // Генерируем целое число от -2000 до 2000 (всего 4001 возможное значение).
+            // Делим на 100, чтобы получить смещение от -20.00 до 20.00.
+            var offset = _random.Next(-2000, 2001) / 100m;
+            return Math.Round(150m + offset, 2);
+        }
+
+        // Создаем список котировок, применяя функцию GeneratePrice к каждому символу.
+        return _symbols.Select(symbol => new StockQuote(
+                symbol,
+                GeneratePrice() // <-- ИСПРАВЛЕННАЯ СТРОКА
+            )).ToList();
+    }
+}
+
+================
+File: Worker.cs
+================
+namespace QuoteGeneratorWorker
+{
+    public class Worker(ILogger<Worker> logger) : BackgroundService
+    {
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                if (logger.IsEnabled(LogLevel.Information))
+                {
+                    logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+                }
+                await Task.Delay(1000, stoppingToken);
+            }
+        }
+    }
+}
+
+================================================================
+End of Codebase
+================================================================
