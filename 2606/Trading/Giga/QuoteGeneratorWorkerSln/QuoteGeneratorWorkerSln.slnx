@@ -4,4 +4,7 @@
   <Project Path="QuoteGeneratorWorker02/QuoteGeneratorWorker02.csproj" Id="753bfb60-af4b-4641-99b9-337c08f528b1" />
   <Project Path="QuoteGeneratorWorker03/QuoteGeneratorWorker03.csproj" Id="f26c0e1f-dbca-4653-90d7-01fea3f8cbef" />
   <Project Path="QuoteGeneratorWorker04/QuoteGeneratorWorker04.csproj" Id="d4037f4a-e82d-4486-80ba-6bc80ca3bb46" />
+  <Project Path="QuoteGeneratorWorker05/QuoteGeneratorWorker05.csproj" Id="db6faa3c-b061-41ae-b1df-7e2edd4ba8ce" />
+  <Project Path="QuoteGeneratorWorker053/QuoteGeneratorWorker053.csproj" Id="953004eb-994c-4af0-a0da-b28ffa2f15d7" />
+  <Project Path="QuoteGeneratorWorker06/QuoteGeneratorWorker06.csproj" Id="9268d03f-7fb7-4d04-9c27-8e9f073d47d5" />
 </Solution>

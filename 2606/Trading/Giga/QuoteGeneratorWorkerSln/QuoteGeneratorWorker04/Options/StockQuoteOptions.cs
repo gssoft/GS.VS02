@@ -12,6 +12,8 @@ public class StockQuoteOptions
     /// <summary>
     /// Список тикеров акций.
     /// </summary>
-    public List<string> Symbols { get; set; } = new() { "GAZP", "SBER", "LKOH" };
+    // public List<string> Symbols { get; set; } = new() { "GAZP", "SBER", "LKOH" };
+
+    public required List<string> Symbols { get; set; }
 }
 
