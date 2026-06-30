@@ -1,0 +1,6 @@
+﻿TplDataflow
+ActionBlock
+BroadcastBlock
+BlockMonitor
+Backgroundservice
+.NetCore10
