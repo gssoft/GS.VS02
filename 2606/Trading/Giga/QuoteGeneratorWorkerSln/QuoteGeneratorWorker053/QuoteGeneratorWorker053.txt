@@ -1,4 +1,184 @@
-﻿using System;
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+
+
+================================================================
+Directory Structure
+================================================================
+appsettings.Development.json
+appsettings.json
+Models/StockQuote.cs
+Options/StockQuoteOptions.cs
+Program.cs
+Properties/launchSettings.json
+QuoteGeneratorWorker053.csproj
+Services/QuoteGeneratorService.cs
+Worker.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "StockQuoteOptions": {
+    "IntervalSeconds": 2,
+    "Symbols": [
+      "GAZP",
+      "SBER",
+      "LKOH",
+      "ROSN",
+      "YNDX"
+    ]
+  }
+}
+
+================
+File: Models/StockQuote.cs
+================
+namespace QuoteGeneratorWorker.Models;
+
+/// <summary>
+/// Котировка финансового инструмента.
+/// </summary>
+public record StockQuote(string Symbol, decimal Price);
+
+================
+File: Options/StockQuoteOptions.cs
+================
+namespace QuoteGeneratorWorker.Options;
+
+public class StockQuoteOptions
+{
+    public int IntervalSeconds { get; set; } = 2;
+    public required List<string> Symbols { get; set; }
+}
+
+================
+File: Program.cs
+================
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using System.Text;
+
+using QuoteGeneratorWorker;
+
+Console.OutputEncoding = Encoding.UTF8;
+
+var builder = Host.CreateDefaultBuilder(args);
+
+builder.ConfigureServices((hostContext, services) =>
+{
+    // Привязываем секцию "StockQuoteOptions" к нашему классу StockQuoteOptions
+    services.Configure<QuoteGeneratorWorker.Options.StockQuoteOptions>(hostContext.Configuration.GetSection("StockQuoteOptions"));
+
+    // Регистрируем наш сервис, который использует TPL Dataflow.
+    // Интерфейс IQuoteHandler и его реализации больше не нужны и не регистрируются.
+    services.AddHostedService<QuoteGeneratorWorker.Services.QuoteGeneratorService>();
+});
+
+var host = builder.Build();
+await host.RunAsync();
+
+================
+File: Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "QuoteGeneratorWorker053": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: QuoteGeneratorWorker053.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-QuoteGeneratorWorker053-76b24cbd-11ed-4fbd-85ba-d09921937fdd</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+  </ItemGroup>
+</Project>
+
+================
+File: Services/QuoteGeneratorService.cs
+================
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -133,8 +313,7 @@ namespace QuoteGeneratorWorker.Services
             _logger.LogInformation("🛑 2. Завершаем все блоки-потребители");
             foreach (var block in _consumerBlocks)
             {
-                // _logger.LogInformation($"🛑 2. Завершаем блок-потребитель: {block.GetType().ToString()} ");
-                _logger.LogInformation($"🛑 2. Завершаем блок-потребитель: {block.GetType().Name} ");
+                _logger.LogInformation($"🛑 2. Завершаем блок-потребитель: {block.GetType().ToString()} ");
                 block.Complete();
             }
             // 3. Ждём завершения всех обработчиков (ActionBlocks).
@@ -172,3 +351,32 @@ namespace QuoteGeneratorWorker.Services
         //}
     }
 }
+
+================
+File: Worker.cs
+================
+namespace QuoteGeneratorWorker053
+{
+    public class Worker(ILogger<Worker> logger) : BackgroundService
+    {
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                if (logger.IsEnabled(LogLevel.Information))
+                {
+                    logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+                }
+                await Task.Delay(1000, stoppingToken);
+            }
+        }
+    }
+}
+
+
+
+
+
+================================================================
+End of Codebase
+================================================================
