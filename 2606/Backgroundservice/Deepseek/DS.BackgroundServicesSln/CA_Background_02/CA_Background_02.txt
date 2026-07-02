@@ -1,7 +1,9 @@
 ================================================================
+26.07.03
+================================================================
 Directory Structure
 ================================================================
-CA_Backgraound_02.csproj
+CA_Background_02.csproj
 Program.cs
 
 ================================================================
@@ -9,7 +11,7 @@ Files
 ================================================================
 
 ================
-File: CA_Backgraound_02.csproj
+File: CA_Background_02.csproj
 ================
 <Project Sdk="Microsoft.NET.Sdk">
 
@@ -52,6 +54,8 @@ builder.Services.AddHostedService<ContinuousListener>();
 builder.Services.AddHostedService<StartupInitializer>();
 builder.Services.AddHostedService<CronJob>();
 
+builder.Services.AddHostedService<CustomDataProcessor>();
+
 // При необходимости можно зарегистрировать дополнительные зависимости
 // builder.Services.AddSingleton<IMyService, MyService>();
 
@@ -59,7 +63,6 @@ var host = builder.Build();
 
 Console.WriteLine("Запуск хоста...");
 await host.RunAsync();
-
 
 ================================================================
 End of Codebase

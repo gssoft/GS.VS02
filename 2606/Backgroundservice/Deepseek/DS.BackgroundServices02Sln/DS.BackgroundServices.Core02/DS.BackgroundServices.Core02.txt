@@ -1,15 +1,18 @@
-================================================================
-27.06.03
+26.07.03
 ================================================================
 Directory Structure
 ================================================================
 Base/BackgroundServiceBase.cs
-DS.BackgroundServices.Core.csproj
-Workers/ContinuousBackgroundService.cs
-Workers/CustomDataProcessor.cs
-Workers/OneTimeStartupService.cs
-Workers/PeriodicBackgroundService.cs
-Workers/ScheduledBackgroundService.cs
+DS.BackgroundServices.Core02.csproj
+Workers/ContinuousListener.cs
+Workers/CronJob.cs
+Workers/PeriodicProcessor.cs
+Workers/StartupInitializer.cs
+WorkersAbstract/ContinuousBackgroundService.cs
+WorkersAbstract/CustomDataProcessor.cs
+WorkersAbstract/OneTimeStartupService.cs
+WorkersAbstract/PeriodicBackgroundService.cs
+WorkersAbstract/ScheduledBackgroundService.cs
 
 ================================================================
 Files
@@ -21,8 +24,7 @@ File: Base/BackgroundServiceBase.cs
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace DS.BackgroundServices.Core;
-// namespace DS.BackgroundServices.Core;
+namespace DS.BackgroundServices.Core02;
 
 // namespace DS.BackgroundServices.Workers;
 
@@ -98,7 +100,7 @@ public abstract class BackgroundServiceBase : BackgroundService
 }
 
 ================
-File: DS.BackgroundServices.Core.csproj
+File: DS.BackgroundServices.Core02.csproj
 ================
 <Project Sdk="Microsoft.NET.Sdk">
 
@@ -108,29 +110,124 @@ File: DS.BackgroundServices.Core.csproj
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Cronos" Version="0.13.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Cronos" Version="0.13.0" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
+	</ItemGroup>
 
 </Project>
 
 ================
-File: Workers/ContinuousBackgroundService.cs
+File: Workers/ContinuousListener.cs
+================
+using DS.BackgroundServices.Core02;
+using Microsoft.Extensions.Logging;
+
+/// <summary>Непрерывный конвейер (слушает очередь/канал).</summary>
+public class ContinuousListener : ContinuousBackgroundService
+{
+    private readonly ILogger<ContinuousListener> _logger;
+    public ContinuousListener(ILogger<ContinuousListener> logger) : base(logger)
+    {
+        _logger = logger;
+    }
+
+    protected override async Task DoWorkAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("ContinuousListener: ожидаю новые данные...");
+        // В реальном коде здесь ожидание сообщения из канала/сокета
+        await Task.Delay(2000, stoppingToken);
+    }
+}
+
+================
+File: Workers/CronJob.cs
+================
+using DS.BackgroundServices.Core02;
+using Microsoft.Extensions.Logging;
+
+/// <summary>Задача по Cron‑расписанию (каждые 10 секунд).</summary>
+public class CronJob : ScheduledBackgroundService
+{
+    private readonly ILogger<CronJob> _logger;
+    public CronJob(ILogger<CronJob> logger)
+        : base(logger, "*/10 * * * * *")
+    {
+        _logger = logger;
+
+    } // Cronos формат с секундами
+
+    protected override async Task DoWorkAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("CronJob: запуск по расписанию в {Time}", DateTime.UtcNow);
+        await Task.Delay(300, stoppingToken);
+    }
+}
+
+================
+File: Workers/PeriodicProcessor.cs
+================
+using DS.BackgroundServices.Core02;
+using Microsoft.Extensions.Logging;
+
+// < summary > Периодическая обработка каждые 5 секунд.</summary>
+public class PeriodicProcessor : PeriodicBackgroundService
+{
+    private readonly ILogger<PeriodicProcessor> _logger;
+
+    public PeriodicProcessor(ILogger<PeriodicProcessor> logger)
+        : base(logger, TimeSpan.FromSeconds(5))
+    {
+        _logger = logger;
+    }
+
+    protected override async Task DoWorkAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("PeriodicProcessor: выполняю работу...");
+        await Task.Delay(200, stoppingToken); // имитация полезной нагрузки
+    }
+}
+
+================
+File: Workers/StartupInitializer.cs
+================
+using DS.BackgroundServices.Core02;
+using Microsoft.Extensions.Logging;
+
+/// <summary>Одноразовое задание при запуске.</summary>
+public class StartupInitializer : OneTimeStartupService
+{
+    private readonly ILogger<StartupInitializer> _logger;
+    public StartupInitializer(ILogger<StartupInitializer> logger) : base(logger)
+    {
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteOnceAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("StartupInitializer: выполняю разовую инициализацию...");
+        await Task.Delay(1000, stoppingToken);
+        _logger.LogInformation("StartupInitializer: инициализация завершена.");
+    }
+}
+
+================
+File: WorkersAbstract/ContinuousBackgroundService.cs
 ================
 using System;
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.Extensions.Logging;
 
-namespace DS.BackgroundServices.Core.Workers;
+// namespace DS.BackgroundServices.Core.Workers;
+namespace DS.BackgroundServices.Core02;
 
 /// <summary>
 /// Сервис, выполняющий работу в бесконечном цикле без искусственных пауз.
 /// Используйте, когда нужно постоянно слушать очередь, поток или канал.
 /// </summary>
-public abstract class ContinuousBackgroundService : BackgroundServiceBase
+public abstract class ContinuousBackgroundService : DS.BackgroundServices.Core02.BackgroundServiceBase
 {
     private readonly ILogger _logger;
     protected ContinuousBackgroundService(ILogger logger)
@@ -168,18 +265,19 @@ public abstract class ContinuousBackgroundService : BackgroundServiceBase
 }
 
 ================
-File: Workers/CustomDataProcessor.cs
+File: WorkersAbstract/CustomDataProcessor.cs
 ================
-using DS.BackgroundServices.Core.Workers;
+// using DS.BackgroundServices.Core.Workers;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace DS.BackgroundServices.Core.Workers;
+// namespace DS.BackgroundServices.Core.Workers;
+namespace DS.BackgroundServices.Core02;
 
 // Периодическая обработка каждые 10 секунд
-public class CustomDataProcessor : PeriodicBackgroundService
+public class CustomDataProcessor : DS.BackgroundServices.Core02.PeriodicBackgroundService
 {
     private readonly ILogger _logger;
     public CustomDataProcessor(ILogger<CustomDataProcessor> logger)
@@ -197,14 +295,15 @@ public class CustomDataProcessor : PeriodicBackgroundService
 }
 
 ================
-File: Workers/OneTimeStartupService.cs
+File: WorkersAbstract/OneTimeStartupService.cs
 ================
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace DS.BackgroundServices.Core.Workers;
+// namespace DS.BackgroundServices.Core.Workers;
+namespace DS.BackgroundServices.Core02;
 
 /// <summary>
 /// Сервис, который выполняет задачу один раз при старте приложения и завершается.
@@ -229,7 +328,7 @@ public abstract class OneTimeStartupService : BackgroundServiceBase
 }
 
 ================
-File: Workers/PeriodicBackgroundService.cs
+File: WorkersAbstract/PeriodicBackgroundService.cs
 ================
 using System;
 using System.Collections.Generic;
@@ -239,7 +338,8 @@ using System.Text;
 
 using Microsoft.Extensions.Logging;
 
-namespace DS.BackgroundServices.Core.Workers;
+// namespace DS.BackgroundServices.Core.Workers;
+namespace DS.BackgroundServices.Core02;
 
 /// <summary>
 /// Фоновый сервис, повторяющий операцию через заданный интервал.
@@ -293,16 +393,17 @@ public abstract class PeriodicBackgroundService : BackgroundServiceBase
 }
 
 ================
-File: Workers/ScheduledBackgroundService.cs
+File: WorkersAbstract/ScheduledBackgroundService.cs
 ================
 using Cronos;
-using DS.BackgroundServices.Core;
+// using DS.BackgroundServices.Core02;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace DS.BackgroundServices.Core.Workers;
+// namespace DS.BackgroundServices.Core.Workers;
+namespace DS.BackgroundServices.Core02;
 
 /// <summary>
 /// Выполняет задачу строго по cron‑расписанию. Требует пакет Cronos.
@@ -355,6 +456,11 @@ public abstract class ScheduledBackgroundService : BackgroundServiceBase
         }
     }
 }
+
+
+
+
+
 ================================================================
 End of Codebase
 ================================================================
