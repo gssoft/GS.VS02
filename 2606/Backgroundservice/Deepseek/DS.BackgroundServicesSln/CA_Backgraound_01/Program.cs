@@ -28,13 +28,14 @@ await host.RunAsync();
 // Конкретные реализации фоновых сервисов (можно вынести в отдельные файлы)
 // ------------------------------------------------------------
 
-/// <summary>Периодическая обработка каждые 5 секунд.</summary>
+// < summary > Периодическая обработка каждые 5 секунд.</summary>
 public class PeriodicProcessor : PeriodicBackgroundService
 {
     private readonly ILogger<PeriodicProcessor> _logger;
 
     public PeriodicProcessor(ILogger<PeriodicProcessor> logger)
-        : base(logger, TimeSpan.FromSeconds(5)) {
+        : base(logger, TimeSpan.FromSeconds(5))
+    {
         _logger = logger;
     }
 

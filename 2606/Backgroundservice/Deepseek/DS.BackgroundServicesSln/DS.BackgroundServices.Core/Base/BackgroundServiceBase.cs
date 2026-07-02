@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 
 namespace DS.BackgroundServices.Core;
 
+// namespace DS.BackgroundServices.Workers;
+
 /// <summary>
 /// Надёжная база для любого фонового сервиса.
 /// Предоставляет правильную асинхронную остановку, логирование с именем конечного класса

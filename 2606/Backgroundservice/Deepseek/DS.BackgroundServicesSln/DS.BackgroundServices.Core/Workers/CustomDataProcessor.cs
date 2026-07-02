@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
+namespace DS.BackgroundServices.Core.Workers;
+
 // Периодическая обработка каждые 10 секунд
 public class CustomDataProcessor : PeriodicBackgroundService
 {
