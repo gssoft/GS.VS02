@@ -1,0 +1,364 @@
+
+26.07.02
+================================================================
+Directory Structure
+================================================================
+Base/BackgroundServiceBase.cs
+DS.BackgroundServices.Core.csproj
+Workers/ContinuousBackgroundService.cs
+Workers/CustomDataProcessor.cs
+Workers/OneTimeStartupService.cs
+Workers/PeriodicBackgroundService.cs
+Workers/ScheduledBackgroundService.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: Base/BackgroundServiceBase.cs
+================
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace DS.BackgroundServices.Core;
+
+// namespace DS.BackgroundServices.Workers;
+
+/// <summary>
+/// Надёжная база для любого фонового сервиса.
+/// Предоставляет правильную асинхронную остановку, логирование с именем конечного класса
+/// и хуки жизненного цикла.
+/// </summary>
+public abstract class BackgroundServiceBase : BackgroundService
+{
+    private readonly ILogger _logger;
+
+    protected BackgroundServiceBase(ILogger logger)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// Реализует основной цикл или логику работы. Вызывается после <see cref="OnStartingAsync"/>.
+    /// </summary>
+    protected abstract Task ExecuteCoreAsync(CancellationToken stoppingToken);
+
+    /// <summary>
+    /// Вызывается один раз перед входом в <see cref="ExecuteCoreAsync"/>.
+    /// Идеально для инициализации, открытия соединений и т.п.
+    /// </summary>
+    protected virtual Task OnStartingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>
+    /// Вызывается после завершения основного цикла, даже при ошибке.
+    /// Гарантирует корректное освобождение ресурсов.
+    /// </summary>
+    protected virtual Task OnStoppedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    protected sealed override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            _logger.LogInformation("Сервис {ServiceName} запускается", GetType().Name);
+
+            await OnStartingAsync(stoppingToken).ConfigureAwait(false);
+
+            await ExecuteCoreAsync(stoppingToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogInformation("Сервис {ServiceName} остановлен по запросу хоста", GetType().Name);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogCritical(ex, "Критический сбой в сервисе {ServiceName}", GetType().Name);
+            throw; // Даём хосту возможность отреагировать (например, перезапустить)
+        }
+        finally
+        {
+            // Асинхронная очистка – теперь без блокировок и deadlock'ов
+            try
+            {
+                await OnStoppedAsync(stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                // Ожидаемо при штатной остановке
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при финальной очистке сервиса {ServiceName}", GetType().Name);
+            }
+
+            _logger.LogInformation("Сервис {ServiceName} завершил работу", GetType().Name);
+        }
+    }
+}
+
+================
+File: DS.BackgroundServices.Core.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Cronos" Version="0.13.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Workers/ContinuousBackgroundService.cs
+================
+using System;
+using System.Collections.Generic;
+using System.Text;
+using Microsoft.Extensions.Logging;
+
+namespace DS.BackgroundServices.Core.Workers;
+
+/// <summary>
+/// Сервис, выполняющий работу в бесконечном цикле без искусственных пауз.
+/// Используйте, когда нужно постоянно слушать очередь, поток или канал.
+/// </summary>
+public abstract class ContinuousBackgroundService : BackgroundServiceBase
+{
+    private readonly ILogger _logger;
+    protected ContinuousBackgroundService(ILogger logger)
+        : base(logger)
+    {
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Один проход непрерывной обработки.
+    /// Если метод блокируется внутри асинхронного ожидания – это допустимо.
+    /// </summary>
+    protected abstract Task DoWorkAsync(CancellationToken stoppingToken);
+
+    protected override async Task ExecuteCoreAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await DoWorkAsync(stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка в непрерывном цикле сервиса {ServiceName}", GetType().Name);
+                // Небольшая защита от «шторма» ошибок
+                await Task.Delay(1000, stoppingToken).ConfigureAwait(false);
+            }
+        }
+    }
+}
+
+================
+File: Workers/CustomDataProcessor.cs
+================
+using DS.BackgroundServices.Core.Workers;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace DS.BackgroundServices.Core.Workers;
+
+// Периодическая обработка каждые 10 секунд
+public class CustomDataProcessor : PeriodicBackgroundService
+{
+    private readonly ILogger _logger;
+    public CustomDataProcessor(ILogger<CustomDataProcessor> logger)
+        : base(logger, TimeSpan.FromSeconds(10))
+    {
+        _logger = logger;
+    }
+
+    protected override async Task DoWorkAsync(CancellationToken stoppingToken)
+    {
+       _logger.LogInformation("Обработка данных...");
+        // бизнес-логика
+        await Task.Delay(500, stoppingToken); // имитация работы
+    }
+}
+
+================
+File: Workers/OneTimeStartupService.cs
+================
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace DS.BackgroundServices.Core.Workers;
+
+/// <summary>
+/// Сервис, который выполняет задачу один раз при старте приложения и завершается.
+/// Хост не будет ждать его повторного запуска.
+/// </summary>
+public abstract class OneTimeStartupService : BackgroundServiceBase
+{
+    private readonly ILogger _logger;
+    protected OneTimeStartupService(ILogger logger)
+        : base(logger)
+    {
+        _logger = logger;
+    }
+
+    protected abstract Task ExecuteOnceAsync(CancellationToken stoppingToken);
+
+    protected override async Task ExecuteCoreAsync(CancellationToken stoppingToken)
+    {
+        await ExecuteOnceAsync(stoppingToken).ConfigureAwait(false);
+        // После выполнения метод возвращается – сервис считается завершённым.
+    }
+}
+
+================
+File: Workers/PeriodicBackgroundService.cs
+================
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+// периодическое выполнение с настраиваемым интервалом
+
+using Microsoft.Extensions.Logging;
+
+namespace DS.BackgroundServices.Core.Workers;
+
+/// <summary>
+/// Фоновый сервис, повторяющий операцию через заданный интервал.
+/// Подходит для синхронизаций, опросов и периодической обработки.
+/// </summary>
+public abstract class PeriodicBackgroundService : BackgroundServiceBase
+{
+    private readonly TimeSpan _interval;
+    private readonly ILogger _logger;
+
+    protected PeriodicBackgroundService(ILogger logger, TimeSpan interval)
+        : base(logger)
+    {
+        _logger = logger;
+
+        if (interval <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(interval), "Интервал должен быть положительным");
+        _interval = interval;
+    }
+
+    /// <summary>
+    /// Одна итерация работы.
+    /// </summary>
+    protected abstract Task DoWorkAsync(CancellationToken stoppingToken);
+
+    protected override async Task ExecuteCoreAsync(CancellationToken stoppingToken)
+    {
+        // Первый запуск – сразу после старта, если не нужно ждать первый интервал,
+        // можно раскомментировать задержку.
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await DoWorkAsync(stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                // Нормальная остановка – выходим
+                break;
+            }
+            catch (Exception ex)
+            {
+                // Логируем ошибку итерации, но не обрушиваем весь сервис
+                _logger.LogError(ex, "Ошибка в периодической операции сервиса {ServiceName}", GetType().Name);
+            }
+
+            // Пауза между итерациями. Если хост уже остановлен, задержка прервётся сразу.
+            await Task.Delay(_interval, stoppingToken).ConfigureAwait(false);
+        }
+    }
+}
+
+================
+File: Workers/ScheduledBackgroundService.cs
+================
+using Cronos;
+using DS.BackgroundServices.Core;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace DS.BackgroundServices.Core.Workers;
+
+/// <summary>
+/// Выполняет задачу строго по cron‑расписанию. Требует пакет Cronos.
+/// </summary>
+public abstract class ScheduledBackgroundService : BackgroundServiceBase
+{
+    private readonly CronExpression _cronExpression;
+    private readonly ILogger _logger;
+
+    protected ScheduledBackgroundService(ILogger logger, string cronExpression)
+        : base(logger)
+    {
+        _cronExpression = CronExpression.Parse(cronExpression, CronFormat.IncludeSeconds);
+        _logger = logger;
+    }
+
+    protected abstract Task DoWorkAsync(CancellationToken stoppingToken);
+
+    protected override async Task ExecuteCoreAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var now = DateTime.UtcNow;
+            var next = _cronExpression.GetNextOccurrence(now, inclusive: false);
+            if (next is null)
+                break; // расписание никогда не сработает
+
+            var delay = next.Value - DateTime.UtcNow;
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, stoppingToken).ConfigureAwait(false);
+            }
+
+            // Если остановка запрошена во время задержки – выходим
+            if (stoppingToken.IsCancellationRequested)
+                break;
+
+            try
+            {
+                await DoWorkAsync(stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при выполнении задания по расписанию в {ServiceName}", GetType().Name);
+            }
+        }
+    }
+}
+
+
+
+
+
+================================================================
+End of Codebase
+================================================================

@@ -1,8 +1,7 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace DS.BackgroundServices.Core;
-// namespace DS.BackgroundServices.Core;
+namespace DS.BackgroundServices.Core02;
 
 // namespace DS.BackgroundServices.Workers;
 

@@ -1,4 +1,37 @@
-﻿using DS.BackgroundServices.Core.Workers;
+
+26.07.02
+================================================================
+Directory Structure
+================================================================
+CA_Backgraound_01.csproj
+Program.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: CA_Backgraound_01.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DS.BackgroundServices.Core\DS.BackgroundServices.Core.csproj" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Program.cs
+================
+using DS.BackgroundServices.Core.Workers;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -119,3 +152,11 @@ public class CronJob : ScheduledBackgroundService
 
 //Console.WriteLine("Запуск хоста...");
 //await host.RunAsync();
+
+
+
+
+
+================================================================
+End of Codebase
+================================================================

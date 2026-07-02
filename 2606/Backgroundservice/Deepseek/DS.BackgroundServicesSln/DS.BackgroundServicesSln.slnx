@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="CA_Backgraound_01/CA_Backgraound_01.csproj" />
+  <Project Path="CA_Backgraound_02/CA_Backgraound_02.csproj" />
   <Project Path="DS.BackgroundServices.Core/DS.BackgroundServices.Core.csproj" />
+  <Project Path="DS.BackgroundServices.Core02/DS.BackgroundServices.Core02.csproj" />
 </Solution>
