@@ -10,7 +10,7 @@ namespace DS.BackgroundServices.Core02;
 /// Сервис, выполняющий работу в бесконечном цикле без искусственных пауз.
 /// Используйте, когда нужно постоянно слушать очередь, поток или канал.
 /// </summary>
-public abstract class ContinuousBackgroundService : BackgroundServiceBase
+public abstract class ContinuousBackgroundService : DS.BackgroundServices.Core02.BackgroundServiceBase
 {
     private readonly ILogger _logger;
     protected ContinuousBackgroundService(ILogger logger)

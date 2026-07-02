@@ -17,6 +17,8 @@ builder.Services.AddHostedService<ContinuousListener>();
 builder.Services.AddHostedService<StartupInitializer>();
 builder.Services.AddHostedService<CronJob>();
 
+builder.Services.AddHostedService<CustomDataProcessor>();
+
 // При необходимости можно зарегистрировать дополнительные зависимости
 // builder.Services.AddSingleton<IMyService, MyService>();
 

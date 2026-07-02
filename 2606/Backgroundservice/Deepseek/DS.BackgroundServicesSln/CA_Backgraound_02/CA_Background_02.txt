@@ -1,0 +1,66 @@
+================================================================
+Directory Structure
+================================================================
+CA_Backgraound_02.csproj
+Program.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: CA_Backgraound_02.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DS.BackgroundServices.Core02\DS.BackgroundServices.Core02.csproj" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Program.cs
+================
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+using DS.BackgroundServices.Core02;
+
+HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
+
+// Настройка логирования
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.SetMinimumLevel(LogLevel.Information);
+
+// Регистрация фоновых сервисов (порядок не важен)
+builder.Services.AddHostedService<PeriodicProcessor>();
+builder.Services.AddHostedService<ContinuousListener>();
+builder.Services.AddHostedService<StartupInitializer>();
+builder.Services.AddHostedService<CronJob>();
+
+// При необходимости можно зарегистрировать дополнительные зависимости
+// builder.Services.AddSingleton<IMyService, MyService>();
+
+var host = builder.Build();
+
+Console.WriteLine("Запуск хоста...");
+await host.RunAsync();
+
+
+================================================================
+End of Codebase
+================================================================

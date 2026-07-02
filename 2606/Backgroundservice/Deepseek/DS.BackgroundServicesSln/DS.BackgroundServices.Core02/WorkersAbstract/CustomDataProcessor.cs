@@ -8,7 +8,7 @@ using System.Text;
 namespace DS.BackgroundServices.Core02;
 
 // Периодическая обработка каждые 10 секунд
-public class CustomDataProcessor : PeriodicBackgroundService
+public class CustomDataProcessor : DS.BackgroundServices.Core02.PeriodicBackgroundService
 {
     private readonly ILogger _logger;
     public CustomDataProcessor(ILogger<CustomDataProcessor> logger)
