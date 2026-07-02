@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="CA_Backgroundservice01/CA_Backgroundservice01.csproj" />
+  <Project Path="GA.BackgroundServices.Core/GA.BackgroundServices.Core.csproj" />
+</Solution>

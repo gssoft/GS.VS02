@@ -1,0 +1,119 @@
+================================================================
+Directory Structure
+================================================================
+CA_Backgroundservice01.csproj
+CustomDataProcessor.cs
+Program.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: CA_Backgroundservice01.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GA.BackgroundServices.Core\GA.BackgroundServices.Core.csproj" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: CustomDataProcessor.cs
+================
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using GA.BackgroundServices.Core;
+
+public class CustomDataProcessor : WorkerCore
+{
+    public CustomDataProcessor(ILogger<CustomDataProcessor> logger) : base(logger) { }
+
+    protected override Task DoWorkAsync(CancellationToken stoppingToken)
+    {
+        // Здесь ваша бизнес-логика
+        _logger.LogInformation("DoWorkAsync(): Выполняется обработка данных...");
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnStartingAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("OnStartingAsync(): Инициализация соединений перед запуском...");
+        await base.OnStartingAsync(cancellationToken);
+    }
+
+    protected override async Task OnStoppedAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("OnStoppedAsync(): Закрытие соединений БД...");
+        await base.OnStoppedAsync(cancellationToken);
+    }
+}
+
+================
+File: Program.cs
+================
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using GA.BackgroundServices.Core; // Подключаем пространство имен вашей библиотеки
+
+// Создаем билдер хоста. Это точка входа приложения Worker Service.
+var builder = Host.CreateApplicationBuilder(args);
+
+// ---------------------------------------------------
+// 1. Настройка конфигурации и логирования (опционально)
+// ---------------------------------------------------
+builder.Logging.ClearProviders(); // Очищаем провайдеры по умолчанию
+builder.Logging.AddConsole();     // Добавляем вывод в консоль (стандарт для воркеров)
+
+// Если у вас есть настройки в appsettings.json специально для этого сервиса:
+// builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection("CustomDataProcessor"));
+
+// ---------------------------------------------------
+// 2. Регистрация зависимостей (DI Container)
+// ---------------------------------------------------
+
+// ВАЖНО: CoreWorker из вашей библиотеки уже зарегистрирован как IHostedService внутри себя,
+// но если он использует другие сервисы (например, HttpClientFactory или DbContext), 
+// их нужно добавить здесь ДО регистрации самого процессора.
+
+// Пример добавления HTTP клиента, если библиотека его использует:
+// builder.Services.AddHttpClient();
+
+// Пример настроек времени жизни (Lifetimes):
+// - AddSingleton: один экземпляр на всю жизнь приложения.
+// - AddScoped: новый экземпляр для каждой итерации цикла DoWorkAsync (безопасно для EF Core DbContext).
+// - AddTransient: новый экземпляр при каждом запросе внедрения.
+
+// Регистрируем сторонние компоненты, которые нужны CustomDataProcessor
+// builder.Services.AddSingleton<IMyExternalApi, MyExternalApi>();
+
+// ---------------------------------------------------
+// 3. Регистрация фонового сервиса
+// ---------------------------------------------------
+// RegisterHostedService гарантирует, что будет создан только ОДИН экземпляр сервиса за весь цикл жизни приложения.
+// Именно этот метод нужен для BackgroundService.
+builder.Services.AddHostedService<CustomDataProcessor>();
+
+// Альтернатива (работает так же для BackgroundService):
+// builder.Services.AddSingleton<IHostedService, CustomDataProcessor>();
+
+// ---------------------------------------------------
+// Сборка и запуск хоста
+// ---------------------------------------------------
+var host = builder.Build();
+
+await host.RunAsync();
+
+================================================================
+End of Codebase
+================================================================
