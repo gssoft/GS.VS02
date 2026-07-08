@@ -3,4 +3,6 @@
   <Project Path="CA_Background_02/CA_Background_02.csproj" />
   <Project Path="DS.BackgroundServices.Core/DS.BackgroundServices.Core.csproj" />
   <Project Path="DS.BackgroundServices.Core02/DS.BackgroundServices.Core02.csproj" />
+  <Project Path="DS.BackgroundServices.Core03/DS.BackgroundServices.Core03.csproj" Id="7a52c54c-2543-4988-bf64-8a9d9127594e" />
+  <Project Path="DS.BackgroundServices.Core04/DS.BackgroundServices.Core04.csproj" Id="5c0b8289-1c1d-4b67-8480-b130f269dc56" />
 </Solution>
