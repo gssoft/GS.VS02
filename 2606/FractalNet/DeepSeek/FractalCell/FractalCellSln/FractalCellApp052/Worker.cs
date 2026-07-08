@@ -69,26 +69,28 @@ public class Worker : BackgroundService
         }
     }
 
+    // Worker.cs (ключевые изменения)
+
     private async Task InitializeSystemAsync(CancellationToken ct)
     {
         _logger.LogInformation("🏗️ Initializing fractal system with behaviors...");
 
-        // === КОМПОЗИТНАЯ ЯЧЕЙКА (Root) — два поведения ===
+        // === Корневая ячейка (два поведения) ===
         var rootBehaviors = new IBehavior[]
         {
-            CreateHeartbeatBehavior(),
-            CreateDataProcessingBehavior()
+        CreateHeartbeatBehavior(),
+        CreateDataProcessingBehavior()
         };
         var rootCell = await CreateCellWithBehaviorsAsync("Root", 3, ct, rootBehaviors);
         _cells.Add(rootCell);
 
-        // === Дочерние ячейки с одним поведением ===
+        // === Дочерние ячейки ===
         var childConfigs = new List<(string id, int workers, Func<IBehavior> behaviorFactory)>
-        {
-            ("Child-A", 2, CreateHeartbeatBehavior),
-            ("Child-B", 2, CreateDataProcessingBehavior),
-            ("Child-C", 1, CreateDataProcessingBehavior)
-        };
+    {
+        ("Child-A", 2, CreateHeartbeatBehavior),
+        ("Child-B", 2, CreateDataProcessingBehavior),
+        ("Child-C", 1, CreateDataProcessingBehavior)
+    };
 
         foreach (var (id, workers, behaviorFactory) in childConfigs)
         {
@@ -97,17 +99,71 @@ public class Worker : BackgroundService
             _cells.Add(child);
         }
 
+        // === НОВОЕ: Ячейка-оркестратор ===
+        var orchestratorBehavior = new OrchestratorBehavior(
+            _loggerFactory.CreateLogger<OrchestratorBehavior>(),
+            TimeSpan.FromSeconds(2) // интервал
+        );
+        var orchestratorCell = await CreateCellWithBehaviorAsync(
+            "Orchestrator",
+            1, // минимальное количество воркеров (можно и 0)
+            ct,
+            orchestratorBehavior
+        );
+        _cells.Add(orchestratorCell);
+
         _logger.LogInformation("🔍 System cells: {Count}", _cells.Count);
         foreach (var cell in _cells)
-        {
             _logger.LogInformation("🔍 Cell: {CellId}", cell.CellId);
-        }
 
         _logger.LogInformation("▶️ Starting all cells...");
         await Task.WhenAll(_cells.Select(c => c.StartAsync(ct)));
 
         _logger.LogInformation("✅ System initialized with {Count} cells and behaviors", _cells.Count);
     }
+
+    // Метод OrchestrateWithBehaviorsAsync полностью удалён (или закомментирован).
+    // В ExecuteAsync больше нет вызова этого метода – оркестрация теперь внутри ячейки.
+
+    //private async Task InitializeSystemAsync(CancellationToken ct)
+    //{
+    //    _logger.LogInformation("🏗️ Initializing fractal system with behaviors...");
+
+    //    // === КОМПОЗИТНАЯ ЯЧЕЙКА (Root) — два поведения ===
+    //    var rootBehaviors = new IBehavior[]
+    //    {
+    //        CreateHeartbeatBehavior(),
+    //        CreateDataProcessingBehavior()
+    //    };
+    //    var rootCell = await CreateCellWithBehaviorsAsync("Root", 3, ct, rootBehaviors);
+    //    _cells.Add(rootCell);
+
+    //    // === Дочерние ячейки с одним поведением ===
+    //    var childConfigs = new List<(string id, int workers, Func<IBehavior> behaviorFactory)>
+    //    {
+    //        ("Child-A", 2, CreateHeartbeatBehavior),
+    //        ("Child-B", 2, CreateDataProcessingBehavior),
+    //        ("Child-C", 1, CreateDataProcessingBehavior)
+    //    };
+
+    //    foreach (var (id, workers, behaviorFactory) in childConfigs)
+    //    {
+    //        var behavior = behaviorFactory();
+    //        var child = await CreateCellWithBehaviorAsync(id, workers, ct, behavior);
+    //        _cells.Add(child);
+    //    }
+
+    //    _logger.LogInformation("🔍 System cells: {Count}", _cells.Count);
+    //    foreach (var cell in _cells)
+    //    {
+    //        _logger.LogInformation("🔍 Cell: {CellId}", cell.CellId);
+    //    }
+
+    //    _logger.LogInformation("▶️ Starting all cells...");
+    //    await Task.WhenAll(_cells.Select(c => c.StartAsync(ct)));
+
+    //    _logger.LogInformation("✅ System initialized with {Count} cells and behaviors", _cells.Count);
+    //}
 
     // === Фабрики для создания поведений ===
     private IBehavior CreateHeartbeatBehavior()
