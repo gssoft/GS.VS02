@@ -33,31 +33,17 @@ public class Worker : BackgroundService
         try
         {
             await InitializeSystemAsync(stoppingToken);
+            _logger.LogInformation("✅ System initialized. Worker is now idle, waiting for shutdown...");
 
-            _logger.LogInformation("✅ System initialized with behaviors. Starting orchestration loop...");
-
-            while (!stoppingToken.IsCancellationRequested)
+            // Ожидаем сигнала остановки
+            try
             {
-                try
-                {
-                    await OrchestrateWithBehaviorsAsync(stoppingToken);
-                    await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    _logger.LogInformation("⏹️ Orchestration loop canceled");
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "❌ Error in orchestration loop");
-                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
-                }
+                await Task.Delay(-1, stoppingToken);
             }
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("👋 Worker stopping due to cancellation");
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("👋 Worker stopping due to cancellation");
+            }
         }
         catch (Exception ex)
         {
@@ -65,9 +51,11 @@ public class Worker : BackgroundService
         }
         finally
         {
-            _logger.LogInformation("🏁 Worker (Orchestrator) finished");
+            _logger.LogInformation("🏁 Worker finished");
         }
     }
+
+   
 
     // Worker.cs (ключевые изменения)
 
@@ -124,46 +112,6 @@ public class Worker : BackgroundService
 
     // Метод OrchestrateWithBehaviorsAsync полностью удалён (или закомментирован).
     // В ExecuteAsync больше нет вызова этого метода – оркестрация теперь внутри ячейки.
-
-    //private async Task InitializeSystemAsync(CancellationToken ct)
-    //{
-    //    _logger.LogInformation("🏗️ Initializing fractal system with behaviors...");
-
-    //    // === КОМПОЗИТНАЯ ЯЧЕЙКА (Root) — два поведения ===
-    //    var rootBehaviors = new IBehavior[]
-    //    {
-    //        CreateHeartbeatBehavior(),
-    //        CreateDataProcessingBehavior()
-    //    };
-    //    var rootCell = await CreateCellWithBehaviorsAsync("Root", 3, ct, rootBehaviors);
-    //    _cells.Add(rootCell);
-
-    //    // === Дочерние ячейки с одним поведением ===
-    //    var childConfigs = new List<(string id, int workers, Func<IBehavior> behaviorFactory)>
-    //    {
-    //        ("Child-A", 2, CreateHeartbeatBehavior),
-    //        ("Child-B", 2, CreateDataProcessingBehavior),
-    //        ("Child-C", 1, CreateDataProcessingBehavior)
-    //    };
-
-    //    foreach (var (id, workers, behaviorFactory) in childConfigs)
-    //    {
-    //        var behavior = behaviorFactory();
-    //        var child = await CreateCellWithBehaviorAsync(id, workers, ct, behavior);
-    //        _cells.Add(child);
-    //    }
-
-    //    _logger.LogInformation("🔍 System cells: {Count}", _cells.Count);
-    //    foreach (var cell in _cells)
-    //    {
-    //        _logger.LogInformation("🔍 Cell: {CellId}", cell.CellId);
-    //    }
-
-    //    _logger.LogInformation("▶️ Starting all cells...");
-    //    await Task.WhenAll(_cells.Select(c => c.StartAsync(ct)));
-
-    //    _logger.LogInformation("✅ System initialized with {Count} cells and behaviors", _cells.Count);
-    //}
 
     // === Фабрики для создания поведений ===
     private IBehavior CreateHeartbeatBehavior()

@@ -21,6 +21,12 @@ public class OrchestratorBehavior : BackgroundBehaviorTemplate
 
     public OrchestratorBehavior() : this(null, null) { }
 
+    public override Task<bool> CanHandleAsync(IApplicationEvent @event)
+    {
+        // Оркестратор только отправляет, но не обрабатывает входящие события
+        return Task.FromResult(false);
+    }
+
     protected override async Task BackgroundLoopAsync(CancellationToken ct)
     {
         _logger?.LogInformation("🎛️ OrchestratorBehavior started, interval: {Interval}", _interval);
