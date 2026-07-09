@@ -58,6 +58,7 @@ public class PerformanceTuner : ITunerStrategy
 
 // 3. Наш рабочий сервис НАСЛЕДУЕТ BackgroundService 
 // Но теперь он получает зависимости через конструктор DI-контейнера
+// Это номер 2 - опасаемся, что не зарегистрируем что-то
 public class MyWorker : BackgroundService
 {
     private readonly ISchedulerStrategy _scheduler;
