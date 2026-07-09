@@ -5,6 +5,8 @@
     <Project Path="StrategyPattern03/StrategyPattern03.csproj" />
     <Project Path="StrategyPattern04/StrategyPattern04.csproj" />
     <Project Path="WorkerService05/WorkerService05.csproj" />
+    <Project Path="WorkerService07/WorkerService07.csproj" />
+    <Project Path="WorkerService08/WorkerService08.csproj" />
   </Folder>
   <Project Path="StrategyApp01/TemplateMethod01.csproj" />
   <Project Path="TemplateMethod02/TemplateMethod02.csproj" />

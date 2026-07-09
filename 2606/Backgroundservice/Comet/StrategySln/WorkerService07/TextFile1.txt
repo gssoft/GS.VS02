@@ -1,0 +1,50 @@
+﻿https://www.perplexity.ai/search/db6e2fc1-20a3-411a-823f-379f4d79ea73
+
+Как это выглядит в коде с делегатами
+Если не нужны отдельные классы для маленьких стратегий, можно тоже использовать делегаты:
+
+text
+public class BackgroundService
+{
+    private readonly Func<CancellationToken, Task> _behavior;
+    private readonly Func(TimeSpan, CancellationToken, Task> _scheduler;
+    private readonly Action<string, double> _metrics;
+    private readonly Func<TunerConfig, TunerConfig> _tuner;
+
+    public BackgroundService(
+        Func<CancellationToken, Task> behavior,
+        Func(TimeSpan, CancellationToken, Task> scheduler,
+        Action<string, double> metrics,
+        Func<TunerConfig, TunerConfig> tuner)
+    {
+        _behavior = behavior;
+        _scheduler = scheduler;
+        _metrics = metrics;
+        _tuner = tuner;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _scheduler(TimeSpan.FromSeconds(10), stoppingToken, async token =>
+        {
+            _metrics("start", 1);
+            await _behavior(token);
+            _metrics("end", 1);
+        });
+    }
+}
+Это тоже «стратегия + делегирование», но с несколькими стратегиями (behavior, scheduler, metrics, tuner).
+
+Резюме
+Применять в контексте несколько разных стратегий — это хорошая практика, если они отвечают за независимые аспекты поведения.
+
+Ваш BackgroundService<TBehavior, TScheduler, TMetrics, TTuner> — это не одна сложная стратегия, а четыре компактные стратегии,
+каждая для своего аспекта.
+
+Такой подход:
+
+Улучшает модульность и тестируемость.
+
+Упрощает конфигурацию и комбинацию вариантов.
+
+Лучше соответствует принципам чистой архитектуры и современным .NET-практикам jasulib.
