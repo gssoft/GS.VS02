@@ -1,5 +1,9 @@
 <Solution>
-  <Folder Name="/Startegy/">
+  <Folder Name="/Solution Items/">
+    <File Path="../Doc/Strategy_Pattern_260709_.txt" />
+    <File Path="../Doc/TemplateMethod_260709_.txt" />
+  </Folder>
+  <Folder Name="/Strategy/">
     <Project Path="StrategyPattern01/StrategyPattern01.csproj" />
     <Project Path="StrategyPattern02/StrategyPattern02.csproj" />
     <Project Path="StrategyPattern03/StrategyPattern03.csproj" />
@@ -8,8 +12,10 @@
     <Project Path="WorkerService07/WorkerService07.csproj" />
     <Project Path="WorkerService08/WorkerService08.csproj" />
   </Folder>
-  <Project Path="StrategyApp01/TemplateMethod01.csproj" />
-  <Project Path="TemplateMethod02/TemplateMethod02.csproj" />
-  <Project Path="TemplateMethod03/TemplateMethod03.csproj" />
-  <Project Path="TemplateMethod04/TemplateMethod04.csproj" />
+  <Folder Name="/TemplateMethod/">
+    <Project Path="StrategyApp01/TemplateMethod01.csproj" />
+    <Project Path="TemplateMethod02/TemplateMethod02.csproj" />
+    <Project Path="TemplateMethod03/TemplateMethod03.csproj" />
+    <Project Path="TemplateMethod04/TemplateMethod04.csproj" />
+  </Folder>
 </Solution>
