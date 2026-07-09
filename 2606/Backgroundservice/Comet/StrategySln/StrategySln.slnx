@@ -1,4 +1,11 @@
 <Solution>
+  <Folder Name="/Startegy/">
+    <Project Path="StrategyPattern01/StrategyPattern01.csproj" />
+    <Project Path="StrategyPattern02/StrategyPattern02.csproj" />
+    <Project Path="StrategyPattern03/StrategyPattern03.csproj" />
+    <Project Path="StrategyPattern04/StrategyPattern04.csproj" />
+    <Project Path="WorkerService05/WorkerService05.csproj" />
+  </Folder>
   <Project Path="StrategyApp01/TemplateMethod01.csproj" />
   <Project Path="TemplateMethod02/TemplateMethod02.csproj" />
   <Project Path="TemplateMethod03/TemplateMethod03.csproj" />
