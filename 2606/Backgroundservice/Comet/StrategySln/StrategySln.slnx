@@ -2,4 +2,5 @@
   <Project Path="StrategyApp01/TemplateMethod01.csproj" />
   <Project Path="TemplateMethod02/TemplateMethod02.csproj" />
   <Project Path="TemplateMethod03/TemplateMethod03.csproj" />
+  <Project Path="TemplateMethod04/TemplateMethod04.csproj" />
 </Solution>
