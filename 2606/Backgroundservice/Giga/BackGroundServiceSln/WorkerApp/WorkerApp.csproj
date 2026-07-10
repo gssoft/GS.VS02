@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-WorkerApp-f40fd7ae-bbc5-4b1b-a0db-8781663fa8c7</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Worker.Core.Abstractions\Worker.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Worker.Core.Infrastructure\Worker.Core.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

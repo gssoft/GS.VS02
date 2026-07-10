@@ -1,3 +1,5 @@
 <Solution>
   <Project Path="Worker.Core.Abstractions/Worker.Core.Abstractions.csproj" />
+  <Project Path="Worker.Core.Infrastructure/Worker.Core.Infrastructure.csproj" />
+  <Project Path="WorkerApp/WorkerApp.csproj" />
 </Solution>
