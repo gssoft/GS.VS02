@@ -1,0 +1,82 @@
+26.07.10
+================================================================
+https://giga.chat/link/gcsUQkJWTX
+================================================================
+Directory Structure
+================================================================
+.repomixignore
+IBehaviorStrategy.cs
+IClock.cs
+ILivenessStrategy.cs
+ISchedulerStrategy.cs
+Worker.Core.Abstractions.csproj
+
+================================================================
+Files
+================================================================
+
+================
+File: .repomixignore
+================
+.repomixignore
+
+================
+File: IBehaviorStrategy.cs
+================
+namespace Worker.Core.Abstractions;
+
+public interface IBehaviorStrategy : IDisposable
+{
+    Task ExecuteAsync(CancellationToken token);
+}
+
+================
+File: IClock.cs
+================
+namespace Worker.Core.Abstractions;
+
+public interface IClock
+{
+    DateTimeOffset UtcNow { get; }
+}
+
+================
+File: ILivenessStrategy.cs
+================
+namespace Worker.Core.Abstractions;
+
+public interface ILivenessStrategy
+{
+    void Pulse();
+}
+
+================
+File: ISchedulerStrategy.cs
+================
+namespace Worker.Core.Abstractions;
+
+public interface ISchedulerStrategy : IAsyncDisposable
+{
+    IAsyncEnumerable<DateTimeOffset> GetScheduleAsync(CancellationToken stoppingToken);
+}
+
+================
+File: Worker.Core.Abstractions.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
+
+
+
+
+
+================================================================
+End of Codebase
+================================================================

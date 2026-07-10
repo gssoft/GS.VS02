@@ -1,0 +1,289 @@
+===============================================================
+26.07.10
+================================================================
+https://giga.chat/link/gcsUQkJWTX
+================================================================
+Directory Structure
+================================================================
+.repomixignore
+DefaultLivenessStrategy.cs
+ExponentialBackoffScheduler.cs
+GenericJobHost.cs
+SystemClock.cs
+Utils/SafeWaiter.cs
+Worker.Core.Infrastructure.csproj
+
+================================================================
+Files
+================================================================
+
+================
+File: .repomixignore
+================
+.repomixignore
+
+================
+File: DefaultLivenessStrategy.cs
+================
+namespace Worker.Core.Infrastructure.Liveness;
+
+using System.Threading;
+using Worker.Core.Abstractions;
+
+public sealed class DefaultLivenessStrategy : ILivenessStrategy
+{
+    private long _lastPulseTicks = DateTimeOffset.UtcNow.Ticks;
+
+    public void Pulse() =>
+        Interlocked.Exchange(ref _lastPulseTicks, DateTimeOffset.UtcNow.Ticks);
+
+    // Этот метод можно использовать в Health Checks провайдере
+    public TimeSpan GetStaleness() =>
+        TimeSpan.FromTicks(DateTimeOffset.UtcNow.Ticks - Volatile.Read(ref _lastPulseTicks));
+}
+
+================
+File: ExponentialBackoffScheduler.cs
+================
+namespace Worker.Core.Infrastructure.Schedulers;
+
+using System.Runtime.CompilerServices;
+using Worker.Core.Abstractions;
+using Worker.Core.Infrastructure.Utils;
+
+public sealed class ExponentialBackoffScheduler : ISchedulerStrategy
+{
+    private readonly IClock _clock;
+    private readonly TimeSpan _baseDelay;
+    private readonly TimeSpan _maxDelay;
+    private readonly int _maxAttempts;
+    private readonly Random _jitter = new();
+    private int _attempt;
+
+    public ExponentialBackoffScheduler(IClock clock, TimeSpan baseDelay, TimeSpan maxDelay, int maxAttempts = 10)
+    {
+        _clock = clock;
+        _baseDelay = baseDelay;
+        _maxDelay = maxDelay;
+        _maxAttempts = maxAttempts;
+    }
+
+    public async IAsyncEnumerable<DateTimeOffset> GetScheduleAsync([EnumeratorCancellation] CancellationToken stoppingToken)
+    {
+        //while (!stoppingToken.IsCancellationRequested && _attempt < _maxAttempts)
+        //{
+        //    var delay = CalculateNextDelay();
+        //    var nextRunAt = _clock.UtcNow.Add(delay);
+
+        //    var waitTime = nextRunAt - _clock.UtcNow;
+        //    if (waitTime > TimeSpan.Zero)
+        //    {
+        //        await Task.Delay(waitTime, stoppingToken);
+        //    }
+
+        //    yield return nextRunAt;
+        //    _attempt++;
+        //}
+
+        while (!stoppingToken.IsCancellationRequested && _attempt < _maxAttempts)
+        {
+            var delay = CalculateNextDelay();
+            var nextRunAt = _clock.UtcNow.Add(delay);
+
+            // Вся логика Exception теперь здесь
+            await SafeWaiter.WaitUntilAsync(nextRunAt, _clock, stoppingToken);
+
+            yield return nextRunAt;
+            _attempt++;
+        }
+    }
+
+    private TimeSpan CalculateNextDelay()
+    {
+        double ticks = Math.Min(_baseDelay.Ticks * Math.Pow(2, _attempt), _maxDelay.Ticks);
+        var jitteredTicks = (long)(ticks * _jitter.NextDouble());
+        return TimeSpan.FromTicks(jitteredTicks);
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}
+
+================
+File: GenericJobHost.cs
+================
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Worker.Core.Abstractions;
+
+public sealed class GenericJobHost(
+    ISchedulerStrategy scheduler,
+    IBehaviorStrategy behavior,
+    ILivenessStrategy liveness,
+    ILogger<GenericJobHost> logger) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        logger.LogInformation("GenericJobHost starting.");
+
+        try
+        {
+            // Весь цикл планирования обернут в защиту от Cancellation
+            await foreach (var scheduledStart in scheduler.GetScheduleAsync(stoppingToken))
+            {
+                using var workCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                workCts.CancelAfter(TimeSpan.FromMinutes(5));
+
+                try
+                {
+                    await behavior.ExecuteAsync(workCts.Token);
+                    liveness.Pulse();
+                }
+                catch (OperationCanceledException) when (workCts.Token.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+                {
+                    logger.LogWarning("Work iteration timed out after 5 minutes.");
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Unhandled exception during job execution at {Time}", DateTimeOffset.Now);
+                }
+            }
+        }
+        // ЛОВУШКА ДЛЯ CTRL+C
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Мы явно ловим отмену хоста здесь. 
+            // Ошибка больше не считается "unhandled", так как мы ее перехватили.
+            logger.LogInformation("Scheduler loop gracefully stopped by host shutdown signal.");
+        }
+        finally
+        {
+            await scheduler.DisposeAsync();
+        }
+
+        logger.LogInformation("GenericJobHost is stopping.");
+    }
+}
+
+//namespace Worker.Core.Infrastructure.Hosting;
+
+//using Microsoft.Extensions.Hosting;
+//using Microsoft.Extensions.Logging;
+//using Worker.Core.Abstractions;
+
+//public sealed class GenericJobHost(
+//    ISchedulerStrategy scheduler,
+//    IBehaviorStrategy behavior,
+//    ILivenessStrategy liveness,
+//    ILogger<GenericJobHost> logger) : BackgroundService
+//{
+//    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+//    {
+//        logger.LogInformation("GenericJobHost starting.");
+
+//        try
+//        {
+//            await foreach (var scheduledStart in scheduler.GetScheduleAsync(stoppingToken))
+//            {
+//                using var workCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+
+//                // Таймаут выполнения одной итерации (защита от "залипания" воркера)
+//                workCts.CancelAfter(TimeSpan.FromMinutes(5));
+
+//                try
+//                {
+//                    await behavior.ExecuteAsync(workCts.Token);
+//                    liveness.Pulse(); // Оповестили мир, что мы живы после успешного прохода
+//                }
+//                catch (OperationCanceledException) when (workCts.Token.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+//                {
+//                    logger.LogWarning("Work iteration timed out after 5 minutes.");
+//                }
+//                catch (Exception ex)
+//                {
+//                    logger.LogError(ex, "Unhandled exception during job execution at {Time}", DateTimeOffset.Now);
+//                    // Не пробрасываем исключение вверх, чтобы не убить хост
+//                }
+//            }
+//        }
+//        finally
+//        {
+//            await scheduler.DisposeAsync();
+//        }
+
+//        logger.LogInformation("GenericJobHost is stopping.");
+//    }
+//}
+
+================
+File: SystemClock.cs
+================
+namespace Worker.Core.Infrastructure.Clocks;
+
+using Worker.Core.Abstractions;
+
+public sealed class SystemClock : IClock
+{
+    public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+}
+
+================
+File: Utils/SafeWaiter.cs
+================
+using Worker.Core.Abstractions;
+
+namespace Worker.Core.Infrastructure.Utils;
+
+public static class SafeWaiter
+{
+    /// <summary>
+    /// Ожидает наступления целевого времени, учитывая CancellationToken.
+    /// Корректно обрабатывает ситуацию отмены хоста во время сна.
+    /// </summary>
+    public static async Task WaitUntilAsync(DateTimeOffset targetTime, IClock clock, CancellationToken token)
+    {
+        var waitTime = targetTime - clock.UtcNow;
+
+        if (waitTime > TimeSpan.Zero)
+        {
+            try
+            {
+                await Task.Delay(waitTime, token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                // Пробрасываем дальше. Это сигнал GenericJobHost о том, 
+                // что приложение закрывается и нужно завершать ExecuteAsync.
+                throw;
+            }
+        }
+    }
+}
+
+================
+File: Worker.Core.Infrastructure.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Worker.Core.Abstractions\Worker.Core.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>
+
+
+
+
+
+================================================================
+End of Codebase
+================================================================

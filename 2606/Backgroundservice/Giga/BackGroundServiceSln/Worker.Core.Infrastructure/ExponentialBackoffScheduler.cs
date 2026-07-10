@@ -2,6 +2,7 @@
 
 using System.Runtime.CompilerServices;
 using Worker.Core.Abstractions;
+using Worker.Core.Infrastructure.Utils;
 
 public sealed class ExponentialBackoffScheduler : ISchedulerStrategy
 {
@@ -22,16 +23,28 @@ public sealed class ExponentialBackoffScheduler : ISchedulerStrategy
 
     public async IAsyncEnumerable<DateTimeOffset> GetScheduleAsync([EnumeratorCancellation] CancellationToken stoppingToken)
     {
+        //while (!stoppingToken.IsCancellationRequested && _attempt < _maxAttempts)
+        //{
+        //    var delay = CalculateNextDelay();
+        //    var nextRunAt = _clock.UtcNow.Add(delay);
+
+        //    var waitTime = nextRunAt - _clock.UtcNow;
+        //    if (waitTime > TimeSpan.Zero)
+        //    {
+        //        await Task.Delay(waitTime, stoppingToken);
+        //    }
+
+        //    yield return nextRunAt;
+        //    _attempt++;
+        //}
+
         while (!stoppingToken.IsCancellationRequested && _attempt < _maxAttempts)
         {
             var delay = CalculateNextDelay();
             var nextRunAt = _clock.UtcNow.Add(delay);
 
-            var waitTime = nextRunAt - _clock.UtcNow;
-            if (waitTime > TimeSpan.Zero)
-            {
-                await Task.Delay(waitTime, stoppingToken);
-            }
+            // Вся логика Exception теперь здесь
+            await SafeWaiter.WaitUntilAsync(nextRunAt, _clock, stoppingToken);
 
             yield return nextRunAt;
             _attempt++;

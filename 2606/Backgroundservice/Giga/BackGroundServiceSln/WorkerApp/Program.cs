@@ -1,7 +1,7 @@
 using Worker.Core.Abstractions;
 using Worker.Core.Infrastructure;
 using Worker.Core.Infrastructure.Clocks;
-using Worker.Core.Infrastructure.Hosting;
+// using Worker.Core.Infrastructure.Hosting;
 using Worker.Core.Infrastructure.Liveness;
 using Worker.Core.Infrastructure.Schedulers;
 using WorkerApp.Behaviors;

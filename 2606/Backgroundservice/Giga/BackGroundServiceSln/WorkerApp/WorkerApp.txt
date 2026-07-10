@@ -1,0 +1,184 @@
+26.07.10
+================================================================
+https://giga.chat/link/gcsUQkJWTX
+================================================================
+Directory Structure
+================================================================
+.repomixignore
+appsettings.Development.json
+appsettings.json
+DatabasePollingBehavior.cs
+Program.cs
+Properties/launchSettings.json
+Worker.cs
+WorkerApp.csproj
+
+================================================================
+Files
+================================================================
+
+================
+File: .repomixignore
+================
+.repomixignore
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: DatabasePollingBehavior.cs
+================
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+using global::Worker.Core.Abstractions;
+
+using System.Threading;
+using System.Threading.Tasks;
+// using Worker.Core.Abstractions;
+
+namespace WorkerApp.Behaviors;
+public sealed class DatabasePollingBehavior : IBehaviorStrategy
+{
+    // Здесь могут быть DbContext, HttpClientFactory и т.д.
+
+    public async Task ExecuteAsync(CancellationToken token)
+    {
+        Console.WriteLine($"[{DateTimeOffset.Now}] Polling database for new orders...");
+
+        // Имитация долгой работы БД
+        await Task.Delay(TimeSpan.FromSeconds(2), token);
+
+        // Если выбросится Exception — GenericJobHost поймает его и залогирует,
+        // но сам сервис продолжит работу со следующей попытки бэкоффа.
+
+        Console.WriteLine($"[{DateTimeOffset.Now}] Batch processed successfully.");
+    }
+
+    public void Dispose()
+    {
+        // Освобождение ресурсов контекста
+    }
+}
+
+================
+File: Program.cs
+================
+using Worker.Core.Abstractions;
+using Worker.Core.Infrastructure;
+using Worker.Core.Infrastructure.Clocks;
+// using Worker.Core.Infrastructure.Hosting;
+using Worker.Core.Infrastructure.Liveness;
+using Worker.Core.Infrastructure.Schedulers;
+using WorkerApp.Behaviors;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+// Регистрация инфраструктуры (можно вынести в Extension Method AddWorkerCore())
+builder.Services.AddSingleton<IClock, SystemClock>();
+builder.Services.AddSingleton<ILivenessStrategy, DefaultLivenessStrategy>();
+
+// Конфигурация планировщика через appsettings.json или жестко здесь
+builder.Services.AddSingleton<ISchedulerStrategy>(sp =>
+    new ExponentialBackoffScheduler(
+        sp.GetRequiredService<IClock>(),
+        baseDelay: TimeSpan.FromSeconds(10),
+        maxDelay: TimeSpan.FromMinutes(5)));
+
+// Регистрация конкретного поведения
+builder.Services.AddTransient<IBehaviorStrategy, DatabasePollingBehavior>();
+
+// Вместо стандартного worker'а запускаем наш универсальный хост
+builder.Services.AddHostedService<GenericJobHost>();
+
+var host = builder.Build();
+await host.RunAsync();
+
+================
+File: Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "WorkerApp": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: Worker.cs
+================
+namespace WorkerApp
+{
+    public class Worker(ILogger<Worker> logger) : BackgroundService
+    {
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                if (logger.IsEnabled(LogLevel.Information))
+                {
+                    logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+                }
+                await Task.Delay(1000, stoppingToken);
+            }
+        }
+    }
+}
+
+================
+File: WorkerApp.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-WorkerApp-f40fd7ae-bbc5-4b1b-a0db-8781663fa8c7</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Worker.Core.Abstractions\Worker.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Worker.Core.Infrastructure\Worker.Core.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>
+
+
+
+
+
+================================================================
+End of Codebase
+================================================================
