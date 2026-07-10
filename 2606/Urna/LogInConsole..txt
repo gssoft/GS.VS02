@@ -1,0 +1,1361 @@
+ПОСМОТРИТЕ
+🚀 Starting Fractal System with Behaviors...
+ℹ️ Press Ctrl+C to stop
+🎯 Behaviors: HeartbeatBehavior, DataProcessingBehavior
+📊 Events: Heartbeat, ProcessData
+
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      InMemoryFractalEventHub created
+info: FractalCellApp.Worker[0]
+      🚀 Worker (Orchestrator) started
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: FractalCellApp.Worker[0]
+      🏗️ Initializing fractal system with behaviors...
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln\FractalCellApp053
+info: ExternalBus-Root[0]
+      ChannelExternalBus Root-external created with capacity 1000
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Registering channel for cell Root
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Cell Root registered successfully. Total cells: 1
+info: ExternalBus-Root[0]
+      ChannelExternalBus Root-external connected to hub for cell Root
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      Behavior HeartbeatBehavior added to cell Root
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      Behavior DataProcessingBehavior added to cell Root
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      Behavior TimeSynchronizationBehavior added to cell Root
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      Behavior HeartbeatBehavior attached to cell Root
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      Behavior DataProcessingBehavior attached to cell Root
+info: FractalCellApp.Behaviors.TimeSynchronizationBehavior[0]
+      Behavior TimeSynchronizationBehavior attached to cell Root
+info: FractalCellApp.Worker[0]
+      📦 Cell Root created with behaviors [HeartbeatBehavior, DataProcessingBehavior, TimeSynchronizationBehavior] and 3 workers
+info: ExternalBus-Child-A[0]
+      ChannelExternalBus Child-A-external created with capacity 1000
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Registering channel for cell Child-A
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Cell Child-A registered successfully. Total cells: 2
+info: ExternalBus-Child-A[0]
+      ChannelExternalBus Child-A-external connected to hub for cell Child-A
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      Behavior HeartbeatBehavior added to cell Child-A
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      Behavior HeartbeatBehavior attached to cell Child-A
+info: FractalCellApp.Worker[0]
+      📦 Cell Child-A created with behavior HeartbeatBehavior and 2 workers
+info: ExternalBus-Child-B[0]
+      ChannelExternalBus Child-B-external created with capacity 1000
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Registering channel for cell Child-B
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Cell Child-B registered successfully. Total cells: 3
+info: ExternalBus-Child-B[0]
+      ChannelExternalBus Child-B-external connected to hub for cell Child-B
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      Behavior DataProcessingBehavior added to cell Child-B
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      Behavior DataProcessingBehavior attached to cell Child-B
+info: FractalCellApp.Worker[0]
+      📦 Cell Child-B created with behavior DataProcessingBehavior and 2 workers
+info: ExternalBus-Child-C[0]
+      ChannelExternalBus Child-C-external created with capacity 1000
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Registering channel for cell Child-C
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Cell Child-C registered successfully. Total cells: 4
+info: ExternalBus-Child-C[0]
+      ChannelExternalBus Child-C-external connected to hub for cell Child-C
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      Behavior DataProcessingBehavior added to cell Child-C
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      Behavior DataProcessingBehavior attached to cell Child-C
+info: FractalCellApp.Worker[0]
+      📦 Cell Child-C created with behavior DataProcessingBehavior and 1 workers
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external created with capacity 1000
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Registering channel for cell Orchestrator
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Cell Orchestrator registered successfully. Total cells: 5
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external connected to hub for cell Orchestrator
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      Behavior OrchestratorBehavior added to cell Orchestrator
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      Behavior OrchestratorBehavior attached to cell Orchestrator
+info: FractalCellApp.Worker[0]
+      📦 Cell Orchestrator created with behavior OrchestratorBehavior and 1 workers
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external created with capacity 1000
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Registering channel for cell FractalTime
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Cell FractalTime registered successfully. Total cells: 6
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external connected to hub for cell FractalTime
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      Behavior TimeGenerationBehavior added to cell FractalTime
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior attached to cell FractalTime
+info: FractalCellApp.Worker[0]
+      📦 Cell FractalTime created with behavior TimeGenerationBehavior and 1 workers
+info: FractalCellApp.Worker[0]
+      🔍 System cells: 6
+info: FractalCellApp.Worker[0]
+      🔍 Cell: Root
+info: FractalCellApp.Worker[0]
+      🔍 Cell: Child-A
+info: FractalCellApp.Worker[0]
+      🔍 Cell: Child-B
+info: FractalCellApp.Worker[0]
+      🔍 Cell: Child-C
+info: FractalCellApp.Worker[0]
+      🔍 Cell: Orchestrator
+info: FractalCellApp.Worker[0]
+      🔍 Cell: FractalTime
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      🎛️ OrchestratorBehavior started, interval: 00:00:02
+info: FractalCellApp.Worker[0]
+      ▶️ Starting all cells...
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ TimeGenerationBehavior started, interval: 00:00:01
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Root starting
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      🚀 [DataProcessing] Cell starting, resetting counters
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Root-worker-0 started
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Root-worker-2 started
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Root-worker-1 started
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Root execute loop started
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Cell started, ready to process data
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Root started successfully with 3 behaviors
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-A starting
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Child-A-worker-0 started
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Child-A-worker-1 started
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-A execute loop started
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-A started successfully with 1 behaviors
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-B starting
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      🚀 [DataProcessing] Cell starting, resetting counters
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Child-B-worker-0 started
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-B execute loop started
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Child-B-worker-1 started
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Cell started, ready to process data
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-B started successfully with 1 behaviors
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-C starting
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      🚀 [DataProcessing] Cell starting, resetting counters
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-C execute loop started
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Child-C-worker-0 started
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Cell started, ready to process data
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-C started successfully with 1 behaviors
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Orchestrator starting
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Orchestrator execute loop started
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Orchestrator-worker-0 started
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Orchestrator started successfully with 1 behaviors
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell FractalTime starting
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ TimeGeneration: cell starting, resetting tick counter
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell FractalTime execute loop started
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService FractalTime-worker-0 started
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ TimeGeneration: cell started
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell FractalTime started successfully with 1 behaviors
+info: FractalCellApp.Worker[0]
+      ✅ System initialized with 6 cells and behaviors
+info: FractalCellApp.Worker[0]
+      ✅ System initialized. Worker is now idle, waiting for shutdown...
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 1 at 07/10/2026 13:34:27 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-59d5caf1e8c84685a38d57643df0f9c0
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-59d5caf1e8c84685a38d57643df0f9c0 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-59d5caf1e8c84685a38d57643df0f9c0 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-59d5caf1e8c84685a38d57643df0f9c0 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-59d5caf1e8c84685a38d57643df0f9c0 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting Heartbeat from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event heartbeat-639192872680784192
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event heartbeat-639192872680784192 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event heartbeat-639192872680784192 broadcasted to 6 cells
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 2 at 07/10/2026 13:34:28 +00:00
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872680784192 but doesn't handle it
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-24e8ea950ec84bf485348c61b36a5d96
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-24e8ea950ec84bf485348c61b36a5d96 to all cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872680784192 but doesn't handle it
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-24e8ea950ec84bf485348c61b36a5d96 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-24e8ea950ec84bf485348c61b36a5d96 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-24e8ea950ec84bf485348c61b36a5d96 but doesn't handle it
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 1, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:28
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 1, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:28
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 2, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:28
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 2, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:28
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 3 at 07/10/2026 13:34:29 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-a9e44f6b5cc344eb87a6de6bbc8f683d
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-a9e44f6b5cc344eb87a6de6bbc8f683d to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-a9e44f6b5cc344eb87a6de6bbc8f683d broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-a9e44f6b5cc344eb87a6de6bbc8f683d but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-a9e44f6b5cc344eb87a6de6bbc8f683d but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting Heartbeat from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event heartbeat-639192872700998535
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event heartbeat-639192872700998535 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event heartbeat-639192872700998535 broadcasted to 6 cells
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 3, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:30
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872700998535 but doesn't handle it
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 3, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:30
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872700998535 but doesn't handle it
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      🔄 [Heartbeat] Sending response from Child-A
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      🔄 [Heartbeat] Sending response from Root
+info: ExternalBus-Root[0]
+      ChannelExternalBus Root-external sending event response-639192872702280858 to Orchestrator
+info: ExternalBus-Child-A[0]
+      ChannelExternalBus Child-A-external sending event response-639192872702275963 to Orchestrator
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Publishing event response-639192872702275963 to target cell Orchestrator. Active cells: 6
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Publishing event response-639192872702280858 to target cell Orchestrator. Active cells: 6
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event response-639192872702275963 successfully sent to Orchestrator
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event response-639192872702280858 successfully sent to Orchestrator
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 4, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:30
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 4, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:30
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 4 at 07/10/2026 13:34:30 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-9c7685df996e46b3b713bc95f2ce4b80
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-9c7685df996e46b3b713bc95f2ce4b80 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-9c7685df996e46b3b713bc95f2ce4b80 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-9c7685df996e46b3b713bc95f2ce4b80 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-9c7685df996e46b3b713bc95f2ce4b80 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 5 at 07/10/2026 13:34:31 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-ad0147b53d084f46b91a902119342c80
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-ad0147b53d084f46b91a902119342c80 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-ad0147b53d084f46b91a902119342c80 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-ad0147b53d084f46b91a902119342c80 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-ad0147b53d084f46b91a902119342c80 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting Heartbeat from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event heartbeat-639192872721233021
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event heartbeat-639192872721233021 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event heartbeat-639192872721233021 broadcasted to 6 cells
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 5, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:32
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872721233021 but doesn't handle it
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 6, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:32
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 5, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:32
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872721233021 but doesn't handle it
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      🔄 [Heartbeat] Sending response from Root
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 6, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:32
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      🔄 [Heartbeat] Sending response from Child-A
+info: ExternalBus-Root[0]
+      ChannelExternalBus Root-external sending event response-639192872722062762 to Orchestrator
+info: ExternalBus-Child-A[0]
+      ChannelExternalBus Child-A-external sending event response-639192872722273077 to Orchestrator
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Publishing event response-639192872722062762 to target cell Orchestrator. Active cells: 6
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Publishing event response-639192872722273077 to target cell Orchestrator. Active cells: 6
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event response-639192872722062762 successfully sent to Orchestrator
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event response-639192872722273077 successfully sent to Orchestrator
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 6 at 07/10/2026 13:34:32 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-0cff25602d7446929c3a33e7b67fd986
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-0cff25602d7446929c3a33e7b67fd986 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-0cff25602d7446929c3a33e7b67fd986 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-0cff25602d7446929c3a33e7b67fd986 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-0cff25602d7446929c3a33e7b67fd986 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 7 at 07/10/2026 13:34:33 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-98aec97789aa4aa4b52e7026d2fa8022
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-98aec97789aa4aa4b52e7026d2fa8022 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-98aec97789aa4aa4b52e7026d2fa8022 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-98aec97789aa4aa4b52e7026d2fa8022 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-98aec97789aa4aa4b52e7026d2fa8022 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting ProcessData from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event processdata-639192872741285747
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event processdata-639192872741285747 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event processdata-639192872741285747 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192872741285747 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192872741285747 but doesn't handle it
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872741285747, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:34, Source = OrchestratorBehavior, Data = { Value = 69, Priority = 3 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872741285747, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:34, Source = OrchestratorBehavior, Data = { Value = 69, Priority = 3 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872741285747, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:34, Source = OrchestratorBehavior, Data = { Value = 69, Priority = 3 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872741285747
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872741285747
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872741285747
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872741285747, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:34, Source = OrchestratorBehavior, Data = { Value = 69, Priority = 3 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872741285747, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:34, Source = OrchestratorBehavior, Data = { Value = 69, Priority = 3 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872741285747, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:34, Source = OrchestratorBehavior, Data = { Value = 69, Priority = 3 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872741285747
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872741285747
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872741285747
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 8 at 07/10/2026 13:34:34 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-85c9c0fb86644677b443b7b26ac70e9d
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-85c9c0fb86644677b443b7b26ac70e9d to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-85c9c0fb86644677b443b7b26ac70e9d broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-85c9c0fb86644677b443b7b26ac70e9d but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-85c9c0fb86644677b443b7b26ac70e9d but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 9 at 07/10/2026 13:34:35 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-a1f839d382c942238346697018836437
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-a1f839d382c942238346697018836437 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-a1f839d382c942238346697018836437 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-a1f839d382c942238346697018836437 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-a1f839d382c942238346697018836437 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting ProcessData from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event processdata-639192872761509233
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event processdata-639192872761509233 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event processdata-639192872761509233 broadcasted to 6 cells
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872761509233, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:36, Source = OrchestratorBehavior, Data = { Value = 4, Priority = 1 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872761509233, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:36, Source = OrchestratorBehavior, Data = { Value = 4, Priority = 1 } }
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192872761509233 but doesn't handle it
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872761509233, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:36, Source = OrchestratorBehavior, Data = { Value = 4, Priority = 1 } }
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192872761509233 but doesn't handle it
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872761509233
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872761509233
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872761509233
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872761509233, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:36, Source = OrchestratorBehavior, Data = { Value = 4, Priority = 1 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872761509233, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:36, Source = OrchestratorBehavior, Data = { Value = 4, Priority = 1 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872761509233, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:36, Source = OrchestratorBehavior, Data = { Value = 4, Priority = 1 } }
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 10 at 07/10/2026 13:34:36 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-325d9fa90545411194284a600c7d7566
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-325d9fa90545411194284a600c7d7566 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-325d9fa90545411194284a600c7d7566 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-325d9fa90545411194284a600c7d7566 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-325d9fa90545411194284a600c7d7566 but doesn't handle it
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872761509233
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872761509233
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872761509233
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 11 at 07/10/2026 13:34:37 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-ed220a6832624022a296f804a0ff0b9c
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-ed220a6832624022a296f804a0ff0b9c to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-ed220a6832624022a296f804a0ff0b9c broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-ed220a6832624022a296f804a0ff0b9c but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-ed220a6832624022a296f804a0ff0b9c but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting ProcessData from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event processdata-639192872781731203
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event processdata-639192872781731203 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event processdata-639192872781731203 broadcasted to 6 cells
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872781731203, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:38, Source = OrchestratorBehavior, Data = { Value = 61, Priority = 4 } }
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192872781731203 but doesn't handle it
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872781731203, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:38, Source = OrchestratorBehavior, Data = { Value = 61, Priority = 4 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872781731203, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:38, Source = OrchestratorBehavior, Data = { Value = 61, Priority = 4 } }
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192872781731203 but doesn't handle it
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872781731203
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872781731203
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872781731203
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872781731203, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:38, Source = OrchestratorBehavior, Data = { Value = 61, Priority = 4 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872781731203, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:38, Source = OrchestratorBehavior, Data = { Value = 61, Priority = 4 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872781731203, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:38, Source = OrchestratorBehavior, Data = { Value = 61, Priority = 4 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872781731203
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872781731203
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 12 at 07/10/2026 13:34:38 +00:00
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872781731203
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-f745b00f2a0b4b4ea0e21835b54adf74
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-f745b00f2a0b4b4ea0e21835b54adf74 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-f745b00f2a0b4b4ea0e21835b54adf74 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-f745b00f2a0b4b4ea0e21835b54adf74 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-f745b00f2a0b4b4ea0e21835b54adf74 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 13 at 07/10/2026 13:34:39 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-034bc2a7fc0a44c082db2e7b56d47a56
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-034bc2a7fc0a44c082db2e7b56d47a56 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-034bc2a7fc0a44c082db2e7b56d47a56 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-034bc2a7fc0a44c082db2e7b56d47a56 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-034bc2a7fc0a44c082db2e7b56d47a56 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting Heartbeat from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event heartbeat-639192872802000800
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event heartbeat-639192872802000800 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event heartbeat-639192872802000800 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872802000800 but doesn't handle it
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 7, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:40
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 7, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:40
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872802000800 but doesn't handle it
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 8, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:40
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 8, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:40
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 14 at 07/10/2026 13:34:40 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-76ac514c19454e25a924ae8229911eed
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-76ac514c19454e25a924ae8229911eed to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-76ac514c19454e25a924ae8229911eed broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-76ac514c19454e25a924ae8229911eed but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-76ac514c19454e25a924ae8229911eed but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 15 at 07/10/2026 13:34:41 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-fee29c6107264fffb95580ae9ba439a4
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-fee29c6107264fffb95580ae9ba439a4 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-fee29c6107264fffb95580ae9ba439a4 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-fee29c6107264fffb95580ae9ba439a4 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-fee29c6107264fffb95580ae9ba439a4 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting Heartbeat from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event heartbeat-639192872822374994
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event heartbeat-639192872822374994 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event heartbeat-639192872822374994 broadcasted to 6 cells
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 9, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:42
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872822374994 but doesn't handle it
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 9, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:42
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      🔄 [Heartbeat] Sending response from Root
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872822374994 but doesn't handle it
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      🔄 [Heartbeat] Sending response from Child-A
+info: ExternalBus-Child-A[0]
+      ChannelExternalBus Child-A-external sending event response-639192872822485280 to Orchestrator
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Publishing event response-639192872822485280 to target cell Orchestrator. Active cells: 6
+info: ExternalBus-Root[0]
+      ChannelExternalBus Root-external sending event response-639192872822525898 to Orchestrator
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event response-639192872822485280 successfully sent to Orchestrator
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 10, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:42
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Publishing event response-639192872822525898 to target cell Orchestrator. Active cells: 6
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event response-639192872822525898 successfully sent to Orchestrator
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      ❤️ [Heartbeat] Count: 10, Source: Orchestrator, Target: , Timestamp: 07/10/2026 13:34:42
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 16 at 07/10/2026 13:34:42 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-62e84d6e24844160883de4a35ae7d477
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-62e84d6e24844160883de4a35ae7d477 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-62e84d6e24844160883de4a35ae7d477 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-62e84d6e24844160883de4a35ae7d477 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-62e84d6e24844160883de4a35ae7d477 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 17 at 07/10/2026 13:34:43 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-73be05ea65904bc480e8e708d50e043d
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-73be05ea65904bc480e8e708d50e043d to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-73be05ea65904bc480e8e708d50e043d broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-73be05ea65904bc480e8e708d50e043d but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-73be05ea65904bc480e8e708d50e043d but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting ProcessData from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event processdata-639192872842411222
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event processdata-639192872842411222 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event processdata-639192872842411222 broadcasted to 6 cells
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872842411222, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:44, Source = OrchestratorBehavior, Data = { Value = 10, Priority = 3 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872842411222, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:44, Source = OrchestratorBehavior, Data = { Value = 10, Priority = 3 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872842411222, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:44, Source = OrchestratorBehavior, Data = { Value = 10, Priority = 3 } }
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192872842411222 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192872842411222 but doesn't handle it
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872842411222
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872842411222
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872842411222
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872842411222, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:44, Source = OrchestratorBehavior, Data = { Value = 10, Priority = 3 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872842411222, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:44, Source = OrchestratorBehavior, Data = { Value = 10, Priority = 3 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      📊 [DataProcessing] Processing data: EventId=processdata-639192872842411222, Source=Orchestrator, Payload={ Timestamp = 2026-07-10 13:34:44, Source = OrchestratorBehavior, Data = { Value = 10, Priority = 3 } }
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872842411222
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872842411222
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ✅ [DataProcessing] Data processed successfully: processdata-639192872842411222
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 18 at 07/10/2026 13:34:44 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-ef51048e72cb4b338fcb097bc3344812
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-ef51048e72cb4b338fcb097bc3344812 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-ef51048e72cb4b338fcb097bc3344812 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-ef51048e72cb4b338fcb097bc3344812 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-ef51048e72cb4b338fcb097bc3344812 but doesn't handle it
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+info: FractalCellApp.Worker[0]
+      🛑 Stopping all cells...
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Root stopping
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ⏹️ [DataProcessing] Cell stopping, final stats: 8 items processed
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Root-worker-0 stopping
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-A stopping
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-B stopping
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ⏹️ [DataProcessing] Cell stopping, final stats: 8 items processed
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Child-A-worker-0 stopping
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-C stopping
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      ⏹️ [DataProcessing] Cell stopping, final stats: 8 items processed
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Child-B-worker-0 stopping
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Orchestrator stopping
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Root-worker-1 stopping
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Child-A-worker-1 stopping
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Child-C-worker-0 stopping
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell FractalTime stopping
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Child-B-worker-1 stopping
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Root-worker-2 stopping
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService Orchestrator-worker-0 stopping
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      Behavior DataProcessingBehavior detached
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      Behavior HeartbeatBehavior detached
+info: FractalCellApp.Behaviors.HeartbeatBehavior[0]
+      Behavior HeartbeatBehavior detached
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      Behavior DataProcessingBehavior detached
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-C stopped
+info: FractalCellApp.Behaviors.DataProcessingBehavior[0]
+      Behavior DataProcessingBehavior detached
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ TimeGeneration: cell stopping, final tick: 18
+info: FractalCellApp.Behaviors.TimeSynchronizationBehavior[0]
+      Behavior TimeSynchronizationBehavior detached
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-A stopped
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Root stopped
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-B stopped
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      ChannelBackgroundService FractalTime-worker-0 stopping
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 19 at 07/10/2026 13:34:45 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-b8911a60ecb549eaa74de09f990ec769
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-b8911a60ecb549eaa74de09f990ec769 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-b8911a60ecb549eaa74de09f990ec769 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-b8911a60ecb549eaa74de09f990ec769 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-b8911a60ecb549eaa74de09f990ec769 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting Heartbeat from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event heartbeat-639192872862697113
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event heartbeat-639192872862697113 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event heartbeat-639192872862697113 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872862697113 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872862697113 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 20 at 07/10/2026 13:34:46 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-e7d82c74656d40bdb02848a8b9073a13
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-e7d82c74656d40bdb02848a8b9073a13 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-e7d82c74656d40bdb02848a8b9073a13 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-e7d82c74656d40bdb02848a8b9073a13 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-e7d82c74656d40bdb02848a8b9073a13 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 21 at 07/10/2026 13:34:47 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-2b0c976f60f446b4b26fbed3556cb9e2
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-2b0c976f60f446b4b26fbed3556cb9e2 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-2b0c976f60f446b4b26fbed3556cb9e2 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-2b0c976f60f446b4b26fbed3556cb9e2 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-2b0c976f60f446b4b26fbed3556cb9e2 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting ProcessData from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event processdata-639192872883036471
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event processdata-639192872883036471 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event processdata-639192872883036471 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192872883036471 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192872883036471 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 22 at 07/10/2026 13:34:48 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-b97a9d1a71c1435bb0b5a7b8ac4b5c0b
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-b97a9d1a71c1435bb0b5a7b8ac4b5c0b to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-b97a9d1a71c1435bb0b5a7b8ac4b5c0b broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-b97a9d1a71c1435bb0b5a7b8ac4b5c0b but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-b97a9d1a71c1435bb0b5a7b8ac4b5c0b but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 23 at 07/10/2026 13:34:49 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-55a250468cc140238f1349e81c44f1fc
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-55a250468cc140238f1349e81c44f1fc to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-55a250468cc140238f1349e81c44f1fc broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-55a250468cc140238f1349e81c44f1fc but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-55a250468cc140238f1349e81c44f1fc but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting Heartbeat from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event heartbeat-639192872903340102
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event heartbeat-639192872903340102 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event heartbeat-639192872903340102 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872903340102 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872903340102 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 24 at 07/10/2026 13:34:50 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-831d24bd26264effa569375a950afb14
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-831d24bd26264effa569375a950afb14 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-831d24bd26264effa569375a950afb14 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-831d24bd26264effa569375a950afb14 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-831d24bd26264effa569375a950afb14 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 25 at 07/10/2026 13:34:51 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-d0e050c7e98241b6a6d766efca0983f4
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-d0e050c7e98241b6a6d766efca0983f4 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-d0e050c7e98241b6a6d766efca0983f4 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-d0e050c7e98241b6a6d766efca0983f4 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-d0e050c7e98241b6a6d766efca0983f4 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting Heartbeat from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event heartbeat-639192872923410176
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event heartbeat-639192872923410176 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event heartbeat-639192872923410176 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872923410176 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872923410176 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 26 at 07/10/2026 13:34:52 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-826f2f3fa0df45919912831a789c9f30
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-826f2f3fa0df45919912831a789c9f30 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-826f2f3fa0df45919912831a789c9f30 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-826f2f3fa0df45919912831a789c9f30 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-826f2f3fa0df45919912831a789c9f30 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 27 at 07/10/2026 13:34:53 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-f058b6c246294887a901e45bc3021ab8
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-f058b6c246294887a901e45bc3021ab8 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-f058b6c246294887a901e45bc3021ab8 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-f058b6c246294887a901e45bc3021ab8 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-f058b6c246294887a901e45bc3021ab8 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting ProcessData from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event processdata-639192872943449788
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event processdata-639192872943449788 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event processdata-639192872943449788 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192872943449788 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192872943449788 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 28 at 07/10/2026 13:34:54 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-96d457840ce543b88a1d78d0e76f4679
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-96d457840ce543b88a1d78d0e76f4679 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-96d457840ce543b88a1d78d0e76f4679 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-96d457840ce543b88a1d78d0e76f4679 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-96d457840ce543b88a1d78d0e76f4679 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 29 at 07/10/2026 13:34:55 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-036dfae2ec6940afafa8c20978d7dd8f
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-036dfae2ec6940afafa8c20978d7dd8f to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-036dfae2ec6940afafa8c20978d7dd8f broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-036dfae2ec6940afafa8c20978d7dd8f but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-036dfae2ec6940afafa8c20978d7dd8f but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting Heartbeat from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event heartbeat-639192872963472074
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event heartbeat-639192872963472074 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event heartbeat-639192872963472074 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872963472074 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192872963472074 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 30 at 07/10/2026 13:34:56 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-5f28b1a37b3a4b3481f8356831a94b46
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-5f28b1a37b3a4b3481f8356831a94b46 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-5f28b1a37b3a4b3481f8356831a94b46 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-5f28b1a37b3a4b3481f8356831a94b46 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-5f28b1a37b3a4b3481f8356831a94b46 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 31 at 07/10/2026 13:34:57 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-33e2fc06870c47e28a6ec0b6bbafe5e8
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-33e2fc06870c47e28a6ec0b6bbafe5e8 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-33e2fc06870c47e28a6ec0b6bbafe5e8 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-33e2fc06870c47e28a6ec0b6bbafe5e8 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-33e2fc06870c47e28a6ec0b6bbafe5e8 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting ProcessData from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event processdata-639192872983515258
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event processdata-639192872983515258 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event processdata-639192872983515258 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192872983515258 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192872983515258 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 32 at 07/10/2026 13:34:58 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-f0767e38155245c084bbea2855d13f11
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-f0767e38155245c084bbea2855d13f11 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-f0767e38155245c084bbea2855d13f11 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-f0767e38155245c084bbea2855d13f11 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-f0767e38155245c084bbea2855d13f11 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 33 at 07/10/2026 13:35:00 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-ac6c04c64df64128ac4a4c5456b8ef53
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-ac6c04c64df64128ac4a4c5456b8ef53 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-ac6c04c64df64128ac4a4c5456b8ef53 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-ac6c04c64df64128ac4a4c5456b8ef53 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-ac6c04c64df64128ac4a4c5456b8ef53 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting Heartbeat from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event heartbeat-639192873003894326
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event heartbeat-639192873003894326 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event heartbeat-639192873003894326 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192873003894326 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192873003894326 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 34 at 07/10/2026 13:35:01 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-23b7d46f9c9f45358a6c54ca1db08336
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-23b7d46f9c9f45358a6c54ca1db08336 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-23b7d46f9c9f45358a6c54ca1db08336 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-23b7d46f9c9f45358a6c54ca1db08336 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-23b7d46f9c9f45358a6c54ca1db08336 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 35 at 07/10/2026 13:35:02 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-00b8c009906c494da51271a38ab1c869
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-00b8c009906c494da51271a38ab1c869 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-00b8c009906c494da51271a38ab1c869 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-00b8c009906c494da51271a38ab1c869 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-00b8c009906c494da51271a38ab1c869 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting Heartbeat from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event heartbeat-639192873023930851
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event heartbeat-639192873023930851 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event heartbeat-639192873023930851 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192873023930851 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192873023930851 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 36 at 07/10/2026 13:35:03 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-c8ea86e08bd64275a71769d52ecc4d3c
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-c8ea86e08bd64275a71769d52ecc4d3c to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-c8ea86e08bd64275a71769d52ecc4d3c broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-c8ea86e08bd64275a71769d52ecc4d3c but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-c8ea86e08bd64275a71769d52ecc4d3c but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 37 at 07/10/2026 13:35:04 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-c6d3173015e6446c869384cce1665197
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-c6d3173015e6446c869384cce1665197 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-c6d3173015e6446c869384cce1665197 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-c6d3173015e6446c869384cce1665197 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-c6d3173015e6446c869384cce1665197 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting ProcessData from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event processdata-639192873044237050
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event processdata-639192873044237050 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event processdata-639192873044237050 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192873044237050 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192873044237050 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 38 at 07/10/2026 13:35:05 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-8af008f7eba849ee8b42efa16f69c4b2
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-8af008f7eba849ee8b42efa16f69c4b2 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-8af008f7eba849ee8b42efa16f69c4b2 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-8af008f7eba849ee8b42efa16f69c4b2 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-8af008f7eba849ee8b42efa16f69c4b2 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 39 at 07/10/2026 13:35:06 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-dba10278fcfa44fa863170c01e873b50
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-dba10278fcfa44fa863170c01e873b50 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-dba10278fcfa44fa863170c01e873b50 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-dba10278fcfa44fa863170c01e873b50 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-dba10278fcfa44fa863170c01e873b50 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting Heartbeat from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event heartbeat-639192873064521946
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event heartbeat-639192873064521946 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event heartbeat-639192873064521946 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192873064521946 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192873064521946 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 40 at 07/10/2026 13:35:07 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-15aafac078e94f108ed4f7e21a26b3f3
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-15aafac078e94f108ed4f7e21a26b3f3 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-15aafac078e94f108ed4f7e21a26b3f3 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-15aafac078e94f108ed4f7e21a26b3f3 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-15aafac078e94f108ed4f7e21a26b3f3 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 41 at 07/10/2026 13:35:08 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-05d31534aed44ec68ddf124094549f25
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-05d31534aed44ec68ddf124094549f25 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-05d31534aed44ec68ddf124094549f25 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-05d31534aed44ec68ddf124094549f25 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-05d31534aed44ec68ddf124094549f25 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting ProcessData from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event processdata-639192873084555021
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event processdata-639192873084555021 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event processdata-639192873084555021 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192873084555021 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192873084555021 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 42 at 07/10/2026 13:35:09 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-9936a3ab7b8c48feadd6e2f4e5dcece9
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-9936a3ab7b8c48feadd6e2f4e5dcece9 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-9936a3ab7b8c48feadd6e2f4e5dcece9 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-9936a3ab7b8c48feadd6e2f4e5dcece9 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-9936a3ab7b8c48feadd6e2f4e5dcece9 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 43 at 07/10/2026 13:35:10 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-a51feb342c1b43b2932de139748c4b68
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-a51feb342c1b43b2932de139748c4b68 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-a51feb342c1b43b2932de139748c4b68 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-a51feb342c1b43b2932de139748c4b68 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-a51feb342c1b43b2932de139748c4b68 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting Heartbeat from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event heartbeat-639192873105027889
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event heartbeat-639192873105027889 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event heartbeat-639192873105027889 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192873105027889 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192873105027889 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 44 at 07/10/2026 13:35:11 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-a5d2c01248ba4bff9be7dc81bc9fe216
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-a5d2c01248ba4bff9be7dc81bc9fe216 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-a5d2c01248ba4bff9be7dc81bc9fe216 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-a5d2c01248ba4bff9be7dc81bc9fe216 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-a5d2c01248ba4bff9be7dc81bc9fe216 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 45 at 07/10/2026 13:35:12 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-1bfdde5eca4d49ef9842ba02eaf2fc1f
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-1bfdde5eca4d49ef9842ba02eaf2fc1f to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-1bfdde5eca4d49ef9842ba02eaf2fc1f broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-1bfdde5eca4d49ef9842ba02eaf2fc1f but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-1bfdde5eca4d49ef9842ba02eaf2fc1f but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting ProcessData from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event processdata-639192873125295338
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event processdata-639192873125295338 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event processdata-639192873125295338 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192873125295338 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event processdata-639192873125295338 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 46 at 07/10/2026 13:35:13 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-ad3c043740564d41830baea5cf1c007d
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-ad3c043740564d41830baea5cf1c007d to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-ad3c043740564d41830baea5cf1c007d broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-ad3c043740564d41830baea5cf1c007d but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-ad3c043740564d41830baea5cf1c007d but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      ⏰ [TimeGen] Tick 47 at 07/10/2026 13:35:14 +00:00
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external broadcasting event ft-f7214fbc184148f68b5c7c1f132e7f09
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event ft-f7214fbc184148f68b5c7c1f132e7f09 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event ft-f7214fbc184148f68b5c7c1f132e7f09 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-f7214fbc184148f68b5c7c1f132e7f09 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event ft-f7214fbc184148f68b5c7c1f132e7f09 but doesn't handle it
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      📡 [Orchestrator] Broadcasting Heartbeat from Orchestrator
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external broadcasting event heartbeat-639192873145656876
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Broadcasting event heartbeat-639192873145656876 to all cells
+info: FractalCellCore.Implementations.InMemoryFractalEventHub[0]
+      Event heartbeat-639192873145656876 broadcasted to 6 cells
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192873145656876 but doesn't handle it
+warn: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior received event heartbeat-639192873145656876 but doesn't handle it
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      Behavior TimeGenerationBehavior detached
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell FractalTime stopped
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      Behavior OrchestratorBehavior detached
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Orchestrator stopped
+info: FractalCellApp.Worker[0]
+      ✅ All cells stopped
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell FractalTime execute loop canceled
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell FractalTime execute loop finished
+info: ExternalBus-Child-A[0]
+      ChannelExternalBus Child-A-external read loop canceled
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-C execute loop canceled
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-C execute loop finished
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Orchestrator execute loop canceled
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Orchestrator execute loop finished
+info: ExternalBus-Child-B[0]
+      ChannelExternalBus Child-B-external read loop canceled
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Root execute loop canceled
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Root execute loop finished
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-A execute loop canceled
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-B execute loop canceled
+info: ExternalBus-FractalTime[0]
+      ChannelExternalBus FractalTime-external read loop canceled
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-A execute loop finished
+info: ExternalBus-Root[0]
+      ChannelExternalBus Root-external read loop canceled
+info: ExternalBus-Child-C[0]
+      ChannelExternalBus Child-C-external read loop canceled
+info: FractalCellApp.Behaviors.TimeGenerationBehavior[0]
+      🏁 TimeGenerationBehavior stopped, total ticks: 47
+info: ExternalBus-Orchestrator[0]
+      ChannelExternalBus Orchestrator-external read loop canceled
+info: FractalCellApp.Worker[0]
+      👋 Worker stopping due to cancellation
+info: FractalCellApp.Behaviors.OrchestratorBehavior[0]
+      🏁 OrchestratorBehavior stopped, total events sent: 24
+info: FractalCellApp.Worker[0]
+      🏁 Worker finished
+info: FractalCellCore.Implementations.Channels.ChannelFractalCell[0]
+      FractalCell Child-B execute loop finished
+✅ Fractal System stopped

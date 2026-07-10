@@ -67,7 +67,8 @@ public class Worker : BackgroundService
         var rootBehaviors = new IBehavior[]
         {
         CreateHeartbeatBehavior(),
-        CreateDataProcessingBehavior()
+        CreateDataProcessingBehavior(),
+        CreateTimeSynchronizationBehavior() // добавляем синхронизацию
         };
         var rootCell = await CreateCellWithBehaviorsAsync("Root", 3, ct, rootBehaviors);
         _cells.Add(rootCell);
@@ -99,7 +100,18 @@ public class Worker : BackgroundService
             orchestratorBehavior
         );
         _cells.Add(orchestratorCell);
+        //-------------------------------------------
+        // === Ячейка фрактального времени ===
+        var timeBehavior = CreateTimeGenerationBehavior();
+        var timeCell = await CreateCellWithBehaviorAsync(
+            "FractalTime",
+            workers: 1, // достаточно одного фонового воркера
+            ct,
+            timeBehavior
+        );
+        _cells.Add(timeCell);
 
+        //-------------------------------------------
         _logger.LogInformation("🔍 System cells: {Count}", _cells.Count);
         foreach (var cell in _cells)
             _logger.LogInformation("🔍 Cell: {CellId}", cell.CellId);
@@ -124,6 +136,18 @@ public class Worker : BackgroundService
     {
         var logger = _loggerFactory.CreateLogger<DataProcessingBehavior>();
         return new DataProcessingBehavior(logger, 4);
+    }
+
+    private IBehavior CreateTimeGenerationBehavior()
+    {
+        var logger = _loggerFactory.CreateLogger<TimeGenerationBehavior>();
+        return new TimeGenerationBehavior(logger, TimeSpan.FromSeconds(1));
+    }
+
+    private IBehavior CreateTimeSynchronizationBehavior()
+    {
+        var logger = _loggerFactory.CreateLogger<TimeSynchronizationBehavior>();
+        return new TimeSynchronizationBehavior(logger);
     }
 
     // === Методы создания ячеек ===
