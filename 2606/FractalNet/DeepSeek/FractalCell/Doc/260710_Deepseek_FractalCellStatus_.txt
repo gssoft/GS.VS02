@@ -1,0 +1,1172 @@
+26.07.10
+=========================================
+https://chat.deepseek.com/share/bvm1gktjaat8ccx1o2
+=========================================
+Отлично, проект уже имеет хорошую архитектуру: ядро с шаблонами, реализациями на Channels и TPL Dataflow, система поведений, фабрика, хаб. Теперь можно двигаться дальше. Предлагаю план развития по трём направлениям: стабильность и наблюдаемость, гибкость и конфигурируемость, расширение функциональности.
+
+1. Ближайшие шаги (улучшение надёжности и отладки)
+1.1. Структурированное логирование
+Сейчас используется ILogger с простыми сообщениями. Перейти на Serilog или NLog с контекстными полями (CellId, BehaviorId, EventId, CorrelationId). Это упростит трассировку в распределённой среде.
+
+1.2. Метрики и мониторинг
+Добавить сбор:
+
+Количество обработанных событий (по типам, по ячейкам)
+
+Время обработки (гистограммы)
+
+Ошибки
+
+Загрузка внутренних буферов (каналов, блоков TPL)
+Интегрировать с Prometheus и выставить endpoint для сбора метрик (через dotnet-counters или библиотеку prometheus-net).
+
+1.3. Политики повторных попыток и Dead Letter Queue
+В DataProcessingBehavior и других обработчиках добавить механизм повторных попыток при ошибках (с экспоненциальной задержкой). Неудачные события можно направлять в специальный канал (DLQ) для последующего анализа.
+
+1.4. Graceful Shutdown
+Сейчас остановка есть, но можно улучшить:
+
+Давать поведениям время на завершение текущей обработки (уже частично есть через CancellationToken).
+
+Добавить таймауты, чтобы система не зависала при остановке.
+
+2. Гибкость и конфигурируемость
+2.1. Конфигурация через appsettings.json
+Вынести параметры:
+
+Типы внутренней/внешней шины для каждой ячейки
+
+Количество воркеров
+
+Интервалы heartbeat
+
+Список создаваемых ячеек с их поведениями (включая параметры)
+Сейчас всё захардкожено в Worker.InitializeSystemAsync. Фабрика уже умеет принимать конфигурацию, но её нужно читать из IConfiguration.
+
+2.2. Регистрация поведений через DI (вместо new)
+Сейчас поведения создаются явно через конструкторы. Лучше зарегистрировать их в контейнере DI как Scoped или Transient и получать через IServiceProvider. Это упростит внедрение зависимостей в поведения (например, репозиториев, сервисов).
+
+2.3. Динамическое добавление/удаление поведений в рантайме
+Реализовать методы в FractalCellTemplate:
+
+csharp
+Task AddBehaviorAsync(IBehavior behavior, CancellationToken ct);
+Task RemoveBehaviorAsync(string behaviorId, CancellationToken ct);
+Это позволит менять логику без перезапуска ячейки.
+
+3. Расширение функциональности
+3.1. Поддержка распределённой работы (кластеризация)
+Заменить InMemoryFractalEventHub на реализацию поверх Redis Pub/Sub, RabbitMQ или Kafka. Тогда события могут передаваться между разными экземплярами приложения. Потребуется сериализация событий (JSON, Protobuf) и уникальные идентификаторы ячеек в кластере.
+
+3.2. Персистентность событий
+Сохранять все проходящие события в базу данных (например, PostgreSQL, MongoDB) для аудита, воспроизведения, восстановления состояния после рестарта. Можно сделать опциональным через конфигурацию.
+
+3.3. Отложенные и запланированные события
+Добавить механизм, позволяющий поведению отправить событие с задержкой (например, через Task.Delay или встроенный планировщик). Можно использовать библиотеку Hangfire или Quartz.NET для более сложных расписаний.
+
+3.4. Версионирование событий
+Ввести поле Version в IApplicationEvent. При обработке разных версий поведение может адаптироваться (миграция данных). Это упростит эволюцию моделей.
+
+3.5. Веб-интерфейс для администрирования
+Добавить ASP.NET Core Minimal API с эндпоинтами:
+
+Получение списка активных ячеек и их состояний
+
+Отправка тестовых событий
+
+Просмотр метрик в реальном времени (можно через SignalR)
+
+Управление поведениями (добавить/удалить)
+
+3.6. Интеграция с внешними системами
+Создать поведения-адаптеры, которые могут вызывать HTTP-API, gRPC-сервисы или читать/писать в очереди. Например, HttpForwardBehavior, который отправляет событие на внешний endpoint.
+
+4. Качество кода и тестирование
+Написать unit-тесты для каждого поведения (изолированно, с моками зависимостей).
+
+Интеграционные тесты для проверки взаимодействия ячеек через хаб.
+
+Добавить тесты на производительность, чтобы оценить пропускную способность при разных конфигурациях шин.
+
+Улучшить XML-документацию публичных API (уже частично есть, но можно дополнить).
+
+5. Рефакторинг существующего кода (опционально)
+В Worker вынести логику создания ячеек в отдельный сервис ICellManager, чтобы Worker занимался только запуском.
+
+Убрать дублирование в ChannelFractalCell и TplFractalCell – можно вынести общую логику в базовый класс, но текущий подход с шаблоном уже неплох.
+
+Упростить FractalCellFactory, сделав его более расширяемым через стратегии создания шин.
+
+Примерный план на ближайшую итерацию (2 недели)
+Настроить Serilog и добавить контекстную информацию.
+
+Вынести конфигурацию в appsettings.json: описать структуру для ячеек и поведений.
+
+Реализовать метрики (число событий, ошибки, время обработки) с экспортом в Prometheus.
+
+Добавить обработку ошибок с повторными попытками в DataProcessingBehavior и HeartbeatBehavior.
+
+Написать первый интеграционный тест, проверяющий цепочку: оркестратор → хаб → ячейка → поведение.
+
+После этого можно переходить к распределённости и веб-интерфейсу.
+--------------
+Добрый день! Отличная идея — внедрить единое фрактальное время как специализированную ячейку-оркестратор. Это важный шаг к синхронизации всей сети.
+
+Вы упомянули, что у вас были попытки, но я не вижу вложений. Если вы пришлёте код, я с удовольствием его проанализирую и помогу доработать. А пока давайте спроектируем FractalCellTime с нуля, опираясь на ваши существующие наработки:
+
+FractalCellApp052 — ячейки, поведения, роутер, жизненный цикл.
+
+Worker.Core — абстракции для планирования (ISchedulerStrategy), фоновых задач (GenericJobHost), контроля жизни (ILivenessStrategy) — это идеально ложится в основу оркестратора времени.
+
+Архитектура FractalCellTime
+1. Роль ячейки
+Единственный источник времени в сети (или кластер с выбором лидера).
+
+Генерирует события FractalTimeEvent с фиксированной периодичностью (например, раз в секунду).
+
+Распространяет их через внешнюю шину (BroadcastAsync), чтобы все ячейки могли получать актуальное время.
+
+Отвечает за целостность времени: монотонность, отсутствие скачков, возможность коррекции по внешнему эталону (NTP, GPS).
+
+2. Структура события времени
+csharp
+public record FractalTimeEvent : IApplicationEvent
+{
+    public string EventId { get; init; }
+    public DateTime Timestamp { get; init; }          // метка создания события
+    public string SourceCellId { get; init; }
+    public string TargetCellId { get; init; }         // пусто для broadcast
+    public string EventType => "FractalTime";
+    public object Payload => new
+    {
+        FractalTime = FractalTime,                     // наше фрактальное время
+        Tick = Tick,
+        IsSynchronized = IsSynchronized,
+        Source = "FractalCellTime"
+    };
+    // Специфичные поля
+    public DateTimeOffset FractalTime { get; init; }   // текущее фрактальное время
+    public long Tick { get; init; }                    // порядковый номер тика (с начала эпохи)
+    public bool IsSynchronized { get; init; }          // синхронизировано ли с внешним источником
+}
+3. Поведение генерации времени (TimeGenerationBehavior)
+Можно реализовать как BackgroundBehaviorTemplate или даже как отдельный IBehaviorStrategy из Worker.Core. Но в вашей модели все поведения — это IBehavior, поэтому создадим новое:
+
+csharp
+public class TimeGenerationBehavior : BackgroundBehaviorTemplate, ILifecycleBehavior
+{
+    private readonly ISchedulerStrategy _scheduler;
+    private readonly IClock _clock;
+    private long _tick;
+    private DateTimeOffset _currentFractalTime;
+
+    public TimeGenerationBehavior(ISchedulerStrategy scheduler, IClock clock, ILogger<TimeGenerationBehavior>? logger = null)
+        : base(logger)
+    {
+        _scheduler = scheduler;
+        _clock = clock;
+    }
+
+    protected override async Task BackgroundLoopAsync(CancellationToken ct)
+    {
+        await foreach (var scheduledTime in _scheduler.GetScheduleAsync(ct))
+        {
+            // Генерируем новый тик
+            Interlocked.Increment(ref _tick);
+            _currentFractalTime = _clock.UtcNow; // или вычисляем смещение
+
+            var timeEvent = new FractalTimeEvent(
+                eventId: $"ft-{Guid.NewGuid():N}",
+                timestamp: DateTime.UtcNow,
+                sourceCellId: _attachedCell?.CellId ?? "unknown",
+                targetCellId: string.Empty,
+                fractalTime: _currentFractalTime,
+                tick: _tick,
+                isSynchronized: true // пока всегда true, позже можно добавить проверку
+            );
+
+            _logger?.LogInformation("⏰ [TimeGen] Tick {Tick} at {Time}", _tick, _currentFractalTime);
+
+            // Отправляем всем через внешнюю шину
+            if (_attachedCell != null)
+                await _attachedCell.ExternalBus.BroadcastAsync(timeEvent);
+        }
+    }
+}
+4. Интеграция с существующей системой ячеек
+Создадим специальную ячейку FractalCellTime, которая использует ChannelFractalCell (или TplFractalCell) и добавляет наше поведение. Можно даже не создавать новый класс, а в фабрике при создании передать нужный набор поведений.
+
+В Worker.InitializeSystemAsync:
+
+csharp
+var timeScheduler = new ExponentialBackoffScheduler(
+    new SystemClock(),
+    baseDelay: TimeSpan.FromSeconds(1),   // каждую секунду
+    maxDelay: TimeSpan.FromSeconds(1),
+    maxAttempts: int.MaxValue
+);
+
+var timeBehavior = new TimeGenerationBehavior(
+    timeScheduler,
+    new SystemClock(),
+    loggerFactory.CreateLogger<TimeGenerationBehavior>()
+);
+
+var timeCell = await CreateCellWithBehaviorAsync(
+    "FractalTime",
+    workers: 1,       // достаточно одного воркера
+    ct,
+    timeBehavior
+);
+_cells.Add(timeCell);
+5. Получение времени другими ячейками
+Другие ячейки могут подписаться на события типа FractalTimeEvent через свои поведения. Например, создадим TimeSynchronizationBehavior, которое будет обновлять локальное время:
+
+csharp
+public class TimeSynchronizationBehavior : EventBehaviorTemplate<FractalTimeEvent>
+{
+    private DateTimeOffset _currentTime;
+    public DateTimeOffset CurrentTime => _currentTime;
+
+    protected override async Task HandleEventAsync(FractalTimeEvent @event)
+    {
+        _currentTime = @event.FractalTime;
+        // можно также проверять пропуски тиков и корректировать
+        _logger?.LogDebug("⏱️ Time sync: {Time}", _currentTime);
+        await Task.CompletedTask;
+    }
+}
+И добавить это поведение во все ячейки, которым нужно знать время.
+
+Дополнительные соображения
+6. Отказоустойчивость
+Если ячейка времени падает, можно запустить вторую с тем же ISchedulerStrategy и выбрать лидера (например, через распределённую блокировку или через хаб). Пока можно ограничиться одной, но позже усложнить.
+
+7. Внешняя синхронизация
+Добавить в TimeGenerationBehavior периодическую сверку с NTP-сервером или системным временем, чтобы компенсировать дрейф.
+
+8. Использование Worker.Core
+GenericJobHost уже умеет работать с ISchedulerStrategy и IBehaviorStrategy. Можно создать адаптер, который превращает IBehavior в IBehaviorStrategy, или наоборот. Но в вашей системе поведения уже привязаны к ячейкам, поэтому логичнее оставить как есть.
+
+9. Мониторинг и метрики
+Добавить счётчик тиков, время последнего пульса (используя ILivenessStrategy), чтобы другие ячейки знали, живо ли время.
+
+10. Альтернативный подход: выделенный сервис
+Можно вынести генерацию времени в отдельный фоновый сервис (не ячейку), который публикует события через хаб. Но ячейка даёт больше гибкости и согласуется с вашей архитектурой.
+
+Что делать дальше?
+Определитесь с частотой генерации (секунда, миллисекунда?) и требованиями к точности.
+
+Реализуйте FractalTimeEvent и два поведения: генерации и синхронизации.
+
+Протестируйте в вашем существующем приложении, добавив ячейку времени и подписав на неё другие ячейки.
+
+Если у вас уже есть код с временем, пришлите его — я помогу интегрировать или исправить ошибки.
+
+Вы можете начать с простого варианта (каждую секунду broadcast) и потом усложнять. Я готов помочь с любыми деталями — пишите, что непонятно, и присылайте ваши наработки. Будем развивать FractalNet дальше!
+-----
+Отлично! Мы продолжаем развивать существующие проекты, а не начинаем с нуля. Ваша идея создать специализированную ячейку времени (FractalCellTime) идеально вписывается в архитектуру – это будет ещё один тип ячейки-оркестратора, который генерирует и распространяет фрактальное время.
+
+Ниже я даю чёткий план интеграции, указывая конкретные файлы для создания или изменения. Всё делаем в рамках FractalCellCore052 (ядро) и FractalCellApp052 (приложение). Worker.Core.Infrastructure пригодится, но пока мы можем использовать его идеи (ISchedulerStrategy), не внося жёстких зависимостей – адаптируем под наши поведения.
+
+Общий план
+Добавить новое событие FractalTimeEvent – в проекте FractalCellCore052 (модель).
+
+Создать поведение генерации времени – в FractalCellApp052 (Behaviors/).
+
+Создать поведение синхронизации времени – там же (для других ячеек).
+
+Модифицировать Worker – добавить создание ячейки времени и, опционально, добавить поведение синхронизации в другие ячейки.
+
+(Опционально) Использовать ISchedulerStrategy из Worker.Core.Infrastructure для гибкого управления интервалами – можно адаптировать через обёртку.
+
+Пошаговая реализация
+1. Новое событие FractalTimeEvent (в FractalCellCore052)
+Создать файл: FractalCellCore052/Model/FractalTimeEvent.cs
+
+csharp
+using FractalCellCore.Core.Interfaces;
+
+namespace FractalCellCore;
+
+/// <summary>
+/// Событие, несущее фрактальное время
+/// </summary>
+public record FractalTimeEvent : IApplicationEvent
+{
+    public string EventId { get; init; }
+    public DateTime Timestamp { get; init; }          // время создания события (UTC)
+    public string SourceCellId { get; init; }
+    public string TargetCellId { get; init; } = string.Empty; // broadcast
+    public string EventType => "FractalTime";
+
+    // Специфичные поля
+    public DateTimeOffset FractalTime { get; init; }   // само фрактальное время
+    public long Tick { get; init; }                    // порядковый номер тика
+    public bool IsSynchronized { get; init; }          // синхронизировано ли с внешним эталоном
+
+    public FractalTimeEvent(
+        string eventId,
+        DateTime timestamp,
+        string sourceCellId,
+        DateTimeOffset fractalTime,
+        long tick,
+        bool isSynchronized = true,
+        string targetCellId = "")
+    {
+        EventId = eventId;
+        Timestamp = timestamp;
+        SourceCellId = sourceCellId;
+        TargetCellId = targetCellId;
+        FractalTime = fractalTime;
+        Tick = tick;
+        IsSynchronized = isSynchronized;
+    }
+}
+2. Поведение генерации времени TimeGenerationBehavior (в FractalCellApp052)
+Создать файл: FractalCellApp052/Behaviors/TimeGenerationBehavior.cs
+
+Оно будет наследовать BackgroundBehaviorTemplate и в фоновом цикле с заданным интервалом публиковать FractalTimeEvent через внешнюю шину (Broadcast).
+
+csharp
+using FractalCellCore;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellApp.Behaviors;
+
+/// <summary>
+/// Поведение, генерирующее фрактальное время и рассылающее его всем ячейкам.
+/// </summary>
+public class TimeGenerationBehavior : BackgroundBehaviorTemplate, ILifecycleBehavior
+{
+    private readonly TimeSpan _interval;
+    private long _tick;
+    private DateTimeOffset _currentFractalTime;
+    private readonly IClock? _clock; // опционально, можно использовать System.DateTimeOffset.UtcNow
+
+    public override string BehaviorId => "TimeGenerationBehavior";
+    public override int Priority => 5; // высокий приоритет (как у оркестратора)
+
+    public TimeGenerationBehavior(
+        ILogger<TimeGenerationBehavior>? logger = null,
+        TimeSpan? interval = null,
+        IClock? clock = null)
+        : base(logger)
+    {
+        _interval = interval ?? TimeSpan.FromSeconds(1);
+        _clock = clock; // если не передан, будем использовать DateTimeOffset.UtcNow
+    }
+
+    public TimeGenerationBehavior() : this(null, null, null) { }
+
+    protected override async Task BackgroundLoopAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGenerationBehavior started, interval: {Interval}", _interval);
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_interval, ct);
+
+                if (_attachedCell == null)
+                {
+                    _logger?.LogWarning("TimeGenerationBehavior: no attached cell, skipping");
+                    continue;
+                }
+
+                // Генерируем новый тик
+                Interlocked.Increment(ref _tick);
+                _currentFractalTime = _clock?.UtcNow ?? DateTimeOffset.UtcNow;
+
+                var timeEvent = new FractalTimeEvent(
+                    eventId: $"ft-{Guid.NewGuid():N}",
+                    timestamp: DateTime.UtcNow,
+                    sourceCellId: _attachedCell.CellId,
+                    fractalTime: _currentFractalTime,
+                    tick: _tick,
+                    isSynchronized: true // пока всегда true
+                );
+
+                _logger?.LogInformation("⏰ [TimeGen] Tick {Tick} at {Time}", _tick, _currentFractalTime);
+
+                // Отправляем всем через внешнюю шину
+                await _attachedCell.ExternalBus.BroadcastAsync(timeEvent);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "TimeGenerationBehavior error");
+            }
+        }
+
+        _logger?.LogInformation("🏁 TimeGenerationBehavior stopped, total ticks: {Tick}", _tick);
+    }
+
+    // Реализация ILifecycleBehavior (опционально)
+    public async Task OnCellStartingAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGeneration: cell starting, resetting tick counter");
+        Interlocked.Exchange(ref _tick, 0);
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStartedAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGeneration: cell started");
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStoppingAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGeneration: cell stopping, final tick: {Tick}", _tick);
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStoppedAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGeneration: cell stopped");
+        await Task.CompletedTask;
+    }
+}
+3. Поведение синхронизации времени TimeSynchronizationBehavior (в FractalCellApp052)
+Создать файл: FractalCellApp052/Behaviors/TimeSynchronizationBehavior.cs
+
+Оно будет подписываться на FractalTimeEvent и обновлять локальное время (можно хранить в поле или предоставлять через свойство). Также можно добавить обработку пропусков тиков.
+
+csharp
+using FractalCellCore;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellApp.Behaviors;
+
+/// <summary>
+/// Поведение для синхронизации локального времени с фрактальным временем.
+/// </summary>
+public class TimeSynchronizationBehavior : EventBehaviorTemplate<FractalTimeEvent>
+{
+    private DateTimeOffset _currentTime;
+    private long _lastTick;
+
+    public override string BehaviorId => "TimeSynchronizationBehavior";
+    public override int Priority => 10; // средний приоритет
+
+    public TimeSynchronizationBehavior(ILogger<TimeSynchronizationBehavior>? logger = null)
+        : base(logger)
+    {
+    }
+
+    public TimeSynchronizationBehavior() : this(null) { }
+
+    /// <summary>
+    /// Текущее синхронизированное время (фрактальное)
+    /// </summary>
+    public DateTimeOffset CurrentTime => _currentTime;
+
+    protected override async Task HandleEventAsync(FractalTimeEvent @event)
+    {
+        _currentTime = @event.FractalTime;
+        _lastTick = @event.Tick;
+
+        _logger?.LogDebug("⏱️ [TimeSync] Time updated to {Time}, tick {Tick}", _currentTime, _lastTick);
+
+        // Здесь можно добавить проверку на пропуски тиков и, если нужно, сгенерировать предупреждение
+        await Task.CompletedTask;
+    }
+}
+4. Модификация Worker.cs для добавления ячейки времени
+В методе InitializeSystemAsync добавим создание ячейки с TimeGenerationBehavior. Также можно добавить TimeSynchronizationBehavior во все остальные ячейки (или в те, которым нужно время).
+
+Изменения в Worker.cs:
+
+Добавить фабричный метод для TimeGenerationBehavior.
+
+Создать ячейку времени (например, "FractalTime") с этим поведением.
+
+По желанию добавить синхронизацию в другие ячейки (можно через отдельный метод или прямо при создании).
+
+Пример добавления (в InitializeSystemAsync после создания остальных ячеек):
+
+csharp
+// === Ячейка фрактального времени ===
+var timeBehavior = CreateTimeGenerationBehavior();
+var timeCell = await CreateCellWithBehaviorAsync(
+    "FractalTime",
+    workers: 1, // достаточно одного фонового воркера
+    ct,
+    timeBehavior
+);
+_cells.Add(timeCell);
+Метод-фабрика:
+
+csharp
+private IBehavior CreateTimeGenerationBehavior()
+{
+    var logger = _loggerFactory.CreateLogger<TimeGenerationBehavior>();
+    return new TimeGenerationBehavior(logger, TimeSpan.FromSeconds(1));
+}
+Если хотите добавить синхронизацию в другие ячейки, можно модифицировать создание корневой и дочерних ячеек, передавая им дополнительное поведение. Например, для корневой:
+
+csharp
+var rootBehaviors = new IBehavior[]
+{
+    CreateHeartbeatBehavior(),
+    CreateDataProcessingBehavior(),
+    CreateTimeSynchronizationBehavior() // добавляем синхронизацию
+};
+Соответствующий фабричный метод:
+
+csharp
+private IBehavior CreateTimeSynchronizationBehavior()
+{
+    var logger = _loggerFactory.CreateLogger<TimeSynchronizationBehavior>();
+    return new TimeSynchronizationBehavior(logger);
+}
+5. (Опционально) Использование ISchedulerStrategy из Worker.Core
+Если вы хотите использовать более продвинутое планирование (например, экспоненциальный бэкофф или поддержку джиттера), можно адаптировать TimeGenerationBehavior для работы с ISchedulerStrategy. Но для простоты оставим Task.Delay. Однако вы можете внедрить ISchedulerStrategy как зависимость и в цикле использовать GetScheduleAsync.
+
+Для этого нужно добавить ссылку на Worker.Core.Abstractions и Worker.Core.Infrastructure в проект FractalCellApp052 и зарегистрировать их в DI. Но это уже усложнение, которое можно сделать позже. На первом этапе используем просто интервал.
+
+Итоговая структура изменений
+Новые файлы:
+
+FractalCellCore052/Model/FractalTimeEvent.cs
+
+FractalCellApp052/Behaviors/TimeGenerationBehavior.cs
+
+FractalCellApp052/Behaviors/TimeSynchronizationBehavior.cs
+
+Изменённые файлы:
+
+FractalCellApp052/Worker.cs – добавить создание ячейки времени и (опционально) синхронизацию в другие ячейки.
+
+Не требуется изменений в ядре (FractalCellCore052), так как все поведения уже поддерживаются через существующие шаблоны.
+
+Проверка работы
+После запуска приложения вы увидите в логах:
+
+⏰ TimeGenerationBehavior started, interval: 00:00:01
+
+Периодические сообщения ⏰ [TimeGen] Tick X at ...
+
+Если добавили синхронизацию в другие ячейки – сообщения ⏱️ [TimeSync] Time updated ...
+
+Ячейка времени будет работать как независимый оркестратор, рассылая события всем через внешнюю шину (Broadcast). Другие ячейки могут подписываться на эти события через свои поведения.
+
+Дальнейшее развитие
+Добавьте проверку на то, что ячейка времени должна быть единственной (можно через флаг или через выбор лидера).
+
+Добавьте возможность внешней синхронизации (NTP) и коррекции времени.
+
+Интегрируйте ILivenessStrategy для мониторинга живости ячейки времени.
+
+Этот план полностью использует ваш существующий код, не нарушая его. Всё новое добавляется как расширение. Теперь вы можете спокойно внедрять эти изменения в проекты.
+
+Если нужны дополнительные пояснения по любому пункту – пишите, помогу реализовать. Поехали! 🚀
+-----------------------
+Ошибка возникает, потому что интерфейс IClock определён в проекте Worker.Core.Abstractions, который не подключён к вашему FractalCellApp053. Если вы не хотите тащить эту зависимость, проще всего отказаться от IClock и использовать DateTimeOffset.UtcNow напрямую.
+
+Исправленный код TimeGenerationBehavior.cs (без IClock):
+
+csharp
+using FractalCellCore;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellApp.Behaviors;
+
+/// <summary>
+/// Поведение, генерирующее фрактальное время и рассылающее его всем ячейкам.
+/// </summary>
+public class TimeGenerationBehavior : BackgroundBehaviorTemplate, ILifecycleBehavior
+{
+    private readonly TimeSpan _interval;
+    private long _tick;
+    private DateTimeOffset _currentFractalTime;
+
+    public override string BehaviorId => "TimeGenerationBehavior";
+    public override int Priority => 5;
+
+    public TimeGenerationBehavior(
+        ILogger<TimeGenerationBehavior>? logger = null,
+        TimeSpan? interval = null)
+        : base(logger)
+    {
+        _interval = interval ?? TimeSpan.FromSeconds(1);
+    }
+
+    public TimeGenerationBehavior() : this(null, null) { }
+
+    protected override async Task BackgroundLoopAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGenerationBehavior started, interval: {Interval}", _interval);
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_interval, ct);
+
+                if (_attachedCell == null)
+                {
+                    _logger?.LogWarning("TimeGenerationBehavior: no attached cell, skipping");
+                    continue;
+                }
+
+                Interlocked.Increment(ref _tick);
+                _currentFractalTime = DateTimeOffset.UtcNow; // прямое использование
+
+                var timeEvent = new FractalTimeEvent(
+                    eventId: $"ft-{Guid.NewGuid():N}",
+                    timestamp: DateTime.UtcNow,
+                    sourceCellId: _attachedCell.CellId,
+                    fractalTime: _currentFractalTime,
+                    tick: _tick,
+                    isSynchronized: true
+                );
+
+                _logger?.LogInformation("⏰ [TimeGen] Tick {Tick} at {Time}", _tick, _currentFractalTime);
+
+                await _attachedCell.ExternalBus.BroadcastAsync(timeEvent);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "TimeGenerationBehavior error");
+            }
+        }
+
+        _logger?.LogInformation("🏁 TimeGenerationBehavior stopped, total ticks: {Tick}", _tick);
+    }
+
+    public async Task OnCellStartingAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGeneration: cell starting, resetting tick counter");
+        Interlocked.Exchange(ref _tick, 0);
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStartedAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGeneration: cell started");
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStoppingAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGeneration: cell stopping, final tick: {Tick}", _tick);
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStoppedAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGeneration: cell stopped");
+        await Task.CompletedTask;
+    }
+}
+Альтернативный вариант (если хотите использовать Worker.Core)
+Если вы всё же хотите внедрить IClock (например, для тестируемости), добавьте ссылку на проект Worker.Core.Abstractions в FractalCellApp053.csproj:
+
+xml
+<ProjectReference Include="..\Worker.Core.Abstractions\Worker.Core.Abstractions.csproj" />
+И зарегистрируйте SystemClock в DI (или передавайте его в конструктор). Но для простоты я рекомендую первый вариант – он не требует дополнительных зависимостей.
+
+Таким образом, ошибка исчезнет, и ячейка времени будет работать, используя системное время UTC. Если позже понадобится подменять время для тестов, вы всегда сможете добавить IClock отдельно.
+----
+Анализ логов
+✅ Что работает правильно
+Все 6 ячеек созданы и зарегистрированы в хабе.
+
+Ячейка FractalTime генерирует событие каждую секунду (Tick 1…47).
+
+События времени (ft-...) успешно доставляются всем ячейкам (хаб пишет broadcasted to 6 cells).
+
+Оркестратор продолжает посылать Heartbeat и ProcessData, обработка данных идёт.
+
+Остановка системы корректна.
+
+⚠️ Проблемы, которые нужно исправить
+Множество предупреждений от TimeGenerationBehavior:
+
+text
+warn: Behavior TimeGenerationBehavior received event ft-... but doesn't handle it
+warn: Behavior TimeGenerationBehavior received event heartbeat-... but doesn't handle it
+Причина: TimeGenerationBehavior наследуется от BackgroundBehaviorTemplate, который по умолчанию в CanHandleAsync возвращает true. Поэтому он пытается обработать все входящие события, но не имеет реализации HandleAsync (так как он только генерирует события, а не обрабатывает). Это приводит к предупреждениям.
+
+Решение: переопределить CanHandleAsync, чтобы возвращать false для любых событий (это поведение только отправляет, но не принимает).
+
+Не видно сообщений от TimeSynchronizationBehavior (оно добавлено в корневую ячейку).
+Возможно, оно работает, но логирует только на уровне Debug, а в консоли установлен уровень Information. Поэтому сообщения не выводятся.
+Решение: поднять уровень логирования для этого поведения до Information или добавить явный LogInformation в HandleEventAsync для подтверждения.
+
+В логах также заметно, что TimeGenerationBehavior продолжает генерировать события даже после того, как система начала останавливаться (тики 19, 20 … 47 генерируются уже в процессе остановки). Это не критично, но можно улучшить – в BackgroundLoopAsync использовать ct.IsCancellationRequested для быстрого выхода.
+
+Рекомендуемые изменения кода
+1. Исправление TimeGenerationBehavior.cs
+Добавьте переопределение метода CanHandleAsync:
+
+csharp
+public override Task<bool> CanHandleAsync(IApplicationEvent @event)
+{
+    // Это поведение только генерирует события, но не обрабатывает входящие
+    return Task.FromResult(false);
+}
+Также для более аккуратной остановки в цикле можно проверять ct.IsCancellationRequested перед каждой итерацией (у вас уже есть, но можно усилить):
+
+csharp
+while (!ct.IsCancellationRequested)
+{
+    // ... (тело цикла)
+}
+2. Улучшение TimeSynchronizationBehavior.cs
+Добавьте логирование на уровне Information для подтверждения получения событий (можно оставить Debug для деталей, но добавить одно информационное сообщение при старте и при первом получении):
+
+csharp
+protected override async Task HandleEventAsync(FractalTimeEvent @event)
+{
+    _currentTime = @event.FractalTime;
+    _lastTick = @event.Tick;
+
+    // Логируем только каждый 10-й тик или первый, чтобы не засорять
+    if (_lastTick % 10 == 0 || _lastTick == 1)
+    {
+        _logger?.LogInformation("⏱️ [TimeSync] Time updated to {Time}, tick {Tick}", _currentTime, _lastTick);
+    }
+    else
+    {
+        _logger?.LogDebug("⏱️ [TimeSync] Time updated to {Time}, tick {Tick}", _currentTime, _lastTick);
+    }
+
+    await Task.CompletedTask;
+}
+Это позволит увидеть, что синхронизация работает.
+
+Дополнительные замечания
+Ячейка времени работает как оркестратор, рассылая события всем. Это правильно.
+
+В логах видно, что события времени доходят до всех ячеек (хаб пишет broadcasted to 6 cells). Значит, другие ячейки их получают, но их поведения либо не обрабатывают, либо обрабатывают молча.
+
+Можно также добавить в TimeGenerationBehavior проверку на то, что ячейка привязана (_attachedCell != null) – у вас это уже есть.
+
+Итог
+После внесения этих изменений:
+
+Исчезнут предупреждения от TimeGenerationBehavior.
+
+Появятся информационные сообщения от TimeSynchronizationBehavior (или хотя бы Debug, если включите соответствующий уровень).
+
+Остановка станет чуть чище.
+
+Вы можете сразу применить эти изменения и перезапустить систему – лог станет намного чище, и вы будете точно видеть, что синхронизация времени работает.
+------------
+Отлично! Второй лог показывает, что система работает чисто:
+
+Предупреждения от TimeGenerationBehavior исчезли – добавили CanHandleAsync → false.
+
+Появились информационные сообщения от TimeSynchronizationBehavior (каждый 10-й тик), что подтверждает успешную синхронизацию времени в других ячейках.
+
+Все 6 ячеек корректно общаются через хаб, оркестратор генерирует события, обработка данных идёт.
+
+Остановка системы также проходит без ошибок.
+
+Что дальше?
+Теперь у нас есть работающий фундамент:
+
+Базовая архитектура ячеек и поведений.
+
+Единое фрактальное время.
+
+Гибкая система планирования (можно использовать ExponentialBackoffScheduler из Worker.Core).
+
+Я предлагаю следующие приоритетные шаги для развития (выбирайте, что актуальнее):
+
+1. Отказоустойчивость ячейки времени (кластеризация)
+Если запустить несколько экземпляров приложения, каждая создаст свою ячейку FractalTime, что приведёт к дублированию тиков.
+
+Решение: использовать распределённую блокировку (например, через Redis) или выбрать лидера через хаб (голосование). Можно реализовать LeaderElectionBehavior, который периодически проверяет, кто является лидером, и только лидер генерирует время.
+
+2. Внешняя синхронизация времени (NTP)
+Добавить в TimeGenerationBehavior периодическую сверку с NTP-сервером (или системным временем) для компенсации дрейфа.
+
+Обновлять IsSynchronized и корректировать FractalTime.
+
+3. Метрики и мониторинг
+Интегрировать Prometheus (библиотека prometheus-net) для сбора:
+
+Количество сгенерированных тиков.
+
+Время отклика ячеек.
+
+Количество обработанных событий.
+
+Выставить endpoint /metrics для сбора.
+
+4. Гибкая конфигурация через appsettings.json
+Вынести параметры создания ячеек и поведений (количество воркеров, интервалы, типы шин) в конфигурацию, чтобы не хардкодить в Worker.
+
+5. Распределённая работа (замена хаба)
+Заменить InMemoryFractalEventHub на реализацию поверх Redis Pub/Sub или RabbitMQ. Это позволит масштабировать систему на несколько узлов.
+
+Я готов помочь с реализацией любого из этих пунктов. Если у вас есть конкретная задача на ближайшее время – скажите, и мы приступим. Если же хотите просто укрепить текущую систему, можно добавить юнит-тесты и улучшить обработку ошибок.
+---------------------------------
+Отлично, ваш план звучит очень разумно. Мы создадим базовую инфраструктуру мониторинга состояния ячеек с веб-интерфейсом (Razor Pages) для отображения таблицы и деталей. Это даст нам прозрачность и станет фундаментом для дальнейшего развития.
+
+Давайте спроектируем это пошагово, оставаясь в рамках существующей архитектуры. Я опишу все необходимые изменения, начиная с ядра и заканчивая веб-интерфейсом.
+
+1. Определение статусов и модели состояния (в FractalCellCore)
+1.1. Перечисление CellStatus
+Файл: FractalCellCore/Core/Common/CellStatus.cs
+
+csharp
+namespace FractalCellCore.Core.Common;
+
+public enum CellStatus
+{
+    Unknown,
+    Initializing,
+    Starting,
+    Running,
+    Stopping,
+    Stopped,
+    Faulted
+}
+1.2. Класс состояния CellStatusInfo
+Файл: FractalCellCore/Core/Common/CellStatusInfo.cs
+
+csharp
+using System.Collections.Immutable;
+
+namespace FractalCellCore.Core.Common;
+
+public record CellStatusInfo
+{
+    public string CellId { get; init; } = string.Empty;
+    public CellStatus Status { get; init; }
+    public bool IsActive => Status == CellStatus.Running || Status == CellStatus.Starting;
+    public IReadOnlyList<string> BehaviorIds { get; init; } = Array.Empty<string>();
+    public DateTimeOffset? StartedAt { get; init; }
+    public DateTimeOffset? StoppedAt { get; init; }
+    public TimeSpan? Uptime => StartedAt.HasValue && Status != CellStatus.Stopped
+        ? DateTimeOffset.UtcNow - StartedAt.Value
+        : null;
+    public string? LastError { get; init; }
+    public IReadOnlyDictionary<string, object> Metrics { get; init; } = ImmutableDictionary<string, object>.Empty;
+
+    // Для удобства сериализации
+    public string StatusDisplay => Status.ToString();
+}
+2. Расширение интерфейса IFractalCell
+Файл: FractalCellCore/Core/Interfaces/IFractalCell.cs
+Добавляем метод:
+
+csharp
+Task<CellStatusInfo> GetStatusAsync(CancellationToken ct = default);
+3. Реализация в FractalCellTemplate
+Файл: FractalCellCore/Core/Templates/FractalCellTemplate.cs
+
+Добавляем поля:
+
+csharp
+private CellStatus _cellStatus = CellStatus.Unknown;
+private DateTimeOffset? _startedAt;
+private string? _lastError;
+private readonly object _statusLock = new();
+В StartAsync:
+
+Устанавливаем _cellStatus = CellStatus.Starting в начале.
+
+После успешного запуска устанавливаем _cellStatus = CellStatus.Running, _startedAt = DateTimeOffset.UtcNow.
+
+В случае ошибки – Faulted и сохраняем ошибку.
+
+В StopAsync:
+
+Устанавливаем _cellStatus = CellStatus.Stopping.
+
+После остановки – _cellStatus = CellStatus.Stopped, _stoppedAt = DateTimeOffset.UtcNow.
+
+Реализуем метод GetStatusAsync:
+
+csharp
+public Task<CellStatusInfo> GetStatusAsync(CancellationToken ct = default)
+{
+    lock (_statusLock)
+    {
+        var behaviorIds = _behaviors.Select(b => b.BehaviorId).ToList();
+        var metrics = new Dictionary<string, object>();
+        // Можно добавить общие метрики, например, количество обработанных событий (если есть)
+        // Для каждого поведения можно попросить метрики, но пока оставим пустым.
+
+        var info = new CellStatusInfo
+        {
+            CellId = CellId,
+            Status = _cellStatus,
+            BehaviorIds = behaviorIds.AsReadOnly(),
+            StartedAt = _startedAt,
+            LastError = _lastError,
+            Metrics = metrics
+        };
+        return Task.FromResult(info);
+    }
+}
+4. Сбор статусов в приложении – ICellStatusService
+Файл: FractalCellApp/Services/ICellStatusService.cs (и реализация)
+
+csharp
+using FractalCellCore.Core.Common;
+
+namespace FractalCellApp.Services;
+
+public interface ICellStatusService
+{
+    Task<IReadOnlyList<CellStatusInfo>> GetAllCellsStatusAsync(CancellationToken ct = default);
+    Task<CellStatusInfo?> GetCellStatusAsync(string cellId, CancellationToken ct = default);
+}
+Реализация CellStatusService будет получать список ячеек из Worker (или из другого места, где они хранятся). Можно внедрить через DI и хранить в Worker как поле, но лучше создать отдельный сервис, который будет регистрироваться в DI и получать ссылку на коллекцию ячеек.
+
+Можно в Worker добавить свойство IReadOnlyList<IFractalCell> Cells и зарегистрировать его как синглтон (или через IServiceProvider). Простой путь – сделать CellStatusService зависимым от Worker (но это не очень чисто). Лучше создать отдельный класс CellRegistry, который будет хранить список ячеек и обновляться при создании.
+
+Файл: FractalCellApp/Services/CellRegistry.cs
+
+csharp
+using FractalCellCore.Core.Interfaces;
+using System.Collections.Concurrent;
+
+namespace FractalCellApp.Services;
+
+public class CellRegistry
+{
+    private readonly ConcurrentBag<IFractalCell> _cells = new();
+
+    public void RegisterCell(IFractalCell cell) => _cells.Add(cell);
+    public IReadOnlyList<IFractalCell> GetAllCells() => _cells.ToList();
+}
+В Worker при создании ячейки вызываем cellRegistry.RegisterCell(cell).
+
+Затем CellStatusService использует CellRegistry:
+
+csharp
+public class CellStatusService : ICellStatusService
+{
+    private readonly CellRegistry _registry;
+
+    public CellStatusService(CellRegistry registry) => _registry = registry;
+
+    public async Task<IReadOnlyList<CellStatusInfo>> GetAllCellsStatusAsync(CancellationToken ct = default)
+    {
+        var tasks = _registry.GetAllCells().Select(c => c.GetStatusAsync(ct));
+        var results = await Task.WhenAll(tasks);
+        return results;
+    }
+
+    public async Task<CellStatusInfo?> GetCellStatusAsync(string cellId, CancellationToken ct = default)
+    {
+        var cell = _registry.GetAllCells().FirstOrDefault(c => c.CellId == cellId);
+        return cell == null ? null : await cell.GetStatusAsync(ct);
+    }
+}
+Зарегистрировать в DI: builder.Services.AddSingleton<CellRegistry>(); и builder.Services.AddScoped<ICellStatusService, CellStatusService>(); (или Singleton, если нет состояния).
+
+5. Веб-интерфейс (Razor Pages)
+5.1. Добавление веб-проекта или расширение текущего
+Проще всего добавить веб-компоненты в существующий FractalCellApp053.csproj. Для этого нужно добавить ссылки на Microsoft.AspNetCore.App и изменить Program.cs для работы с WebApplication.
+
+В Program.cs заменим Host.CreateApplicationBuilder на WebApplication.CreateBuilder:
+
+csharp
+var builder = WebApplication.CreateBuilder(args);
+// ... существующие регистрации ...
+builder.Services.AddRazorPages();
+builder.Services.AddScoped<ICellStatusService, CellStatusService>();
+// ... остальное ...
+var app = builder.Build();
+app.MapRazorPages();
+// Запускаем фоновые сервисы (Worker) – они уже зарегистрированы как HostedService
+await app.RunAsync();
+5.2. Страница Index.cshtml (таблица всех ячеек)
+Файл: Pages/Index.cshtml
+
+html
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Fractal Cells Status";
+}
+
+<h1>Fractal Cells Status</h1>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Cell ID</th>
+            <th>Status</th>
+            <th>Behaviors</th>
+            <th>Uptime</th>
+            <th>Details</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var cell in Model.Cells)
+        {
+            <tr>
+                <td>@cell.CellId</td>
+                <td><span class="badge @GetStatusBadgeClass(cell.Status)">@cell.StatusDisplay</span></td>
+                <td>@string.Join(", ", cell.BehaviorIds)</td>
+                <td>@(cell.Uptime?.ToString(@"hh\:mm\:ss") ?? "-")</td>
+                <td><a asp-page="./Details" asp-route-id="@cell.CellId">Details</a></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@functions {
+    public string GetStatusBadgeClass(CellStatus status) => status switch
+    {
+        CellStatus.Running => "bg-success",
+        CellStatus.Starting => "bg-warning",
+        CellStatus.Stopping => "bg-warning",
+        CellStatus.Stopped => "bg-secondary",
+        CellStatus.Faulted => "bg-danger",
+        _ => "bg-light"
+    };
+}
+PageModel: Pages/Index.cshtml.cs
+
+csharp
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using FractalCellCore.Core.Common;
+using FractalCellApp.Services;
+
+public class IndexModel : PageModel
+{
+    private readonly ICellStatusService _statusService;
+
+    public IReadOnlyList<CellStatusInfo> Cells { get; private set; } = Array.Empty<CellStatusInfo>();
+
+    public IndexModel(ICellStatusService statusService) => _statusService = statusService;
+
+    public async Task OnGetAsync()
+    {
+        Cells = await _statusService.GetAllCellsStatusAsync();
+    }
+}
+5.3. Страница Details.cshtml (детали ячейки)
+Файл: Pages/Details.cshtml
+
+html
+@page "{id?}"
+@model DetailsModel
+@{
+    ViewData["Title"] = $"Cell {Model.Cell?.CellId} Details";
+}
+
+<h1>Cell Details: @Model.Cell?.CellId</h1>
+@if (Model.Cell == null)
+{
+    <div class="alert alert-danger">Cell not found.</div>
+}
+else
+{
+    <dl class="row">
+        <dt class="col-sm-3">Cell ID</dt>
+        <dd class="col-sm-9">@Model.Cell.CellId</dd>
+
+        <dt class="col-sm-3">Status</dt>
+        <dd class="col-sm-9"><span class="badge @GetStatusBadgeClass(Model.Cell.Status)">@Model.Cell.StatusDisplay</span></dd>
+
+        <dt class="col-sm-3">Behaviors</dt>
+        <dd class="col-sm-9">@string.Join(", ", Model.Cell.BehaviorIds)</dd>
+
+        <dt class="col-sm-3">Started At</dt>
+        <dd class="col-sm-9">@Model.Cell.StartedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-"</dd>
+
+        <dt class="col-sm-3">Uptime</dt>
+        <dd class="col-sm-9">@(Model.Cell.Uptime?.ToString(@"hh\:mm\:ss") ?? "-")</dd>
+
+        @if (!string.IsNullOrEmpty(Model.Cell.LastError))
+        {
+            <dt class="col-sm-3">Last Error</dt>
+            <dd class="col-sm-9 text-danger">@Model.Cell.LastError</dd>
+        }
+
+        @if (Model.Cell.Metrics.Any())
+        {
+            <dt class="col-sm-3">Metrics</dt>
+            <dd class="col-sm-9">
+                <ul>
+                @foreach (var kv in Model.Cell.Metrics)
+                {
+                    <li><strong>@kv.Key</strong>: @kv.Value</li>
+                }
+                </ul>
+            </dd>
+        }
+    </dl>
+    <a asp-page="./Index" class="btn btn-primary">Back to List</a>
+}
+PageModel: Pages/Details.cshtml.cs
+
+csharp
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using FractalCellCore.Core.Common;
+using FractalCellApp.Services;
+
+public class DetailsModel : PageModel
+{
+    private readonly ICellStatusService _statusService;
+
+    public CellStatusInfo? Cell { get; private set; }
+
+    public DetailsModel(ICellStatusService statusService) => _statusService = statusService;
+
+    public async Task OnGetAsync(string id)
+    {
+        if (!string.IsNullOrEmpty(id))
+            Cell = await _statusService.GetCellStatusAsync(id);
+    }
+}
+6. Обновление Worker для регистрации ячеек
+В InitializeSystemAsync после создания каждой ячейки добавляем:
+
+csharp
+_cellRegistry.RegisterCell(cell);
+Не забываем внедрить CellRegistry в конструктор Worker.
+
+7. Настройка Program.cs для веб-интерфейса
+Добавляем сервисы и middleware:
+
+csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddRazorPages();
+builder.Services.AddSingleton<CellRegistry>();
+builder.Services.AddScoped<ICellStatusService, CellStatusService>();
+builder.Services.AddHostedService<Worker>(); // существующий Worker
+// ... остальные регистрации ...
+var app = builder.Build();
+app.UseRouting();
+app.MapRazorPages();
+app.Run();
+8. Итог
+Теперь у нас есть:
+
+Фундамент статусов ячеек в ядре.
+
+Сервис для сбора статусов в приложении.
+
+Веб-интерфейс с двумя страницами – таблица и детали.
+
+Все изменения вписываются в существующую архитектуру, не нарушая её. Мы можем запустить приложение, открыть браузер по адресу http://localhost:5000 и увидеть состояние всех ячеек.
+----------------------
+
+
+
