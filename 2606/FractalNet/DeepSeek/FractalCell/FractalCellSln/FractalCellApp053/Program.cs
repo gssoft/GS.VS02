@@ -1,7 +1,6 @@
 // FractalCellApp/Program.cs
 
 using FractalCellApp;
-using FractalCellApp053;
 
 // using FractalCellApp.Behaviors;
 using FractalCellCore.Core.Configuration;
