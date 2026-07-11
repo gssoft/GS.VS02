@@ -2,12 +2,14 @@
   <Folder Name="/Solution Items/">
     <File Path="../Doc/Strategy_Pattern_260709_.txt" />
     <File Path="../Doc/TemplateMethod_260709_.txt" />
+    <File Path="Reffs.txt" />
   </Folder>
   <Folder Name="/Strategy/">
     <Project Path="StrategyPattern01/StrategyPattern01.csproj" />
     <Project Path="StrategyPattern02/StrategyPattern02.csproj" />
     <Project Path="StrategyPattern03/StrategyPattern03.csproj" />
     <Project Path="StrategyPattern04/StrategyPattern04.csproj" />
+    <Project Path="WorkerService01/WorkerService01.csproj" Id="c5288c2b-ac3d-4de3-b13b-4524b375af61" />
     <Project Path="WorkerService05/WorkerService05.csproj" />
     <Project Path="WorkerService07/WorkerService07.csproj" />
     <Project Path="WorkerService08/WorkerService08.csproj" />
