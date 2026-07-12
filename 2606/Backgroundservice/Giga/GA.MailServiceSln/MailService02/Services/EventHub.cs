@@ -47,23 +47,5 @@ public class EventHub : BackgroundService
             Console.WriteLine($"[HUB] Unexpected error: {ex.Message}");
         }
     }
-
-    //protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    //{
-    //    while (!stoppingToken.IsCancellationRequested)
-    //    {
-    //        if (_fromA.TryRead(out var msgA))
-    //        {
-    //            Console.WriteLine($"[HUB] Relay A -> B: {msgA}");
-    //            await _toB.WriteAsync(msgA, stoppingToken);
-    //        }
-    //        if (_fromB.TryRead(out var msgB))
-    //        {
-    //            Console.WriteLine($"[HUB] Relay B -> A: {msgB}");
-    //            await _toA.WriteAsync(msgB, stoppingToken);
-    //        }
-    //        await Task.Delay(10, stoppingToken);
-    //    }
-    //}
 }
 

@@ -1,0 +1,500 @@
+26.07.12
+================================================================
+Directory Structure
+================================================================
+appsettings.Development.json
+appsettings.json
+MailService02.csproj
+Pipes/AToHubPipe.cs
+Pipes/BToHubPipe.cs
+Pipes/HubToAPipe.cs
+Pipes/HubToBPipe.cs
+Program.cs
+Properties/launchSettings.json
+Services/ClientA.cs
+Services/ClientB.cs
+Services/EventHub.cs
+Worker.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: MailService02.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-MailService02-751479a4-b41b-49d2-8663-73e8571c59b8</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+  </ItemGroup>
+</Project>
+
+================
+File: Pipes/AToHubPipe.cs
+================
+using System.Threading.Channels;
+
+public sealed class AToHubPipe
+{
+    public readonly ChannelWriter<string> Writer;
+    public readonly ChannelReader<string> Reader;
+
+    public AToHubPipe(ChannelWriter<string> w, ChannelReader<string> r)
+    {
+        Writer = w;
+        Reader = r;
+    }
+}
+
+================
+File: Pipes/BToHubPipe.cs
+================
+using System.Threading.Channels;
+
+public sealed class BToHubPipe
+{
+    public readonly ChannelWriter<string> Writer;
+    public readonly ChannelReader<string> Reader;
+
+    public BToHubPipe(ChannelWriter<string> w, ChannelReader<string> r)
+    {
+        Writer = w;
+        Reader = r;
+    }
+}
+
+================
+File: Pipes/HubToAPipe.cs
+================
+using System.Threading.Channels;
+
+public sealed class HubToAPipe
+{
+    public readonly ChannelWriter<string> Writer;
+    public readonly ChannelReader<string> Reader;
+
+    public HubToAPipe(ChannelWriter<string> w, ChannelReader<string> r)
+    {
+        Writer = w;
+        Reader = r;
+    }
+}
+
+================
+File: Pipes/HubToBPipe.cs
+================
+using System.Threading.Channels;
+
+public sealed class HubToBPipe
+{
+    public readonly ChannelWriter<string> Writer;
+    public readonly ChannelReader<string> Reader;
+
+    public HubToBPipe(ChannelWriter<string> w, ChannelReader<string> r)
+    {
+        Writer = w;
+        Reader = r;
+    }
+}
+
+================
+File: Program.cs
+================
+using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using System.Threading.Channels;
+
+internal static class Program
+{
+    private static async Task Main(string[] args)
+    {
+        IHost host = Host.CreateDefaultBuilder(args)
+            .ConfigureServices((context, services) =>
+            {
+                // Создаем физические каналы
+                var aToHubChan = Channel.CreateUnbounded<string>();
+                var hubToAChan = Channel.CreateUnbounded<string>();
+                var bToHubChan = Channel.CreateUnbounded<string>();
+                var hubToBChan = Channel.CreateUnbounded<string>();
+
+                // РЕГИСТРАЦИЯ УНИКАЛЬНЫХ ТИПОВ (Больше нет конфликта!)
+                services.AddSingleton(new AToHubPipe(aToHubChan.Writer, aToHubChan.Reader));
+                services.AddSingleton(new HubToAPipe(hubToAChan.Writer, hubToAChan.Reader));
+
+                services.AddSingleton(new BToHubPipe(bToHubChan.Writer, bToHubChan.Reader));
+                services.AddSingleton(new HubToBPipe(hubToBChan.Writer, hubToBChan.Reader));
+
+                // Регистрируем воркеры
+                services.AddHostedService<EventHub>();
+                services.AddHostedService<ClientA>();
+                services.AddHostedService<ClientB>();
+            })
+            .Build();
+
+        await host.RunAsync();
+    }
+}
+
+================
+File: Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "MailService02": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: Services/ClientA.cs
+================
+using System;
+using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
+
+public class ClientA : BackgroundService
+{
+    private readonly ChannelWriter<string> _outgoing;
+    private readonly ChannelReader<string> _incoming;
+    private int _counter = 0;
+
+    public ClientA(AToHubPipe outPipe, HubToAPipe inPipe)
+    {
+        _outgoing = outPipe.Writer;
+        _incoming = inPipe.Reader;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                bool receivedSomething = false;
+                while (_incoming.TryRead(out var msg))
+                {
+                    Console.WriteLine($"[A] Received from B: {msg}");
+                    receivedSomething = true;
+                }
+                if (receivedSomething) Console.WriteLine("[A] --- End of Receive Batch ---");
+
+                var outMsg = $"Message {_counter++} from A at {DateTime.Now:HH:mm:ss}";
+
+                // WriteAsync также может выкинуть исключение при отмене токена или закрытии канала
+                await _outgoing.WriteAsync(outMsg, stoppingToken);
+                Console.WriteLine($"[A] Sent: {outMsg}");
+
+                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+            }
+        }
+        // 1. Штатная остановка по CTRL+C (отмена токена)
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("[A] Graceful shutdown: Cancellation requested.");
+        }
+        // 2. Если канал был явно закрыт (например, вызовом Complete())
+        catch (ChannelClosedException)
+        {
+            Console.WriteLine("[A] Graceful shutdown: Channel was closed.");
+        }
+        // 3. Любые другие непредвиденные ошибки
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[A] Unexpected error: {ex.Message}");
+        }
+    }
+}
+
+//using System;
+//using System.Threading;
+//using System.Threading.Channels;
+//using System.Threading.Tasks;
+//using Microsoft.Extensions.Hosting;
+
+//public class ClientA : BackgroundService
+//{
+//    private readonly ChannelWriter<string> _outgoing;
+//    private readonly ChannelReader<string> _incoming;
+//    private int _counter = 0;
+
+//    public ClientA(AToHubPipe outPipe, HubToAPipe inPipe)
+//    {
+//        _outgoing = outPipe.Writer;
+//        _incoming = inPipe.Reader;
+//    }
+
+//    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+//    {
+//        await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+
+//        while (!stoppingToken.IsCancellationRequested)
+//        {
+//            bool receivedSomething = false;
+//            while (_incoming.TryRead(out var msg))
+//            {
+//                Console.WriteLine($"[A] Received from B: {msg}");
+//                receivedSomething = true;
+//            }
+//            if (receivedSomething) Console.WriteLine("[A] --- End of Receive Batch ---");
+
+//            var outMsg = $"Message {_counter++} from A at {DateTime.Now:HH:mm:ss}";
+//            await _outgoing.WriteAsync(outMsg, stoppingToken);
+//            Console.WriteLine($"[A] Sent: {outMsg}");
+
+//            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+//        }
+//    }
+//}
+
+================
+File: Services/ClientB.cs
+================
+using System;
+using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
+
+public class ClientB : BackgroundService
+{
+    private readonly ChannelWriter<string> _outgoing;
+    private readonly ChannelReader<string> _incoming;
+    private int _counter = 0;
+
+    public ClientB(BToHubPipe outPipe, HubToBPipe inPipe)
+    {
+        _outgoing = outPipe.Writer;
+        _incoming = inPipe.Reader;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1.1), stoppingToken);
+
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                bool receivedSomething = false;
+                while (_incoming.TryRead(out var msg))
+                {
+                    Console.WriteLine($"[B] Received from A: {msg}");
+                    receivedSomething = true;
+                }
+                if (receivedSomething) Console.WriteLine("[B] --- End of Receive Batch ---");
+
+                var outMsg = $"Alert {_counter++} from B at {DateTime.Now:HH:mm:ss}";
+
+                // WriteAsync тоже может выкинуть исключение, если токен отменится прямо во время записи
+                await _outgoing.WriteAsync(outMsg, stoppingToken);
+                Console.WriteLine($"[B] Sent: {outMsg}");
+
+                // Вот здесь при CTRL-C вылетает TaskCanceledException
+                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+            }
+        }
+        // 1. Ловим отмену токена (TaskCanceledException наследуется от OperationCanceledException)
+        catch (OperationCanceledException)
+        {
+            // Это не ошибка, а штатная остановка по CTRL+C
+            Console.WriteLine("[B] Graceful shutdown: Cancellation requested.");
+        }
+        // 2. На всякий случай ловим закрытие канала (если кто-то вызовет Complete() на канале)
+        catch (ChannelClosedException)
+        {
+            Console.WriteLine("[B] Graceful shutdown: Channel was closed.");
+        }
+        // 3. Ловим все остальные непредвиденные ошибки, чтобы сервис не "упал" молча
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[B] Unexpected error: {ex.Message}");
+        }
+    }
+}
+
+
+//using System;
+//using System.Threading;
+//using System.Threading.Channels;
+//using System.Threading.Tasks;
+//using Microsoft.Extensions.Hosting;
+
+//public class ClientB : BackgroundService
+//{
+//    private readonly ChannelWriter<string> _outgoing;
+//    private readonly ChannelReader<string> _incoming;
+//    private int _counter = 0;
+
+//    public ClientB(BToHubPipe outPipe, HubToBPipe inPipe)
+//    {
+//        _outgoing = outPipe.Writer;
+//        _incoming = inPipe.Reader;
+//    }
+
+//    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+//    {
+//        await Task.Delay(TimeSpan.FromSeconds(1.1), stoppingToken);
+
+//        while (!stoppingToken.IsCancellationRequested)
+//        {
+//            bool receivedSomething = false;
+//            while (_incoming.TryRead(out var msg))
+//            {
+//                Console.WriteLine($"[B] Received from A: {msg}");
+//                receivedSomething = true;
+//            }
+//            if (receivedSomething) Console.WriteLine("[B] --- End of Receive Batch ---");
+
+//            var outMsg = $"Alert {_counter++} from B at {DateTime.Now:HH:mm:ss}";
+//            await _outgoing.WriteAsync(outMsg, stoppingToken);
+//            Console.WriteLine($"[B] Sent: {outMsg}");
+
+//            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);   // Вот здесь делает останов при ctrl-c
+//        }
+//    }
+//}
+
+================
+File: Services/EventHub.cs
+================
+using System;
+using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
+
+public class EventHub : BackgroundService
+{
+    private readonly ChannelReader<string> _fromA;
+    private readonly ChannelWriter<string> _toA;
+    private readonly ChannelReader<string> _fromB;
+    private readonly ChannelWriter<string> _toB;
+
+    public EventHub(AToHubPipe aIn, HubToAPipe aOut, BToHubPipe bIn, HubToBPipe bOut)
+    {
+        _fromA = aIn.Reader;
+        _toA = aOut.Writer;
+        _fromB = bIn.Reader;
+        _toB = bOut.Writer;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                if (_fromA.TryRead(out var msgA))
+                {
+                    Console.WriteLine($"[HUB] Relay A -> B: {msgA}");
+                    await _toB.WriteAsync(msgA, stoppingToken);
+                }
+                if (_fromB.TryRead(out var msgB))
+                {
+                    Console.WriteLine($"[HUB] Relay B -> A: {msgB}");
+                    await _toA.WriteAsync(msgB, stoppingToken);
+                }
+                await Task.Delay(10, stoppingToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("[HUB] Graceful shutdown: Cancellation requested.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[HUB] Unexpected error: {ex.Message}");
+        }
+    }
+
+    //protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    //{
+    //    while (!stoppingToken.IsCancellationRequested)
+    //    {
+    //        if (_fromA.TryRead(out var msgA))
+    //        {
+    //            Console.WriteLine($"[HUB] Relay A -> B: {msgA}");
+    //            await _toB.WriteAsync(msgA, stoppingToken);
+    //        }
+    //        if (_fromB.TryRead(out var msgB))
+    //        {
+    //            Console.WriteLine($"[HUB] Relay B -> A: {msgB}");
+    //            await _toA.WriteAsync(msgB, stoppingToken);
+    //        }
+    //        await Task.Delay(10, stoppingToken);
+    //    }
+    //}
+}
+
+================
+File: Worker.cs
+================
+namespace MailService02
+{
+    public class Worker(ILogger<Worker> logger) : BackgroundService
+    {
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                if (logger.IsEnabled(LogLevel.Information))
+                {
+                    logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+                }
+                await Task.Delay(1000, stoppingToken);
+            }
+        }
+    }
+}
+
+
+
+
+
+================================================================
+End of Codebase
+================================================================
