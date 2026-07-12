@@ -51,7 +51,7 @@ public class TimingMetrics : IMetricsStrategy
 public class PerformanceTuner : ITunerStrategy
 {
     private readonly int _adj;
-    public PerformanceTuner(int adj) => _adj = _adj;
+    public PerformanceTuner(int adj) => _adj = adj;
     public void ApplyAdjustments() => Console.WriteLine($"[Tuner] Юстировка применена (-{_adj} мс).");
 }
 #endregion

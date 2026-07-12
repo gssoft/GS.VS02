@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MailService01/MailService01.csproj" />
+  <Project Path="MailService02/MailService02.csproj" />
+</Solution>
