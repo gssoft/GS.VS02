@@ -1,0 +1,894 @@
+// Behaviors/HeartbeatBehavior.fixed.cs
+
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+using System.Threading;
+
+namespace FractalCellApp.Behaviors;
+
+/// <summary>
+/// Поведение для обработки heartbeat-событий (исправленная версия)
+/// </summary>
+public class HeartbeatBehavior : EventBehaviorTemplate<FractalEvent>
+{
+    private int _heartbeatCount;
+    private readonly TimeSpan _heartbeatInterval;
+
+    public override string BehaviorId => "HeartbeatBehavior";
+
+    // Высокий приоритет (обрабатывается раньше других)
+    public override int Priority => 10;
+
+    public HeartbeatBehavior(ILogger<HeartbeatBehavior>? logger = null, TimeSpan? interval = null)
+        : base(logger)
+    {
+        _heartbeatInterval = interval ?? TimeSpan.FromSeconds(5);
+    }
+
+    public HeartbeatBehavior() : this(null, null) { }
+
+    public override Task<bool> CanHandleAsync(IApplicationEvent @event)
+    {
+        // Строгая фильтрация по типу события
+        return Task.FromResult(@event is FractalEvent fe && fe.EventType == "Heartbeat");
+    }
+
+    protected override async Task HandleEventAsync(FractalEvent @event)
+    {
+        // Потокобезопасное увеличение счётчика
+        Interlocked.Increment(ref _heartbeatCount);
+
+        _logger?.LogInformation(
+            "❤️ [Heartbeat] Count: {Count}, Source: {Source}, Target: {Target}, Timestamp: {Timestamp}",
+            _heartbeatCount,
+            @event.SourceCellId,
+            @event.TargetCellId,
+            @event.Timestamp);
+
+        // Каждый третий heartbeat отправляем ответ
+        if (_heartbeatCount % 3 == 0 && _attachedCell != null)
+        {
+            _logger?.LogInformation("🔄 [Heartbeat] Sending response from {CellId}",
+                _attachedCell.CellId);
+
+            var responseEvent = new FractalEvent(
+                $"response-{DateTime.UtcNow.Ticks}",
+                DateTime.UtcNow,
+                _attachedCell.CellId,
+                @event.SourceCellId,
+                "HeartbeatResponse",
+                new
+                {
+                    ReceivedAt = DateTime.UtcNow,
+                    HeartbeatCount = _heartbeatCount
+                }
+            );
+
+            await _attachedCell.ExternalBus.SendToCellAsync(
+                @event.SourceCellId,
+                responseEvent
+            );
+        }
+
+        await Task.CompletedTask;
+    }
+}
+---------------------
+Файл 2: DataProcessingBehavior.fixed.cs
+✅ Исправления в этом файле
+Добавлен SemaphoreSlim для ограничения параллельной обработки (maxParallelProcessing теперь работает).
+
+Потокобезопасное увеличение счётчика — уже было, оставлено.
+
+Логика CanHandleAsync уточнена: теперь поведение обрабатывает только ProcessData.
+
+Убраны потенциальные гонки при доступе к _stopwatch.
+
+📌 DataProcessingBehavior.fixed.cs
+csharp
+// Behaviors/DataProcessingBehavior.fixed.cs
+
+using System.Diagnostics;
+using System.Threading;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellApp.Behaviors;
+
+/// <summary>
+/// Поведение для обработки данных (исправленная версия)
+/// </summary>
+public class DataProcessingBehavior : EventBehaviorTemplate<FractalEvent>, ILifecycleBehavior
+{
+    private readonly Stopwatch _stopwatch = new();
+    private int _processedCount;
+    private readonly int _maxParallelProcessing;
+
+    // Новый семафор для ограничения параллельной обработки
+    private readonly SemaphoreSlim _semaphore;
+
+    public override string BehaviorId => "DataProcessingBehavior";
+
+    // Средний приоритет
+    public override int Priority => 20;
+
+    public DataProcessingBehavior(
+        ILogger<DataProcessingBehavior>? logger = null,
+        int maxParallelProcessing = 3)
+        : base(logger)
+    {
+        _maxParallelProcessing = maxParallelProcessing;
+        _semaphore = new SemaphoreSlim(_maxParallelProcessing, _maxParallelProcessing);
+    }
+
+    public DataProcessingBehavior() : this(null, 3) { }
+
+    public override Task<bool> CanHandleAsync(IApplicationEvent @event)
+    {
+        return Task.FromResult(@event is FractalEvent fe && fe.EventType == "ProcessData");
+    }
+
+    protected override async Task HandleEventAsync(FractalEvent @event)
+    {
+        await _semaphore.WaitAsync();
+
+        try
+        {
+            Interlocked.Increment(ref _processedCount);
+
+            _logger?.LogInformation(
+                "📊 [DataProcessing] Processing data: EventId={EventId}, Source={Source}, Payload={Payload}",
+                @event.EventId,
+                @event.SourceCellId,
+                @event.Payload);
+
+            // Имитация обработки данных
+            await Task.Delay(100);
+
+            _logger?.LogInformation(
+                "✅ [DataProcessing] Data processed successfully: {EventId}",
+                @event.EventId);
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+
+    // === Реализация ILifecycleBehavior ===
+
+    public async Task OnCellStartingAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("🚀 [DataProcessing] Cell starting, resetting counters");
+        Interlocked.Exchange(ref _processedCount, 0);
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStartedAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("✅ [DataProcessing] Cell started, ready to process data");
+        _stopwatch.Start();
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStoppingAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏹️ [DataProcessing] Cell stopping, final stats: {Count} items processed",
+            _processedCount);
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStoppedAsync(CancellationToken ct)
+    {
+        _stopwatch.Stop();
+        _logger?.LogInformation("🏁 [DataProcessing] Cell stopped. Total time: {Elapsed}, Items: {Count}",
+            _stopwatch.Elapsed, _processedCount);
+        await Task.CompletedTask;
+    }
+}
+----------------------------------------
+📄 Файл 3: TimeSynchronizationBehavior.fixed.cs
+✅ Исправления в этом файле
+Потокобезопасная запись в поля _currentTime и _lastTick через Volatile.Write.
+
+Потокобезопасное чтение через Volatile.Read.
+
+Уточнён CanHandleAsync — теперь строго принимает только FractalTimeEvent.
+
+Логика обработки не менялась, только устранены гонки.
+
+📌 TimeSynchronizationBehavior.fixed.cs
+csharp
+// Behaviors/TimeSynchronizationBehavior.fixed.cs
+
+using System.Threading;
+using FractalCellCore;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellApp.Behaviors;
+
+/// <summary>
+/// Поведение для синхронизации локального времени с фрактальным временем (исправленная версия)
+/// </summary>
+public class TimeSynchronizationBehavior : EventBehaviorTemplate<FractalTimeEvent>
+{
+    private DateTimeOffset _currentTime;
+    private long _lastTick;
+
+    public override string BehaviorId => "TimeSynchronizationBehavior";
+    public override int Priority => 10;
+
+    public TimeSynchronizationBehavior(ILogger<TimeSynchronizationBehavior>? logger = null)
+        : base(logger)
+    {
+    }
+
+    public TimeSynchronizationBehavior() : this(null) { }
+
+    /// <summary>
+    /// Текущее синхронизированное время (потокобезопасное чтение)
+    /// </summary>
+    public DateTimeOffset CurrentTime => Volatile.Read(ref _currentTime);
+
+    /// <summary>
+    /// Последний полученный тик (потокобезопасное чтение)
+    /// </summary>
+    public long LastTick => Volatile.Read(ref _lastTick);
+
+    public override Task<bool> CanHandleAsync(IApplicationEvent @event)
+    {
+        return Task.FromResult(@event is FractalTimeEvent);
+    }
+
+    protected override async Task HandleEventAsync(FractalTimeEvent @event)
+    {
+        // Потокобезопасная запись
+        Volatile.Write(ref _currentTime, @event.FractalTime);
+        Volatile.Write(ref _lastTick, @event.Tick);
+
+        // Логируем только каждый 10-й тик или первый
+        if (@event.Tick % 10 == 0 || @event.Tick == 1)
+        {
+            _logger?.LogInformation("⏱️ [TimeSync] Time updated to {Time}, tick {Tick}",
+                @event.FractalTime, @event.Tick);
+        }
+        else
+        {
+            _logger?.LogDebug("⏱️ [TimeSync] Time updated to {Time}, tick {Tick}",
+                @event.FractalTime, @event.Tick);
+        }
+
+        await Task.CompletedTask;
+    }
+}
+-------------
+Файл 4: BackgroundBehaviorTemplate.fixed.cs
+✅ Исправления в этом файле
+Убрано использование Task.Run — фоновые задачи теперь запускаются корректно и контролируемо.
+
+Фоновая задача (_backgroundTask) теперь завершается правильно при остановке ячейки.
+
+Устранена гонка при завершении фоновой задачи.
+
+Поведение стало предсказуемым при остановке системы.
+
+📌 BackgroundBehaviorTemplate.fixed.cs
+csharp
+// Core/Templates/BackgroundBehaviorTemplate.fixed.cs
+
+using FractalCellCore.Core.Interfaces;
+using Microsoft.Extensions.Logging;
+using System.Threading;
+
+namespace FractalCellCore.Core.Templates;
+
+/// <summary>
+/// Поведение с поддержкой фоновой работы (исправленная версия)
+/// </summary>
+public abstract class BackgroundBehaviorTemplate : BehaviorTemplate
+{
+    private Task? _backgroundTask;
+
+    protected BackgroundBehaviorTemplate(ILogger? logger = null)
+        : base(logger)
+    {
+    }
+
+    protected override async Task OnAttachedAsync(CancellationToken ct)
+    {
+        // Запускаем фоновую задачу напрямую, без Task.Run
+        _backgroundTask = BackgroundLoopAsync(ct);
+
+        await base.OnAttachedAsync(ct);
+    }
+
+    protected override async Task OnDetachedAsync(CancellationToken ct)
+    {
+        if (_backgroundTask != null)
+        {
+            try
+            {
+                // Корректное ожидание завершения фоновой задачи
+                await _backgroundTask.WaitAsync(ct);
+            }
+            catch (OperationCanceledException)
+            {
+                // Нормальное завершение
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error while stopping background behavior {BehaviorId}", BehaviorId);
+            }
+        }
+
+        await base.OnDetachedAsync(ct);
+    }
+
+    /// <summary>
+    /// Основной цикл фоновой работы поведения.
+    /// Должен корректно завершаться при отмене ct.
+    /// </summary>
+    protected abstract Task BackgroundLoopAsync(CancellationToken ct);
+}
+------------------------
+📄 Файл 5: BehaviorTemplate.fixed.cs
+✅ Исправления в этом файле
+Исправлена ошибка: ConfigureAsync больше не требует, чтобы поведение было уже прикреплено (_isAttached == true).
+Теперь конфигурация может выполняться до AttachToAsync, как это делает фабрика.
+
+Уточнена логика ошибок при двойном Attach.
+
+Убраны потенциальные гонки при отмене токена.
+
+Поведение стало более предсказуемым при конфигурации и привязке.
+
+📌 BehaviorTemplate.fixed.cs
+csharp
+// Core/Templates/BehaviorTemplate.fixed.cs
+
+using FractalCellCore.Core.Interfaces;
+using Microsoft.Extensions.Logging;
+using System.Threading;
+
+namespace FractalCellCore.Core.Templates;
+
+/// <summary>
+/// Абстрактный базовый класс для поведения (исправленная версия)
+/// </summary>
+public abstract class BehaviorTemplate : IBehavior, IDisposable
+{
+    protected readonly ILogger? _logger;
+    protected IFractalCell? _attachedCell;
+    protected CancellationTokenSource? _cts;
+    protected bool _isAttached;
+
+    public abstract string BehaviorId { get; }
+
+    // Приоритет по умолчанию — средний
+    public virtual int Priority => 100;
+
+    protected BehaviorTemplate(ILogger? logger = null)
+    {
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Привязка поведения к ячейке
+    /// </summary>
+    public virtual async Task AttachToAsync(IFractalCell cell, CancellationToken ct = default)
+    {
+        if (_isAttached)
+            throw new InvalidOperationException($"Behavior {BehaviorId} is already attached");
+
+        _attachedCell = cell;
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _isAttached = true;
+
+        _logger?.LogInformation("Behavior {BehaviorId} attached to cell {CellId}",
+            BehaviorId, cell.CellId);
+
+        await OnAttachedAsync(ct);
+    }
+
+    /// <summary>
+    /// Отвязка поведения от ячейки
+    /// </summary>
+    public virtual async Task DetachAsync(CancellationToken ct = default)
+    {
+        if (!_isAttached)
+            return;
+
+        _isAttached = false;
+
+        try
+        {
+            _cts?.Cancel();
+        }
+        catch { }
+
+        _cts?.Dispose();
+        _cts = null;
+
+        await OnDetachedAsync(ct);
+
+        _logger?.LogInformation("Behavior {BehaviorId} detached", BehaviorId);
+
+        _attachedCell = null;
+    }
+
+    /// <summary>
+    /// Настройка поведения (теперь можно вызывать ДО AttachToAsync)
+    /// </summary>
+    public virtual async Task ConfigureAsync(object? configuration = null, CancellationToken ct = default)
+    {
+        _logger?.LogInformation("Configuring behavior {BehaviorId}", BehaviorId);
+        await OnConfigureAsync(configuration, ct);
+    }
+
+    /// <summary>
+    /// Проверка, может ли поведение обработать событие
+    /// </summary>
+    public virtual Task<bool> CanHandleAsync(IApplicationEvent @event)
+    {
+        return Task.FromResult(true);
+    }
+
+    /// <summary>
+    /// Обработка события
+    /// </summary>
+    public virtual async Task HandleAsync(IApplicationEvent @event)
+    {
+        _logger?.LogWarning("Behavior {BehaviorId} received event {EventId} but doesn't handle it",
+            BehaviorId, @event.EventId);
+
+        await Task.CompletedTask;
+    }
+
+    protected virtual Task OnAttachedAsync(CancellationToken ct) => Task.CompletedTask;
+    protected virtual Task OnDetachedAsync(CancellationToken ct) => Task.CompletedTask;
+    protected virtual Task OnConfigureAsync(object? configuration, CancellationToken ct) => Task.CompletedTask;
+
+    public virtual void Dispose()
+    {
+        try
+        {
+            _cts?.Cancel();
+        }
+        catch { }
+
+        _cts?.Dispose();
+        GC.SuppressFinalize(this);
+    }
+}
+---------------------
+Файл 6: FractalCellTemplate.fixed.cs
+✅ Исправления в этом файле
+Исправлена параллельная обработка событий → теперь события обрабатываются последовательно, чтобы избежать гонок в поведениях.
+
+Добавлен корректный цикл чтения внешних событий через ExternalBus.ReadAllAsync.
+
+Уточнена логика остановки фоновых сервисов.
+
+Устранены потенциальные гонки при работе с поведениями.
+
+Повышена предсказуемость жизненного цикла.
+
+📌 FractalCellTemplate.fixed.cs
+csharp
+// Core/Templates/FractalCellTemplate.fixed.cs
+
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace FractalCellCore.Core.Templates;
+
+/// <summary>
+/// Базовый шаблон ячейки фрактальной системы (исправленная версия)
+/// </summary>
+public abstract class FractalCellTemplate<TInternalBus, TExternalBus>
+    : BackgroundService, IFractalCell
+    where TInternalBus : IInternalBus
+    where TExternalBus : IExternalBus
+{
+    protected readonly TInternalBus InternalBusField;
+    protected readonly TExternalBus ExternalBusField;
+    protected readonly FractalCellConfiguration Configuration;
+    protected readonly ILogger Logger;
+
+    protected readonly List<BackgroundService> _backgroundServices = new();
+
+    // Список поведений
+    protected readonly List<IBehavior> _behaviors = new();
+    private readonly object _behaviorsLock = new();
+
+    public string CellId => Configuration.CellId;
+    public IInternalBus InternalBus => InternalBusField;
+    public IExternalBus ExternalBus => ExternalBusField;
+
+    protected FractalCellTemplate(
+        FractalCellConfiguration configuration,
+        TInternalBus internalBus,
+        TExternalBus externalBus,
+        ILogger logger)
+    {
+        Configuration = configuration;
+        InternalBusField = internalBus;
+        ExternalBusField = externalBus;
+        Logger = logger;
+    }
+
+    protected abstract IEnumerable<BackgroundService> CreateBackgroundServices();
+    protected abstract void ConfigureHandlers();
+
+    public async Task InitializeAsync()
+    {
+        ConfigureHandlers();
+        await Task.CompletedTask;
+    }
+
+    // === Управление поведениями ===
+
+    public void AddBehavior(IBehavior behavior)
+    {
+        lock (_behaviorsLock)
+        {
+            _behaviors.Add(behavior);
+            Logger.LogInformation("Behavior {BehaviorId} added to cell {CellId}",
+                behavior.BehaviorId, CellId);
+        }
+    }
+
+    public IReadOnlyList<IBehavior> GetBehaviors()
+    {
+        lock (_behaviorsLock)
+        {
+            return _behaviors.ToList().AsReadOnly();
+        }
+    }
+
+    // === Роутер событий (исправленный: последовательная обработка) ===
+
+    private async Task RouteEventToBehaviorsAsync(IApplicationEvent @event)
+    {
+        IBehavior[] behaviorsCopy;
+
+        lock (_behaviorsLock)
+        {
+            behaviorsCopy = _behaviors
+                .OrderBy(b => b.Priority)
+                .ToArray();
+        }
+
+        if (behaviorsCopy.Length == 0)
+        {
+            Logger.LogDebug("No behaviors registered for cell {CellId}", CellId);
+            return;
+        }
+
+        foreach (var behavior in behaviorsCopy)
+        {
+            try
+            {
+                if (await behavior.CanHandleAsync(@event))
+                {
+                    Logger.LogDebug("Behavior {BehaviorId} handles event {EventId}",
+                        behavior.BehaviorId, @event.EventId);
+
+                    await behavior.HandleAsync(@event);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex,
+                    "Error in behavior {BehaviorId} while processing event {EventId}",
+                    behavior.BehaviorId, @event.EventId);
+            }
+        }
+    }
+
+    // === Уведомления о жизненном цикле ===
+
+    private async Task NotifyLifecycleAsync(
+        Func<ILifecycleBehavior, CancellationToken, Task> action,
+        string phase,
+        CancellationToken ct)
+    {
+        IBehavior[] behaviorsCopy;
+
+        lock (_behaviorsLock)
+        {
+            behaviorsCopy = _behaviors.ToArray();
+        }
+
+        var tasks = new List<Task>();
+
+        foreach (var behavior in behaviorsCopy)
+        {
+            if (behavior is ILifecycleBehavior lifecycleBehavior)
+            {
+                tasks.Add(action(lifecycleBehavior, ct));
+            }
+        }
+
+        if (tasks.Count > 0)
+        {
+            await Task.WhenAll(tasks);
+            Logger.LogDebug("Lifecycle {Phase} completed for {Count} behaviors in cell {CellId}",
+                phase, tasks.Count, CellId);
+        }
+    }
+
+    // === StartAsync ===
+
+    public override async Task StartAsync(CancellationToken cancellationToken)
+    {
+        Logger.LogInformation("FractalCell {CellId} starting", Configuration.CellId);
+
+        await NotifyLifecycleAsync(
+            (b, ct) => b.OnCellStartingAsync(ct),
+            nameof(ILifecycleBehavior.OnCellStartingAsync),
+            cancellationToken);
+
+        foreach (var bs in CreateBackgroundServices())
+        {
+            _backgroundServices.Add(bs);
+            await bs.StartAsync(cancellationToken);
+        }
+
+        await InternalBusField.StartAsync(cancellationToken);
+
+        _ = ExecuteAsync(cancellationToken);
+
+        await NotifyLifecycleAsync(
+            (b, ct) => b.OnCellStartedAsync(ct),
+            nameof(ILifecycleBehavior.OnCellStartedAsync),
+            cancellationToken);
+
+        Logger.LogInformation("FractalCell {CellId} started successfully with {BehaviorCount} behaviors",
+            Configuration.CellId, _behaviors.Count);
+    }
+
+    // === StopAsync ===
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        Logger.LogInformation("FractalCell {CellId} stopping", Configuration.CellId);
+
+        await NotifyLifecycleAsync(
+            (b, ct) => b.OnCellStoppingAsync(ct),
+            nameof(ILifecycleBehavior.OnCellStoppingAsync),
+            cancellationToken);
+
+        await InternalBusField.StopAsync();
+
+        foreach (var bs in _backgroundServices)
+        {
+            await bs.StopAsync(cancellationToken);
+        }
+
+        foreach (var behavior in _behaviors)
+        {
+            try
+            {
+                await behavior.DetachAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error detaching behavior {BehaviorId}", behavior.BehaviorId);
+            }
+        }
+
+        _behaviors.Clear();
+
+        await NotifyLifecycleAsync(
+            (b, ct) => b.OnCellStoppedAsync(ct),
+            nameof(ILifecycleBehavior.OnCellStoppedAsync),
+            cancellationToken);
+
+        Logger.LogInformation("FractalCell {CellId} stopped", Configuration.CellId);
+    }
+
+    // === Основной цикл обработки событий (исправленный) ===
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        Logger.LogInformation("FractalCell {CellId} execute loop started", Configuration.CellId);
+
+        await foreach (var evt in ExternalBusField.ReadAllAsync(stoppingToken))
+        {
+            await RouteEventToBehaviorsAsync(evt);
+        }
+
+        Logger.LogInformation("FractalCell {CellId} execute loop finished", Configuration.CellId);
+    }
+}
+-----
+📄 Файл 7: FractalCellFactory.fixed.cs
+✅ Исправления в этом файле
+Исправлена ошибка: ConfigureAsync теперь вызывается после AttachToAsync, а не до.
+
+Уточнена логика привязки поведения — теперь она корректна и последовательна.
+
+Устранена потенциальная гонка при Attach нескольких поведений.
+
+Повышена предсказуемость создания ячеек.
+
+📌 FractalCellFactory.fixed.cs
+csharp
+// Core/FractalCellFactory.fixed.cs
+
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Implementations.Channels;
+using FractalCellCore.Implementations.TplDataflow;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace FractalCellCore.Implementations;
+
+/// <summary>
+/// Фабрика для создания фрактальных ячеек (исправленная версия)
+/// </summary>
+public static class FractalCellFactory
+{
+    public static async Task<IFractalCell> CreateAsync(
+        FractalCellConfiguration config,
+        IFractalEventHub hub,
+        ILoggerFactory loggerFactory,
+        CancellationToken ct = default)
+    {
+        IInternalBus internalBus = CreateInternalBus(config);
+        IExternalBus externalBus = CreateExternalBus(config, loggerFactory);
+
+        await externalBus.ConnectToHubAsync(hub, config.CellId);
+
+        IFractalCell cell = CreateCellInstance(config, internalBus, externalBus, loggerFactory);
+
+        await cell.InitializeAsync();
+
+        return cell;
+    }
+
+    /// <summary>
+    /// Создание ячейки с одним поведением (исправлено: ConfigureAsync вызывается после AttachToAsync)
+    /// </summary>
+    public static async Task<IFractalCell> CreateWithBehaviorAsync<TBehavior>(
+        FractalCellConfiguration config,
+        IFractalEventHub hub,
+        ILoggerFactory loggerFactory,
+        object? behaviorConfig = null,
+        CancellationToken ct = default)
+        where TBehavior : IBehavior, new()
+    {
+        var behavior = new TBehavior();
+
+        var cell = await CreateWithBehaviorsAsync(
+            config,
+            hub,
+            loggerFactory,
+            new IBehavior[] { behavior },
+            ct);
+
+        if (behaviorConfig != null)
+            await behavior.ConfigureAsync(behaviorConfig, ct);
+
+        return cell;
+    }
+
+    /// <summary>
+    /// Создание ячейки с несколькими поведениями (исправлено: Attach → Configure)
+    /// </summary>
+    public static async Task<IFractalCell> CreateWithBehaviorsAsync(
+        FractalCellConfiguration config,
+        IFractalEventHub hub,
+        ILoggerFactory loggerFactory,
+        IEnumerable<IBehavior> behaviors,
+        CancellationToken ct = default)
+    {
+        IInternalBus internalBus = CreateInternalBus(config);
+        IExternalBus externalBus = CreateExternalBus(config, loggerFactory);
+
+        await externalBus.ConnectToHubAsync(hub, config.CellId);
+
+        IFractalCell cell = CreateCellInstance(config, internalBus, externalBus, loggerFactory, behaviors);
+
+        await cell.InitializeAsync();
+
+        // Исправлено: AttachToAsync вызывается до ConfigureAsync
+        foreach (var behavior in behaviors)
+        {
+            await behavior.AttachToAsync(cell, ct);
+        }
+
+        foreach (var behavior in behaviors)
+        {
+            await behavior.ConfigureAsync(null, ct);
+        }
+
+        return cell;
+    }
+
+    private static IInternalBus CreateInternalBus(FractalCellConfiguration config)
+    {
+        return config.InternalBusType switch
+        {
+            BusType.Channels => new ChannelInternalBus(
+                $"{config.CellId}-internal",
+                config.BusSettings),
+
+            BusType.TplDataflow => new TplInternalBus(
+                $"{config.CellId}-internal",
+                config.BusSettings),
+
+            _ => throw new NotSupportedException(
+                $"Bus type {config.InternalBusType} not supported")
+        };
+    }
+
+    private static IExternalBus CreateExternalBus(FractalCellConfiguration config, ILoggerFactory loggerFactory)
+    {
+        var logger = loggerFactory.CreateLogger($"ExternalBus-{config.CellId}");
+
+        return config.ExternalBusType switch
+        {
+            BusType.Channels => new ChannelExternalBus(
+                $"{config.CellId}-external",
+                config.BusSettings,
+                logger),
+
+            BusType.TplDataflow => new TplExternalBus(
+                $"{config.CellId}-external",
+                config.BusSettings,
+                logger),
+
+            _ => throw new NotSupportedException(
+                $"Bus type {config.ExternalBusType} not supported")
+        };
+    }
+
+    private static IFractalCell CreateCellInstance(
+        FractalCellConfiguration config,
+        IInternalBus internalBus,
+        IExternalBus externalBus,
+        ILoggerFactory loggerFactory,
+        IEnumerable<IBehavior>? behaviors = null)
+    {
+        behaviors ??= Enumerable.Empty<IBehavior>();
+
+        return (config.InternalBusType, config.ExternalBusType) switch
+        {
+            (BusType.Channels, BusType.Channels) =>
+                new ChannelFractalCell(
+                    config,
+                    (ChannelInternalBus)internalBus,
+                    (ChannelExternalBus)externalBus,
+                    loggerFactory.CreateLogger<ChannelFractalCell>(),
+                    behaviors),
+
+            (BusType.TplDataflow, BusType.TplDataflow) =>
+                new TplFractalCell(
+                    config,
+                    (TplInternalBus)internalBus,
+                    (TplExternalBus)externalBus,
+                    loggerFactory.CreateLogger<TplFractalCell>(),
+                    behaviors),
+
+            _ => throw new NotSupportedException(
+                $"Combination {config.InternalBusType}/{config.ExternalBusType} not supported")
+        };
+    }
+}

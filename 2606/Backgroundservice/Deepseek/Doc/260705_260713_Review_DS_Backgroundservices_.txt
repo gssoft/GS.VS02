@@ -1,0 +1,561 @@
+------------------------------------------------------------------------------
+26.07.03 - Previouse version
+-------------------------------------------------------------------------------
+https://chat.deepseek.com/share/ga77i56obf85i0i462
+--------------------------------------------------------------------------------
+https://giga.chat/link/gcsKjKmXUm
+--------------------------------------------------------------------------------
+CoreWorker.cs
+GA.BackgroundServices.Core.csproj
+--------------------------------------------------------------------------------
+26.07.05 - Backgroundservices ---> Current version
+-------------------------------------------------------------------------------------
+https://chat.deepseek.com/share/64ziqzgqeudqep4j0l
+-------------------------------------------------------------------------------------
+Этот проект мы благополучно завершили.
+Я так понимаю, что мы здесь использовали "Шаблонный метод"
+Я предлагаю сделать примерно тоже самое, но использовать будем паттерн Стратегия.
+Мне кажется он будет более универсален и больше подходит под нашу задачу
+- Создать как можно больше реализаций Backgroundservcies.
+Потому что этих стратегий бесконечно много. Мы, конечно, не будем стремиться реализовать все варианты, но начать все-же можно.
+Итак паттерн СТратегия.
+Я думаю что лозунг или девиз должен быть таким или что-то в этом роде.
+Backgroundservice<TBehavior, TTune> или
+Backgroundservice<TBehavior, TSomethingElse,TTune>
+Думаю - это будет интересная задача.
+--------------------------------------------------------------------------------------------
+Отличная идея! В проекте Core02 вы действительно реализовали классический Шаблонный метод – общий скелет выполнения задаёт BackgroundServiceBase, а конкретные сервисы переопределяют DoWorkAsync и получают готовый цикл/расписание. Это удобно, но жёстко связывает «что делаем» и «как часто/когда делаем» в одном классе.
+
+Паттерн Стратегия позволит разделить эти две оси:
+
+Поведение (TBehavior) – что именно делать (бизнес-логика).
+
+Ритм/Каденция (TTune) – стратегия планирования: когда и как часто выполнять.
+
+Обобщённый сервис будет выглядеть так:
+
+csharp
+BackgroundService<TTask, TSchedule>
+где TTask – реализация задачи, TSchedule – стратегия расписания. Комбинируя разные задачи с разными расписаниями, вы получаете множество фоновых сервисов без дублирования кода.
+
+Ниже предлагаю новую библиотеку DS.BackgroundServices.Core03, построенную на этом принципе.
+
+Новая архитектура
+graph TD
+    A[BackgroundServiceBase] --> B[GenericBackgroundService&lt;TTask,TSchedule&gt;]
+    B --> C[TTask : IBackgroundTask]
+    B --> D[TSchedule : IBackgroundSchedule]
+    
+    C --> E[SampleTask]
+    C --> F[AnotherTask]
+    D --> G[PeriodicSchedule]
+    D --> H[CronSchedule]
+    D --> I[ContinuousSchedule]
+    D --> J[OneTimeSchedule]
+IBackgroundTask — контракт для полезной работы.
+
+IBackgroundSchedule — стратегия, которая управляет ритмом выполнения (ожидание между запусками).
+
+GenericBackgroundService<TTask, TSchedule> — универсальный хост-сервис, собирающий всё вместе и наследующий надёжный жизненный цикл из BackgroundServiceBase.
+
+Код новой библиотеки
+1. Контракты
+IBackgroundTask.cs
+
+csharp
+namespace DS.BackgroundServices.Core03;
+
+/// <summary>Полезная работа, выполняемая фоновым сервисом.</summary>
+public interface IBackgroundTask
+{
+    Task ExecuteAsync(CancellationToken cancellationToken);
+}
+IBackgroundSchedule.cs
+
+csharp
+namespace DS.BackgroundServices.Core03;
+
+/// <summary>
+/// Стратегия расписания: определяет, когда сервис должен запустить задачу.
+/// Возвращает Task, который завершится в момент следующего запуска.
+/// </summary>
+public interface IBackgroundSchedule
+{
+    /// <summary>
+    /// Ожидание следующего момента запуска.
+    /// Если дальнейшие запуски не требуются, возвращает null.
+    /// </summary>
+    Task? WaitForNextAsync(CancellationToken cancellationToken);
+}
+2. Универсальный фоновый сервис
+GenericBackgroundService.cs
+
+csharp
+using Microsoft.Extensions.Logging;
+
+namespace DS.BackgroundServices.Core03;
+
+/// <summary>
+/// Фоновый сервис, комбинирующий задачу (<typeparamref name="TTask"/>) 
+/// и стратегию расписания (<typeparamref name="TSchedule"/>).
+/// </summary>
+public class GenericBackgroundService<TTask, TSchedule> : BackgroundServiceBase
+    where TTask : IBackgroundTask
+    where TSchedule : IBackgroundSchedule
+{
+    private readonly TTask _task;
+    private readonly TSchedule _schedule;
+    private readonly ILogger _logger;
+
+    public GenericBackgroundService(
+        TTask task,
+        TSchedule schedule,
+        ILogger<GenericBackgroundService<TTask, TSchedule>> logger)
+        : base(logger)
+    {
+        _task = task;
+        _schedule = schedule;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteCoreAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation(
+            "Запуск стратегии {ScheduleName} с задачей {TaskName}",
+            typeof(TSchedule).Name, typeof(TTask).Name);
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            // 1. Ждём следующего окна по стратегии
+            Task? waitTask = _schedule.WaitForNextAsync(stoppingToken);
+            if (waitTask is null)
+            {
+                // Расписание сообщило, что выполнение окончено (например, OneTime)
+                _logger.LogDebug("Расписание вернуло null, сервис завершает цикл");
+                break;
+            }
+
+            try
+            {
+                await waitTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+
+            if (stoppingToken.IsCancellationRequested)
+                break;
+
+            // 2. Выполняем полезную работу
+            try
+            {
+                await _task.ExecuteAsync(stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Ошибка в задаче {TaskName} при расписании {ScheduleName}",
+                    typeof(TTask).Name, typeof(TSchedule).Name);
+            }
+        }
+    }
+}
+BackgroundServiceBase можно оставить практически без изменений из предыдущего проекта (хуки OnStartingAsync/OnStoppedAsync).
+
+3. Конкретные стратегии расписания (TTune)
+PeriodicSchedule.cs
+
+csharp
+namespace DS.BackgroundServices.Core03;
+
+/// <summary>Периодическое выполнение с фиксированным интервалом.</summary>
+public class PeriodicSchedule : IBackgroundSchedule
+{
+    private readonly TimeSpan _interval;
+
+    public PeriodicSchedule(TimeSpan interval)
+    {
+        if (interval <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(interval));
+        _interval = interval;
+    }
+
+    public Task WaitForNextAsync(CancellationToken cancellationToken)
+        => Task.Delay(_interval, cancellationToken);
+}
+CronSchedule.cs
+
+csharp
+using Cronos;
+
+namespace DS.BackgroundServices.Core03;
+
+/// <summary>Стратегия на основе Cron-выражения (с секундами).</summary>
+public class CronSchedule : IBackgroundSchedule
+{
+    private readonly CronExpression _cron;
+
+    public CronSchedule(string cronExpression)
+    {
+        _cron = CronExpression.Parse(cronExpression, CronFormat.IncludeSeconds);
+    }
+
+    public async Task? WaitForNextAsync(CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var next = _cron.GetNextOccurrence(now, inclusive: false);
+        if (next is null)
+            return null; // расписание больше никогда не сработает
+
+        var delay = next.Value - DateTime.UtcNow;
+        if (delay > TimeSpan.Zero)
+        {
+            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+        }
+        // Если задержка отрицательная – сразу выполняем
+        return Task.CompletedTask;
+    }
+}
+ContinuousSchedule.cs
+
+csharp
+namespace DS.BackgroundServices.Core03;
+
+/// <summary>Мгновенный перезапуск без паузы (для постоянного ожидания событий).</summary>
+public class ContinuousSchedule : IBackgroundSchedule
+{
+    public Task WaitForNextAsync(CancellationToken cancellationToken)
+        => Task.CompletedTask; // никогда не ждём
+}
+OneTimeSchedule.cs
+
+csharp
+namespace DS.BackgroundServices.Core03;
+
+/// <summary>Одноразовое выполнение при старте.</summary>
+public class OneTimeSchedule : IBackgroundSchedule
+{
+    private bool _executed;
+
+    public Task? WaitForNextAsync(CancellationToken cancellationToken)
+    {
+        if (_executed)
+            return null; // завершаем цикл
+        _executed = true;
+        return Task.CompletedTask; // запускаем немедленно
+    }
+}
+4. Примеры задач (TBehavior)
+csharp
+using Microsoft.Extensions.Logging;
+
+public class SamplePeriodicTask : IBackgroundTask
+{
+    private readonly ILogger<SamplePeriodicTask> _logger;
+    public SamplePeriodicTask(ILogger<SamplePeriodicTask> logger) => _logger = logger;
+
+    public async Task ExecuteAsync(CancellationToken ct)
+    {
+        _logger.LogInformation("Периодическая работа в {Time}", DateTime.UtcNow);
+        await Task.Delay(200, ct); // имитация
+    }
+}
+
+public class SampleCronTask : IBackgroundTask
+{
+    private readonly ILogger<SampleCronTask> _logger;
+    public SampleCronTask(ILogger<SampleCronTask> logger) => _logger = logger;
+
+    public async Task ExecuteAsync(CancellationToken ct)
+    {
+        _logger.LogInformation("Cron-задача в {Time}", DateTime.UtcNow);
+        await Task.Delay(300, ct);
+    }
+}
+5. Регистрация в Program.cs
+csharp
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using DS.BackgroundServices.Core03;
+
+var builder = Host.CreateApplicationBuilder(args);
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+
+// Регистрируем задачи и расписания как сервисы DI
+builder.Services.AddTransient<SamplePeriodicTask>();
+builder.Services.AddTransient<SampleCronTask>();
+
+// Расписания можно регистрировать как singleton с параметрами
+builder.Services.AddSingleton<PeriodicSchedule>(_ => new PeriodicSchedule(TimeSpan.FromSeconds(5)));
+builder.Services.AddSingleton<CronSchedule>(_ => new CronSchedule("*/10 * * * * *"));
+builder.Services.AddSingleton<ContinuousSchedule>();
+builder.Services.AddSingleton<OneTimeSchedule>();
+
+// Регистрируем готовые комбинации – закрытые GenericBackgroundService
+builder.Services.AddHostedService<GenericBackgroundService<SamplePeriodicTask, PeriodicSchedule>>();
+builder.Services.AddHostedService<GenericBackgroundService<SampleCronTask, CronSchedule>>();
+
+// Можно на лету создать одноразовую задачу
+builder.Services.AddHostedService<GenericBackgroundService<SamplePeriodicTask, OneTimeSchedule>>();
+
+var host = builder.Build();
+await host.RunAsync();
+Теперь для добавления нового фонового поведения достаточно создать класс, реализующий IBackgroundTask, и скомбинировать его с любой существующей стратегией расписания – без написания нового BackgroundService.
+
+Преимущества подхода
+Шаблонный метод (Core02)	Стратегия (Core03)
+Каждый вид сервиса – отдельный абстрактный класс	Один универсальный класс GenericBackgroundService
+Необходимо создавать наследника для каждой комбинации задача+ритм	Комбинируем готовые «кубики» через DI
+Сложнее тестировать стратегию отдельно от задачи	Стратегии и задачи можно тестировать изолированно
+Изменение расписания требует правки класса сервиса	Достаточно зарегистрировать другую реализацию IBackgroundSchedule
+Паттерн Стратегия сделал систему по-настоящему открытой для расширения: вы можете не только создавать новые задачи, но и легко внедрять нестандартные расписания (например, адаптивное, с экспоненциальной отсрочкой при ошибках, по внешнему сигналу и т.п.), вообще не трогая сам сервис. Девиз BackgroundService<TBehavior, TTune> работает именно так: TBehavior — что делать, TTune — как планировать.
+-------------------------------------------------------------------------------------
+Добавление третьего измерения TTune – это именно та самая «юстировка», которая превращает абстрактный сервис в производственно‑готовый компонент.
+Стратегия планирования (TScheduler) говорит когда, поведение (TBehavior) – что делать, а TTune – с какими нюансами: пороги ошибок, таймауты, политики повтора, тонкая настройка логирования или метрик. Причём одна и та же пара задача‑расписание может использоваться в разных инсталляциях с разной юстировкой.
+
+Обновим архитектуру, введя третий параметр.
+--------------------
+Общая схема
+graph TD
+    A[GenericBackgroundService&lt;TTask,TSchedule,TTune&gt;] --> B[TTask : IBackgroundTask]
+    A --> C[TSchedule : IBackgroundSchedule]
+    A --> D[TTune : IBackgroundTuning]
+    D --> E[RetryTuning]
+    D --> F[TimeoutTuning]
+    D --> G[CompositeTuning]
+IBackgroundTuning – контракт, который «оборачивает» выполнение задачи, добавляя сквозную функциональность.
+
+GenericBackgroundService<TTask, TSchedule, TTune> принимает все три компонента через DI и строит из них конечный цикл.
+
+Код новой библиотеки (Core04)
+1. Новый контракт юстировки
+IBackgroundTuning.cs
+
+csharp
+namespace DS.BackgroundServices.Core04;
+
+/// <summary>
+/// Юстировочные настройки, оборачивающие выполнение задачи.
+/// Позволяют добавлять повторные попытки, таймауты, метрики и т.п.
+/// </summary>
+public interface IBackgroundTuning
+{
+    /// <summary>
+    /// Выполняет задачу с учётом всех юстировок.
+    /// </summary>
+    /// <param name="task">Делегат, представляющий полезную работу.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    Task ExecuteWithTuningAsync(
+        Func<CancellationToken, Task> task,
+        CancellationToken cancellationToken);
+}
+2. Обновлённый универсальный сервис
+GenericBackgroundService.cs
+
+csharp
+using Microsoft.Extensions.Logging;
+
+namespace DS.BackgroundServices.Core04;
+
+public class GenericBackgroundService<TTask, TSchedule, TTune> : BackgroundServiceBase
+    where TTask : IBackgroundTask
+    where TSchedule : IBackgroundSchedule
+    where TTune : IBackgroundTuning
+{
+    private readonly TTask _task;
+    private readonly TSchedule _schedule;
+    private readonly TTune _tuning;
+    private readonly ILogger _logger;
+
+    public GenericBackgroundService(
+        TTask task,
+        TSchedule schedule,
+        TTune tuning,
+        ILogger<GenericBackgroundService<TTask, TSchedule, TTune>> logger)
+        : base(logger)
+    {
+        _task = task;
+        _schedule = schedule;
+        _tuning = tuning;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteCoreAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation(
+            "Запуск {ScheduleName} + {TaskName} с юстировкой {TuningName}",
+            typeof(TSchedule).Name, typeof(TTask).Name, typeof(TTune).Name);
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var waitTask = _schedule.WaitForNextAsync(stoppingToken);
+            if (waitTask is null)
+            {
+                _logger.LogDebug("Расписание вернуло null, выход из цикла");
+                break;
+            }
+
+            try
+            {
+                await waitTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+
+            if (stoppingToken.IsCancellationRequested) break;
+
+            // Выполняем задачу через слой юстировки
+            await _tuning.ExecuteWithTuningAsync(
+                ct => _task.ExecuteAsync(ct),
+                stoppingToken).ConfigureAwait(false);
+        }
+    }
+}
+Важно: BackgroundServiceBase остаётся прежним (надёжные хуки OnStartingAsync/OnStoppedAsync).
+
+3. Примеры реализаций TTune (юстировок)
+DefaultTuning.cs – без дополнительной логики.
+
+csharp
+namespace DS.BackgroundServices.Core04;
+
+public class DefaultTuning : IBackgroundTuning
+{
+    public Task ExecuteWithTuningAsync(
+        Func<CancellationToken, Task> task,
+        CancellationToken cancellationToken)
+        => task(cancellationToken);
+}
+RetryTuning.cs – простая стратегия повторов с задержкой.
+
+csharp
+using Microsoft.Extensions.Logging;
+
+namespace DS.BackgroundServices.Core04;
+
+public class RetryTuning : IBackgroundTuning
+{
+    private readonly int _maxRetries;
+    private readonly TimeSpan _delay;
+    private readonly ILogger<RetryTuning> _logger;
+
+    public RetryTuning(int maxRetries, TimeSpan delay, ILogger<RetryTuning> logger)
+    {
+        _maxRetries = maxRetries;
+        _delay = delay;
+        _logger = logger;
+    }
+
+    public async Task ExecuteWithTuningAsync(
+        Func<CancellationToken, Task> task,
+        CancellationToken cancellationToken)
+    {
+        for (int attempt = 1; attempt <= _maxRetries; attempt++)
+        {
+            try
+            {
+                await task(cancellationToken).ConfigureAwait(false);
+                return;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Попытка {Attempt} не удалась", attempt);
+                if (attempt == _maxRetries)
+                    throw; // все попытки исчерпаны
+                await Task.Delay(_delay, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+}
+TimeoutTuning.cs – ограничение времени выполнения одной итерации.
+
+csharp
+namespace DS.BackgroundServices.Core04;
+
+public class TimeoutTuning : IBackgroundTuning
+{
+    private readonly TimeSpan _timeout;
+
+    public TimeoutTuning(TimeSpan timeout) => _timeout = timeout;
+
+    public async Task ExecuteWithTuningAsync(
+        Func<CancellationToken, Task> task,
+        CancellationToken cancellationToken)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(_timeout);
+        try
+        {
+            await task(cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Истёк таймаут, а не глобальная остановка
+            throw new TimeoutException($"Операция не завершилась за {_timeout}");
+        }
+    }
+}
+CompositeTuning – можно комбинировать несколько юстировок в цепочку.
+
+4. Расширенные расписания с юстировкой (опционально)
+Если сама стратегия планирования должна зависеть от TTune (например, интервал периодического расписания может подстраиваться динамически), можно ввести второй интерфейс:
+
+csharp
+public interface ITunableSchedule : IBackgroundSchedule
+{
+    // Например, дать расписанию доступ к tuning-объекту
+    void ApplyTuning(IBackgroundTuning tuning);
+}
+Но в простейшей версии юстировка применяется только к выполнению задачи, что более чисто.
+
+5. Регистрация в DI (Program.cs)
+csharp
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using DS.BackgroundServices.Core04;
+
+var builder = Host.CreateApplicationBuilder(args);
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+
+// Задачи
+builder.Services.AddTransient<SamplePeriodicTask>();
+builder.Services.AddTransient<SampleCronTask>();
+
+// Расписания
+builder.Services.AddSingleton(new PeriodicSchedule(TimeSpan.FromSeconds(5)));
+builder.Services.AddSingleton(new CronSchedule("*/10 * * * * *"));
+
+// Юстировки
+builder.Services.AddTransient<DefaultTuning>();
+builder.Services.AddTransient(provider =>
+    new RetryTuning(3, TimeSpan.FromSeconds(2), provider.GetRequiredService<ILogger<RetryTuning>>()));
+builder.Services.AddTransient(new TimeoutTuning(TimeSpan.FromSeconds(30)));
+
+// Комбинации: задача + расписание + юстировка
+builder.Services.AddHostedService<GenericBackgroundService<SamplePeriodicTask, PeriodicSchedule, DefaultTuning>>();
+builder.Services.AddHostedService<GenericBackgroundService<SampleCronTask, CronSchedule, RetryTuning>>();
+builder.Services.AddHostedService<GenericBackgroundService<SampleCronTask, CronSchedule, TimeoutTuning>>();
+
+var host = builder.Build();
+await host.RunAsync();
+Теперь при необходимости заменить только политику повтора достаточно поменять TTune в регистрации – код сервиса и задач остаётся неизменным.
+
+Что даёт TTune на практике
+Аспект	Без TTune	С TTune
+Повтор при ошибках	Нужно встраивать в каждую задачу	Вынесено в RetryTuning, переиспользуется
+Тайм‑аут операции	Требует ручного кода	Готовый TimeoutTuning подключается за секунду
+Метрики / логирование	Размазано по задачам	Можно сделать MetricsTuning, единообразно
+А/B‑тестирование	Невозможно без перекомпиляции	Замена юстировки через конфигурацию DI
+
+Паттерн «Стратегия» с тремя осями превращает систему в настоящий конструктор: поведение – что, расписание – когда, юстировка – как именно. Каждый компонент независим, тестируем и заменяем. Именно такой подход позволяет быстро наращивать библиотеку готовых фоновых сервисов под любые сценарии.

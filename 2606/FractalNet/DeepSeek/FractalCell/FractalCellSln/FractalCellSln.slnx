@@ -6,12 +6,14 @@
     <Project Path="FractalCellApp05/FractalCellApp05.csproj" Id="66e0afbe-d422-45ca-80bd-5d3ceb099b86" />
     <Project Path="FractalCellApp052/FractalCellApp052.csproj" Id="9cd8fd06-0651-4906-9bb8-bff7217dcb1a" />
     <Project Path="FractalCellApp053/FractalCellApp053.csproj" Id="ef77afff-54ba-49aa-adb4-2e274798aeb4" />
+    <Project Path="FractalCellApp055/FractalCellApp055.csproj" Id="36f92d4a-6deb-44fa-8136-1f45f373085f" />
     <Project Path="FractalCellCore01/FractalCellCore01.csproj" Id="a90b4a19-0f77-41f8-a7f9-d16b307089a9" />
     <Project Path="FractalCellCore03/FractalCellCore03.csproj" Id="1ad7d42b-316f-4d9e-bf25-d8630cdbdd42" />
     <Project Path="FractalCellCore04/FractalCellCore04.csproj" Id="3afe6ea7-00d3-45d6-a50d-20d0b32dc61a" />
     <Project Path="FractalCellCore05/FractalCellCore05.csproj" Id="8f64f16e-3af4-448b-8b8f-b02acbf565b6" />
     <Project Path="FractalCellCore052/FractalCellCore052.csproj" Id="1223f3d5-2d35-4f86-a55b-41a55ec8040f" />
     <Project Path="FractalCellCore053/FractalCellCore053.csproj" Id="4b3e443a-06e4-4d5d-9787-f9cb7fa2b7d3" />
+    <Project Path="FractalCellCore055/FractalCellCore055.csproj" Id="bba9f214-150b-4809-a03b-41cafa37130e" />
   </Folder>
   <Project Path="CA_FractalBlock01/CA_FractalBlock01.csproj" Id="99d5ad24-ccf9-48da-a85c-b77e8ccdee50" />
   <Project Path="FractalBlock01/FractalBlock01.csproj" Id="924a3398-9ee7-4bf9-8600-c0b2a10845a2" />
