@@ -1,0 +1,658 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+
+
+================================================================
+Directory Structure
+================================================================
+ApiService/ApiService.csproj
+ApiService/ApiService.csproj.user
+ApiService/ApiService.http
+ApiService/appsettings.Development.json
+ApiService/appsettings.json
+ApiService/Controllers/WeatherForecastController.cs
+ApiService/Program.cs
+ApiService/Properties/launchSettings.json
+ApiService/WeatherForecast.cs
+aspire.config.json
+WorkerService02/appsettings.Development.json
+WorkerService02/appsettings.json
+WorkerService02/Program.cs
+WorkerService02/Properties/launchSettings.json
+WorkerService02/Worker.cs
+WorkerService02/WorkerService02.csproj
+WorkerServiceSln02.AppHost/AppHost.cs
+WorkerServiceSln02.AppHost/appsettings.Development.json
+WorkerServiceSln02.AppHost/appsettings.json
+WorkerServiceSln02.AppHost/Properties/launchSettings.json
+WorkerServiceSln02.AppHost/WorkerServiceSln02.AppHost.csproj
+WorkerServiceSln02.ServiceDefaults/Extensions.cs
+WorkerServiceSln02.ServiceDefaults/WorkerServiceSln02.ServiceDefaults.csproj
+WorkerServiceSln02.slnx
+
+================================================================
+Files
+================================================================
+
+================
+File: ApiService/ApiService.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WorkerService02\WorkerService02.csproj" />
+    <ProjectReference Include="..\WorkerServiceSln02.ServiceDefaults\WorkerServiceSln02.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: ApiService/ApiService.csproj.user
+================
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ActiveDebugProfile>https</ActiveDebugProfile>
+  </PropertyGroup>
+</Project>
+
+================
+File: ApiService/ApiService.http
+================
+@ApiService_HostAddress = http://localhost:5103
+
+GET {{ApiService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+================
+File: ApiService/appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: ApiService/appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: ApiService/Controllers/WeatherForecastController.cs
+================
+using Microsoft.AspNetCore.Mvc;
+
+namespace ApiService.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+public class WeatherForecastController : ControllerBase
+{
+    private static readonly string[] Summaries =
+    [
+        "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
+    ];
+
+    [HttpGet(Name = "GetWeatherForecast")]
+    public IEnumerable<WeatherForecast> Get()
+    {
+        return Enumerable.Range(1, 5).Select(index => new WeatherForecast
+        {
+            Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+            TemperatureC = Random.Shared.Next(-20, 55),
+            Summary = Summaries[Random.Shared.Next(Summaries.Length)]
+        })
+        .ToArray();
+    }
+}
+
+================
+File: ApiService/Program.cs
+================
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSingleton<IMessageQueue, InMemoryQueue>();
+var app = builder.Build();
+
+app.MapPost("/enqueue", (string task, IMessageQueue queue) =>
+{
+    queue.Enqueue(task);
+    return Results.Accepted($"Задача '{task}' принята");
+});
+
+app.MapGet("/", () => "API работает. Отправляйте POST на /enqueue");
+app.Run();
+
+//var builder = WebApplication.CreateBuilder(args);
+
+//builder.AddServiceDefaults();
+
+//// Add services to the container.
+
+//builder.Services.AddControllers();
+//// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+//builder.Services.AddOpenApi();
+
+//var app = builder.Build();
+
+//app.MapDefaultEndpoints();
+
+//// Configure the HTTP request pipeline.
+//if (app.Environment.IsDevelopment())
+//{
+//    app.MapOpenApi();
+//}
+
+//app.UseHttpsRedirection();
+
+//app.UseAuthorization();
+
+//app.MapControllers();
+
+//app.Run();
+
+================
+File: ApiService/Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5103",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://localhost:7052;http://localhost:5103",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: ApiService/WeatherForecast.cs
+================
+namespace ApiService;
+
+public class WeatherForecast
+{
+    public DateOnly Date { get; set; }
+
+    public int TemperatureC { get; set; }
+
+    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+
+    public string? Summary { get; set; }
+}
+
+================
+File: aspire.config.json
+================
+{
+  "appHost": {
+    "path": "WorkerServiceSln02.AppHost/WorkerServiceSln02.AppHost.csproj"
+  }
+}
+
+================
+File: WorkerService02/appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: WorkerService02/appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: WorkerService02/Program.cs
+================
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+IHost host = Host.CreateDefaultBuilder(args)
+    .ConfigureServices(services =>
+    {
+        // Регистрируем нашу "очередь" (в реальности это Redis/RabbitMQ)
+        services.AddSingleton<IMessageQueue, InMemoryQueue>();
+    })
+    .Build();
+
+await host.RunAsync();
+
+================
+File: WorkerService02/Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "WorkerService02": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: WorkerService02/Worker.cs
+================
+using System.Collections.Concurrent;
+
+public class Worker : BackgroundService
+{
+    private readonly ILogger<Worker> _logger;
+    private readonly IMessageQueue _queue;
+
+    public Worker(ILogger<Worker> logger, IMessageQueue queue)
+    {
+        _logger = logger;
+        _queue = queue;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("Фоновый воркер запущен.");
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            if (_queue.TryDequeue(out var message))
+            {
+                _logger.LogInformation("Получена задача: {Message}", message);
+                await Task.Delay(2000, stoppingToken); // Имитация долгой работы
+            }
+            else
+            {
+                // Если задач нет, спим 1 секунду, чтобы не грузить CPU
+                await Task.Delay(1000, stoppingToken);
+            }
+        }
+    }
+}
+
+// Для примера используем простую потокобезопасную очередь вместо БД
+public interface IMessageQueue { void Enqueue(string msg); bool TryDequeue(out string? msg); }
+
+public class InMemoryQueue : ConcurrentQueue<string>, IMessageQueue
+{
+    public void Enqueue(string msg) => base.Enqueue(msg);
+    public bool TryDequeue(out string? msg) => base.TryDequeue(out msg);
+}
+
+================
+File: WorkerService02/WorkerService02.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-WorkerService02-1c222ba7-f1d1-4dc1-a53c-cc239f952580</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WorkerServiceSln02.ServiceDefaults\WorkerServiceSln02.ServiceDefaults.csproj" />
+  </ItemGroup>
+</Project>
+
+================
+File: WorkerServiceSln02.AppHost/AppHost.cs
+================
+var builder = DistributedApplication.CreateBuilder(args);
+
+// var sharedQueue = builder.AddResource(new InMemoryQueue(), "shared-queue");
+
+builder.AddProject<Projects.WorkerService02>("workerservice02");
+
+builder.AddProject<Projects.ApiService>("apiservice");
+
+builder.Build().Run();
+
+================
+File: WorkerServiceSln02.AppHost/appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: WorkerServiceSln02.AppHost/appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Aspire.Hosting.Dcp": "Warning"
+    }
+  }
+}
+
+================
+File: WorkerServiceSln02.AppHost/Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:17168;http://localhost:15037",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21263",
+        "ASPIRE_DASHBOARD_MCP_ENDPOINT_URL": "https://localhost:23164",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22253"
+      }
+    },
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:15037",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19056",
+        "ASPIRE_DASHBOARD_MCP_ENDPOINT_URL": "http://localhost:18102",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20228"
+      }
+    }
+  }
+}
+
+================
+File: WorkerServiceSln02.AppHost/WorkerServiceSln02.AppHost.csproj
+================
+<Project Sdk="Aspire.AppHost.Sdk/13.2.4">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>f4f3cbd0-f05e-4901-84d6-d7c02c6b154c</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ApiService\ApiService.csproj" />
+    <ProjectReference Include="..\WorkerService02\WorkerService02.csproj" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: WorkerServiceSln02.ServiceDefaults/Extensions.cs
+================
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ServiceDiscovery;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+
+namespace Microsoft.Extensions.Hosting;
+
+// Adds common Aspire services: service discovery, resilience, health checks, and OpenTelemetry.
+// This project should be referenced by each service project in your solution.
+// To learn more about using this project, see https://aka.ms/dotnet/aspire/service-defaults
+public static class Extensions
+{
+    private const string HealthEndpointPath = "/health";
+    private const string AlivenessEndpointPath = "/alive";
+
+    public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.ConfigureOpenTelemetry();
+
+        builder.AddDefaultHealthChecks();
+
+        builder.Services.AddServiceDiscovery();
+
+        builder.Services.ConfigureHttpClientDefaults(http =>
+        {
+            // Turn on resilience by default
+            http.AddStandardResilienceHandler();
+
+            // Turn on service discovery by default
+            http.AddServiceDiscovery();
+        });
+
+        // Uncomment the following to restrict the allowed schemes for service discovery.
+        // builder.Services.Configure<ServiceDiscoveryOptions>(options =>
+        // {
+        //     options.AllowedSchemes = ["https"];
+        // });
+
+        return builder;
+    }
+
+    public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.Logging.AddOpenTelemetry(logging =>
+        {
+            logging.IncludeFormattedMessage = true;
+            logging.IncludeScopes = true;
+        });
+
+        builder.Services.AddOpenTelemetry()
+            .WithMetrics(metrics =>
+            {
+                metrics.AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation()
+                    .AddRuntimeInstrumentation();
+            })
+            .WithTracing(tracing =>
+            {
+                tracing.AddSource(builder.Environment.ApplicationName)
+                    .AddAspNetCoreInstrumentation(tracing =>
+                        // Exclude health check requests from tracing
+                        tracing.Filter = context =>
+                            !context.Request.Path.StartsWithSegments(HealthEndpointPath)
+                            && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
+                    )
+                    // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
+                    //.AddGrpcClientInstrumentation()
+                    .AddHttpClientInstrumentation();
+            });
+
+        builder.AddOpenTelemetryExporters();
+
+        return builder;
+    }
+
+    private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+
+        if (useOtlpExporter)
+        {
+            builder.Services.AddOpenTelemetry().UseOtlpExporter();
+        }
+
+        // Uncomment the following lines to enable the Azure Monitor exporter (requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
+        //if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+        //{
+        //    builder.Services.AddOpenTelemetry()
+        //       .UseAzureMonitor();
+        //}
+
+        return builder;
+    }
+
+    public static TBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.Services.AddHealthChecks()
+            // Add a default liveness check to ensure app is responsive
+            .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
+
+        return builder;
+    }
+
+    public static WebApplication MapDefaultEndpoints(this WebApplication app)
+    {
+        // Adding health checks endpoints to applications in non-development environments has security implications.
+        // See https://aka.ms/dotnet/aspire/healthchecks for details before enabling these endpoints in non-development environments.
+        if (app.Environment.IsDevelopment())
+        {
+            // All health checks must pass for app to be considered ready to accept traffic after starting
+            app.MapHealthChecks(HealthEndpointPath);
+
+            // Only health checks tagged with the "live" tag must pass for app to be considered alive
+            app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
+            {
+                Predicate = r => r.Tags.Contains("live")
+            });
+        }
+
+        return app;
+    }
+}
+
+================
+File: WorkerServiceSln02.ServiceDefaults/WorkerServiceSln02.ServiceDefaults.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAspireSharedProject>true</IsAspireSharedProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.2.0" />
+    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" Version="10.2.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: WorkerServiceSln02.slnx
+================
+<Solution>
+  <Project Path="ApiService/ApiService.csproj" />
+  <Project Path="WorkerService02/WorkerService02.csproj" />
+  <Project Path="WorkerServiceSln02.AppHost/WorkerServiceSln02.AppHost.csproj" />
+  <Project Path="WorkerServiceSln02.ServiceDefaults/WorkerServiceSln02.ServiceDefaults.csproj" />
+</Solution>
+
+
+
+
+
+================================================================
+End of Codebase
+================================================================

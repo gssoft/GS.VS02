@@ -1,0 +1,110 @@
+
+================================================================
+Directory Structure
+================================================================
+AppHost.cs
+appsettings.Development.json
+appsettings.json
+Properties/launchSettings.json
+WorkerServiceSln02.AppHost.csproj
+
+================================================================
+Files
+================================================================
+
+================
+File: AppHost.cs
+================
+var builder = DistributedApplication.CreateBuilder(args);
+
+// var sharedQueue = builder.AddResource(new InMemoryQueue(), "shared-queue");
+
+builder.AddProject<Projects.WorkerService02>("workerservice02");
+
+builder.AddProject<Projects.ApiService>("apiservice");
+
+builder.Build().Run();
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Aspire.Hosting.Dcp": "Warning"
+    }
+  }
+}
+
+================
+File: Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:17168;http://localhost:15037",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21263",
+        "ASPIRE_DASHBOARD_MCP_ENDPOINT_URL": "https://localhost:23164",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22253"
+      }
+    },
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:15037",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19056",
+        "ASPIRE_DASHBOARD_MCP_ENDPOINT_URL": "http://localhost:18102",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20228"
+      }
+    }
+  }
+}
+
+================
+File: WorkerServiceSln02.AppHost.csproj
+================
+<Project Sdk="Aspire.AppHost.Sdk/13.2.4">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>f4f3cbd0-f05e-4901-84d6-d7c02c6b154c</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ApiService\ApiService.csproj" />
+    <ProjectReference Include="..\WorkerService02\WorkerService02.csproj" />
+  </ItemGroup>
+
+</Project>
+
+================================================================
+End of Codebase
+================================================================

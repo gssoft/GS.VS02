@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\WorkerServiceSln02.Contracts\WorkerServiceSln02.Contracts.csproj" />
     <ProjectReference Include="..\WorkerServiceSln02.ServiceDefaults\WorkerServiceSln02.ServiceDefaults.csproj" />
   </ItemGroup>
 </Project>

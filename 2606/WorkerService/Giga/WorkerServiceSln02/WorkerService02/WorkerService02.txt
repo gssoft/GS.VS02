@@ -1,0 +1,145 @@
+
+================================================================
+Directory Structure
+================================================================
+appsettings.Development.json
+appsettings.json
+Program.cs
+Properties/launchSettings.json
+Worker.cs
+WorkerService02.csproj
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: Program.cs
+================
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+IHost host = Host.CreateDefaultBuilder(args)
+    .ConfigureServices(services =>
+    {
+        // Регистрируем нашу "очередь" (в реальности это Redis/RabbitMQ)
+        services.AddSingleton<IMessageQueue, InMemoryQueue>();
+    })
+    .Build();
+
+await host.RunAsync();
+
+================
+File: Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "WorkerService02": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: Worker.cs
+================
+using System.Collections.Concurrent;
+
+public class Worker : BackgroundService
+{
+    private readonly ILogger<Worker> _logger;
+    private readonly IMessageQueue _queue;
+
+    public Worker(ILogger<Worker> logger, IMessageQueue queue)
+    {
+        _logger = logger;
+        _queue = queue;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("Фоновый воркер запущен.");
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            if (_queue.TryDequeue(out var message))
+            {
+                _logger.LogInformation("Получена задача: {Message}", message);
+                await Task.Delay(2000, stoppingToken); // Имитация долгой работы
+            }
+            else
+            {
+                // Если задач нет, спим 1 секунду, чтобы не грузить CPU
+                await Task.Delay(1000, stoppingToken);
+            }
+        }
+    }
+}
+
+// Для примера используем простую потокобезопасную очередь вместо БД
+public interface IMessageQueue { void Enqueue(string msg); bool TryDequeue(out string? msg); }
+
+public class InMemoryQueue : ConcurrentQueue<string>, IMessageQueue
+{
+    public void Enqueue(string msg) => base.Enqueue(msg);
+    public bool TryDequeue(out string? msg) => base.TryDequeue(out msg);
+}
+
+================
+File: WorkerService02.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-WorkerService02-1c222ba7-f1d1-4dc1-a53c-cc239f952580</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WorkerServiceSln02.ServiceDefaults\WorkerServiceSln02.ServiceDefaults.csproj" />
+  </ItemGroup>
+</Project>
+
+
+
+
+
+================================================================
+End of Codebase
+================================================================

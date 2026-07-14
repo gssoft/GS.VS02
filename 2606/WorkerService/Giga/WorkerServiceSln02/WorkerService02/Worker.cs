@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using WorkerServiceSln02.Contracts;
 
 public class Worker : BackgroundService
 {
@@ -32,10 +33,10 @@ public class Worker : BackgroundService
 }
 
 // Для примера используем простую потокобезопасную очередь вместо БД
-public interface IMessageQueue { void Enqueue(string msg); bool TryDequeue(out string? msg); }
+//public interface IMessageQueue { void Enqueue(string msg); bool TryDequeue(out string? msg); }
 
-public class InMemoryQueue : ConcurrentQueue<string>, IMessageQueue
-{
-    public void Enqueue(string msg) => base.Enqueue(msg);
-    public bool TryDequeue(out string? msg) => base.TryDequeue(out msg);
-}
+//public class InMemoryQueue : ConcurrentQueue<string>, IMessageQueue
+//{
+//    public void Enqueue(string msg) => base.Enqueue(msg);
+//    public bool TryDequeue(out string? msg) => base.TryDequeue(out msg);
+//}

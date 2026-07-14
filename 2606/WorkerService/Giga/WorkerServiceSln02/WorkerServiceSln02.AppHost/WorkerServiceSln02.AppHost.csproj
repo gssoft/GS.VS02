@@ -9,8 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\ApiService\ApiService.csproj" />
     <ProjectReference Include="..\WorkerService02\WorkerService02.csproj" />
+    <ProjectReference Include="..\WorkerServiceSln02.Contracts\WorkerServiceSln02.Contracts.csproj" />
   </ItemGroup>
 
 </Project>
