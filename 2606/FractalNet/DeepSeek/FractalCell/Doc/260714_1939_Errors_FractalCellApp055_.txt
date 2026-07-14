@@ -1,0 +1,18 @@
+Severity	Code	Description	Project	File	Line	Suppression State	Details
+Error (active)	CS0246	The type or namespace name 'BackgroundBehaviorTemplate' could not be found (are you missing a using directive or an assembly reference?)	FractalCellApp055	D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln\FractalCellApp055\Behaviors\OrchestratorBehavior.cs	7		
+
+Severity	Code	Description	Project	File	Line	Suppression State	Details
+Error (active)	CS0246	The type or namespace name 'BackgroundBehaviorTemplate' could not be found (are you missing a using directive or an assembly reference?)	FractalCellApp055	D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln\FractalCellApp055\Behaviors\TimeGenerationBehavior.cs	11		
+
+Severity	Code	Description	Project	File	Line	Suppression State	Details
+Error (active)	CS0535	'TimeGenerationBehavior' does not implement interface member 'IBehavior.AttachToAsync(IFractalCell, CancellationToken)'	FractalCellApp055	D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln\FractalCellApp055\Behaviors\TimeGenerationBehavior.cs	11		
+
+Severity	Code	Description	Project	File	Line	Suppression State	Details
+Error (active)	CS0535	'TimeGenerationBehavior' does not implement interface member 'IBehavior.DetachAsync(CancellationToken)'	FractalCellApp055	D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln\FractalCellApp055\Behaviors\TimeGenerationBehavior.cs	11
+
+Severity	Code	Description	Project	File	Line	Suppression State	Details
+Error (active)	CS0535	'TimeGenerationBehavior' does not implement interface member 'IBehavior.ConfigureAsync(object?, CancellationToken)'	FractalCellApp055	D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln\FractalCellApp055\Behaviors\TimeGenerationBehavior.cs	11		
+
+Severity	Code	Description	Project	File	Line	Suppression State	Details
+Error (active)	CS0535	'TimeGenerationBehavior' does not implement interface member 'IBehavior.HandleAsync(IApplicationEvent)'	FractalCellApp055	D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln\FractalCellApp055\Behaviors\TimeGenerationBehavior.cs	11		
+		

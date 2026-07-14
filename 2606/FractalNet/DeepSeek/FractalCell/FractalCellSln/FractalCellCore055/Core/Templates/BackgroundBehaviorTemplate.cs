@@ -1,4 +1,6 @@
-﻿namespace FractalCellCore.Core.Templates;
+﻿using Microsoft.Extensions.Logging;
+
+namespace FractalCellCore.Core.Templates;
 
 public abstract class BackgroundBehaviorTemplate : BehaviorTemplate
 {

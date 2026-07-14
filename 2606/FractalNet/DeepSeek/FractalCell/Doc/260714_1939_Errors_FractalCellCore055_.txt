@@ -1,0 +1,5 @@
+Severity	Code	Description	Project	File	Line	Suppression State	Details
+Error (active)	CS0246	The type or namespace name 'ILogger' could not be found (are you missing a using directive or an assembly reference?)	FractalCellCore055	D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln\FractalCellCore055\Core\Templates\BackgroundBehaviorTemplate.cs	7		
+
+Severity	Code	Description	Project	File	Line	Suppression State	Details
+Warning (active)	CS8425	Async-iterator 'ChannelExternalBus.ReadAllAsync(CancellationToken)' has one or more parameters of type 'CancellationToken' but none of them is decorated with the 'EnumeratorCancellation' attribute, so the cancellation token parameter from the generated 'IAsyncEnumerable<>.GetAsyncEnumerator' will be unconsumed	FractalCellCore055	D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln\FractalCellCore055\Implementations\Channels\ChannelExternalBus.cs	63		

@@ -1,5 +1,7 @@
 ﻿// Implementations/Channels/ChannelExternalBus.cs
 
+using System.Runtime.CompilerServices;
+
 using System.Threading.Channels;
 using FractalCellCore.Core.Configuration;
 using FractalCellCore.Core.Interfaces;
@@ -60,7 +62,7 @@ public class ChannelExternalBus : ExternalBusTemplate
         await _hub.PublishToAllAsync(@event, filter);
     }
 
-    public override async IAsyncEnumerable<IApplicationEvent> ReadAllAsync(CancellationToken ct)
+    public override async IAsyncEnumerable<IApplicationEvent> ReadAllAsync([EnumeratorCancellation] CancellationToken ct)
     {
         _logger?.LogDebug("ChannelExternalBus {BusId} starting to read events", BusId);
 
