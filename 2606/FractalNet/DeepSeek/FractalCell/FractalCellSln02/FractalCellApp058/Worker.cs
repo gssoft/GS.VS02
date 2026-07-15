@@ -1,4 +1,7 @@
 // Worker.cs
+
+using FractalBehaviors;
+
 using FractalCellCore;
 using FractalCellApp.Behaviors;
 using FractalCellCore.Core.Configuration;

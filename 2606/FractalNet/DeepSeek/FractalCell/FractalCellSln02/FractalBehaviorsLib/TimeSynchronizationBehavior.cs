@@ -8,7 +8,7 @@ using FractalCellCore.Core.Interfaces;
 using FractalCellCore.Core.Templates;
 using Microsoft.Extensions.Logging;
 
-namespace FractalCellApp.Behaviors;
+namespace FractalBehaviors;
 
 public class TimeSynchronizationBehavior : EventBehaviorTemplate<FractalTimeEvent>
 {

@@ -1,9 +1,9 @@
-﻿namespace FractalCellApp.Behaviors;
-
-using FractalCellCore;
+﻿using FractalCellCore;
 using FractalCellCore.Core.Interfaces;
 using FractalCellCore.Core.Templates;
 using Microsoft.Extensions.Logging;
+
+namespace FractalBehaviors;
 
 /// <summary>
 /// Поведение, генерирующее фрактальное время и рассылающее его всем ячейкам.

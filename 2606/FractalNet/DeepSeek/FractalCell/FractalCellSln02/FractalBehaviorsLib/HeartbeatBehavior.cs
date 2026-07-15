@@ -7,7 +7,7 @@ using FractalCellCore.Core.Templates;
 using Microsoft.Extensions.Logging;
 using System.Threading;
 
-namespace FractalCellApp.Behaviors;
+namespace FractalBehaviors;
 
 /// <summary>
 /// Поведение для обработки heartbeat-событий (исправленная версия)
