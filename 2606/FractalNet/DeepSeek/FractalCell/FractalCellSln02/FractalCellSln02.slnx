@@ -6,6 +6,7 @@
     <Project Path="FractalCellCore053/FractalCellCore053.csproj" />
   </Folder>
   <Folder Name="/Branch02/">
+    <Project Path="FractalBehaviorsLib/FractalBehaviorsLib.csproj" Id="2a6c32ce-5264-47d3-ada2-c94690683761" />
     <Project Path="FractalCellApp055/FractalCellApp055.csproj" />
     <Project Path="FractalCellApp058/FractalCellApp058.csproj" Id="9f4e4555-dcaa-455d-adcb-dd72939d78b4" />
     <Project Path="FractalCellCore055/FractalCellCore055.csproj" />
