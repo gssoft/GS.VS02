@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/Branch01/">
+    <Project Path="FractalCellApp052/FractalCellApp052.csproj" />
+    <Project Path="FractalCellApp053/FractalCellApp053.csproj" />
+    <Project Path="FractalCellCore052/FractalCellCore052.csproj" />
+    <Project Path="FractalCellCore053/FractalCellCore053.csproj" />
+  </Folder>
+  <Folder Name="/Branch02/">
+    <Project Path="FractalCellApp055/FractalCellApp055.csproj" />
+    <Project Path="FractalCellCore055/FractalCellCore055.csproj" />
+  </Folder>
+  <Project Path="WorkerService01/WorkerService01.csproj" />
+</Solution>

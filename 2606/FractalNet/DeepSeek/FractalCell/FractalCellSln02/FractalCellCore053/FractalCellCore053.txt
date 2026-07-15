@@ -1,0 +1,2024 @@
+26.07.10
+================================================================
+https://chat.deepseek.com/share/bvm1gktjaat8ccx1o2
+================================================================
+Directory Structure
+================================================================
+Core/Common/Unsubscriber.cs
+Core/Configuration/FractalCellConfiguration.cs
+Core/FractalCellFactory.cs
+Core/Interfaces/IApplicationEvent.cs
+Core/Interfaces/IBehavior.cs
+Core/Interfaces/IExternalBus.cs
+Core/Interfaces/IFractalCell.cs
+Core/Interfaces/IFractalEventHub.cs
+Core/Interfaces/IInternalBus.cs
+Core/Templates/BehaviorTemplate.cs
+Core/Templates/ExternalBusTemplate.cs
+Core/Templates/FractalCellTemplate.cs
+Core/Templates/InternalBusTemplate.cs
+FractalCellCore053.csproj
+Implementations/Channels/ChannelExternalBus.cs
+Implementations/Channels/ChannelFractalCell.cs
+Implementations/Channels/ChannelInternalBus.cs
+Implementations/FractalEventHub.cs
+Implementations/TplDataflow/TplExternalBus.cs
+Implementations/TplDataflow/TplFractalCell.cs
+Implementations/TplDataflow/TplInternalBus.cs
+Model/FractalEvent.cs
+Model/FractalTimeEvent.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: Core/Common/Unsubscriber.cs
+================
+// Core/Common/Unsubscriber.cs
+
+namespace FractalCellCore.Core.Common;
+
+public class Unsubscriber : IDisposable
+{
+    private readonly Action _unsubscribeAction;
+    private bool _disposed;
+
+    public Unsubscriber(Action unsubscribeAction)
+    {
+        _unsubscribeAction = unsubscribeAction ?? throw new ArgumentNullException(nameof(unsubscribeAction));
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _unsubscribeAction?.Invoke();
+            _disposed = true;
+        }
+    }
+}
+
+================
+File: Core/Configuration/FractalCellConfiguration.cs
+================
+// Core/Configuration/FractalCellConfiguration.cs
+
+namespace FractalCellCore.Core.Configuration;
+
+public record FractalCellConfiguration
+{
+    public string CellId { get; init; } = string.Empty;
+    public int BackgroundServiceCount { get; init; } = 2;
+    public BusType InternalBusType { get; init; } = BusType.Channels;
+    public BusType ExternalBusType { get; init; } = BusType.TplDataflow;
+
+    public BusSettings BusSettings { get; init; } = new();
+    public HubSettings HubSettings { get; init; } = new();
+}
+
+public record BusSettings
+{
+    public int Capacity { get; init; } = 1000;
+    public int MaxParallelism { get; init; } = 4;
+    public TimeSpan MessageTimeout { get; init; } = TimeSpan.FromSeconds(30);
+    public bool EnablePersistence { get; init; } = false;
+    public string? PersistencePath { get; init; }
+}
+
+public record HubSettings
+{
+    public int ChannelCapacity { get; init; } = 1000;
+    public bool EnablePersistence { get; init; } = false;
+    public string? PersistencePath { get; init; }
+    public TimeSpan MessageTimeout { get; init; } = TimeSpan.FromSeconds(30);
+}
+
+public enum BusType
+{
+    Channels,
+    TplDataflow
+}
+
+================
+File: Core/FractalCellFactory.cs
+================
+// Core/FractalCellFactory.cs
+
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Implementations.Channels;
+using FractalCellCore.Implementations.TplDataflow;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellCore.Implementations;
+
+public static class FractalCellFactory
+{
+    public static async Task<IFractalCell> CreateAsync(
+        FractalCellConfiguration config,
+        IFractalEventHub hub,
+        ILoggerFactory loggerFactory,
+        CancellationToken ct = default)
+    {
+        IInternalBus internalBus = CreateInternalBus(config);
+        IExternalBus externalBus = CreateExternalBus(config, loggerFactory);
+
+        await externalBus.ConnectToHubAsync(hub, config.CellId);
+
+        IFractalCell cell = CreateCellInstance(config, internalBus, externalBus, loggerFactory);
+
+        await cell.InitializeAsync();
+
+        return cell;
+    }
+
+    
+
+    public static async Task<IFractalCell> CreateWithBehaviorAsync<TBehavior>(
+    FractalCellConfiguration config,
+    IFractalEventHub hub,
+    ILoggerFactory loggerFactory,
+    object? behaviorConfig = null,
+    CancellationToken ct = default)
+    where TBehavior : IBehavior, new()
+    {
+        var behavior = new TBehavior();
+        if (behaviorConfig != null)
+            await behavior.ConfigureAsync(behaviorConfig, ct);
+
+        // Явно приводим массив к IEnumerable<IBehavior>
+        return await CreateWithBehaviorsAsync(
+            config,
+            hub,
+            loggerFactory,
+            new IBehavior[] { behavior },  // <-- явное приведение
+            ct);
+    }
+
+    /// <summary>
+    /// Создание ячейки с несколькими поведениями (использует новый конструктор)
+    /// </summary>
+    public static async Task<IFractalCell> CreateWithBehaviorsAsync(
+        FractalCellConfiguration config,
+        IFractalEventHub hub,
+        ILoggerFactory loggerFactory,
+        IEnumerable<IBehavior> behaviors,
+        CancellationToken ct = default)
+    {
+        IInternalBus internalBus = CreateInternalBus(config);
+        IExternalBus externalBus = CreateExternalBus(config, loggerFactory);
+
+        await externalBus.ConnectToHubAsync(hub, config.CellId);
+
+        // Создаём ячейку, передавая поведения в конструктор
+        IFractalCell cell = CreateCellInstance(config, internalBus, externalBus, loggerFactory, behaviors);
+
+        await cell.InitializeAsync();
+
+        // Поведения уже добавлены в ячейку через конструктор, поэтому AttachToAsync не нужен.
+        // Однако, если вы хотите, чтобы поведение знало о ячейке, можно вызвать AttachToAsync для каждого,
+        // но в нашем шаблоне AttachToAsync будет вызван внутри конструктора? Нет, мы сами вызываем AddBehavior.
+        // Чтобы поведение получило ссылку на ячейку, нужно вызвать AttachToAsync.
+        // Но мы этого не делаем, потому что роутер не требует AttachToAsync для работы, он только вызывает методы CanHandleAsync и HandleAsync.
+        // Если же поведение использует _attachedCell, то нужно вызывать AttachToAsync.
+        // Рекомендуем вызывать AttachToAsync для каждого поведения, чтобы они могли получить доступ к ячейке.
+        // Для этого пройдём по поведениям и вызовем AttachToAsync.
+        // Но учтите, что AttachToAsync может быть вызван только один раз.
+        // В нашем случае, если мы уже вызвали AttachToAsync в фабрике ранее (в старом варианте), то сейчас мы его не вызывали.
+        // Поэтому вызовем AttachToAsync здесь.
+        // Однако, мы передаём поведения в конструктор, но они ещё не привязаны к ячейке.
+        // Поэтому после создания ячейки привяжем их.
+        foreach (var behavior in behaviors)
+        {
+            await behavior.AttachToAsync(cell, ct);
+        }
+
+        return cell;
+    }
+
+    private static IInternalBus CreateInternalBus(FractalCellConfiguration config)
+    {
+        // ... без изменений
+        return config.InternalBusType switch
+        {
+            BusType.Channels => new ChannelInternalBus(
+                $"{config.CellId}-internal",
+                config.BusSettings),
+            BusType.TplDataflow => new TplInternalBus(
+                $"{config.CellId}-internal",
+                config.BusSettings),
+            _ => throw new NotSupportedException(
+                $"Bus type {config.InternalBusType} not supported")
+        };
+    }
+
+    private static IExternalBus CreateExternalBus(FractalCellConfiguration config, ILoggerFactory loggerFactory)
+    {
+        // ... без изменений
+        var logger = loggerFactory.CreateLogger($"ExternalBus-{config.CellId}");
+
+        return config.ExternalBusType switch
+        {
+            BusType.Channels => new ChannelExternalBus(
+                $"{config.CellId}-external",
+                config.BusSettings,
+                logger),
+            BusType.TplDataflow => new TplExternalBus(
+                $"{config.CellId}-external",
+                config.BusSettings,
+                logger),
+            _ => throw new NotSupportedException(
+                $"Bus type {config.ExternalBusType} not supported")
+        };
+    }
+
+    // Новая перегрузка CreateCellInstance с поведениями
+    private static IFractalCell CreateCellInstance(
+        FractalCellConfiguration config,
+        IInternalBus internalBus,
+        IExternalBus externalBus,
+        ILoggerFactory loggerFactory,
+        IEnumerable<IBehavior>? behaviors = null)
+    {
+        behaviors ??= Enumerable.Empty<IBehavior>();
+
+        return (config.InternalBusType, config.ExternalBusType) switch
+        {
+            (BusType.Channels, BusType.Channels) =>
+                new ChannelFractalCell(config,
+                    (ChannelInternalBus)internalBus,
+                    (ChannelExternalBus)externalBus,
+                    loggerFactory.CreateLogger<ChannelFractalCell>(),
+                    behaviors),
+
+            (BusType.TplDataflow, BusType.TplDataflow) =>
+                new TplFractalCell(config,
+                    (TplInternalBus)internalBus,
+                    (TplExternalBus)externalBus,
+                    loggerFactory.CreateLogger<TplFractalCell>(),
+                    behaviors),
+
+            _ => throw new NotSupportedException(
+                $"Combination {config.InternalBusType}/{config.ExternalBusType} not supported")
+        };
+    }
+}
+
+================
+File: Core/Interfaces/IApplicationEvent.cs
+================
+// Core/Interfaces/IApplicationEvent.cs
+
+namespace FractalCellCore.Core.Interfaces;
+
+public interface IApplicationEvent
+{
+    string EventId { get; }
+    DateTime Timestamp { get; }
+}
+
+================
+File: Core/Interfaces/IBehavior.cs
+================
+// Core/Interfaces/IBehavior.cs
+
+using FractalCellCore.Core.Interfaces;
+
+namespace FractalCellCore.Core.Interfaces;
+
+/// <summary>
+/// Базовый интерфейс для поведения ячейки
+/// </summary>
+public interface IBehavior
+{
+    /// <summary>
+    /// Уникальный идентификатор поведения
+    /// </summary>
+    string BehaviorId { get; }
+
+    /// <summary>
+    /// Приоритет обработки (чем меньше число, тем выше приоритет)
+    /// </summary>
+    int Priority { get; }
+
+    /// <summary>
+    /// Привязка поведения к ячейке
+    /// </summary>
+    Task AttachToAsync(IFractalCell cell, CancellationToken ct = default);
+
+    /// <summary>
+    /// Отвязка поведения от ячейки
+    /// </summary>
+    Task DetachAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Настройка поведения
+    /// </summary>
+    Task ConfigureAsync(object? configuration = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Проверка, может ли поведение обработать событие
+    /// </summary>
+    Task<bool> CanHandleAsync(IApplicationEvent @event);
+
+    /// <summary>
+    /// Обработка события
+    /// </summary>
+    Task HandleAsync(IApplicationEvent @event);
+}
+
+/// <summary>
+/// Поведение с поддержкой жизненного цикла
+/// </summary>
+public interface ILifecycleBehavior : IBehavior
+{
+    Task OnCellStartingAsync(CancellationToken ct);
+    Task OnCellStartedAsync(CancellationToken ct);
+    Task OnCellStoppingAsync(CancellationToken ct);
+    Task OnCellStoppedAsync(CancellationToken ct);
+}
+
+/// <summary>
+/// Поведение с поддержкой ошибок
+/// </summary>
+public interface IErrorHandlingBehavior : IBehavior
+{
+    Task OnErrorAsync(Exception ex, IApplicationEvent? @event = null);
+}
+
+================
+File: Core/Interfaces/IExternalBus.cs
+================
+// Core/Interfaces/IExternalBus.cs
+
+using FractalCellCore.Core.Interfaces;
+
+
+namespace FractalCellCore.Core.Interfaces;
+
+public interface IExternalBus : IDisposable
+{
+    string BusId { get; }
+    Task ConnectToHubAsync(IFractalEventHub hub, string cellId);
+    Task SendToCellAsync(string targetCellId, IApplicationEvent @event);
+    Task BroadcastAsync(IApplicationEvent @event, Predicate<string>? filter = null);
+    IAsyncEnumerable<IApplicationEvent> ReadAllAsync(CancellationToken ct);
+}
+
+================
+File: Core/Interfaces/IFractalCell.cs
+================
+// Core/Interfaces/IFractalCell.cs
+
+using FractalCellCore.Core.Interfaces;
+using Microsoft.Extensions.Hosting;
+
+namespace FractalCellCore.Core.Interfaces;
+
+public interface IFractalCell : IHostedService
+{
+    string CellId { get; }
+    IInternalBus InternalBus { get; }
+    IExternalBus ExternalBus { get; }
+    Task InitializeAsync();
+}
+
+================
+File: Core/Interfaces/IFractalEventHub.cs
+================
+// Core/Interfaces/FractalEventHub.cs
+
+using FractalCellCore.Core.Interfaces;
+using System.Threading.Channels;
+
+namespace FractalCellCore.Core.Interfaces;
+
+public interface IFractalEventHub
+{
+    Task RegisterChannelAsync(string cellId, Channel<IApplicationEvent> incomingChannel);
+    Task RegisterConsumerAsync(string cellId, Func<IApplicationEvent, Task> consumer);
+    Task UnregisterCellAsync(string cellId);
+    Task PublishAsync(string targetCellId, IApplicationEvent @event);
+    Task PublishToAllAsync(IApplicationEvent @event, Predicate<string>? filter = null);
+    IReadOnlyCollection<string> GetActiveCells();
+}
+
+================
+File: Core/Interfaces/IInternalBus.cs
+================
+// -------------------------------
+// Core/Interfaces/InternalBus.cs
+
+using FractalCellCore.Core.Interfaces;
+
+namespace FractalCellCore.Core.Interfaces;
+
+public interface IInternalBus
+{
+    string BusId { get; }
+    Task PublishAsync<TEvent>(TEvent @event) where TEvent : IApplicationEvent;
+    IDisposable Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : IApplicationEvent;
+    Task StartAsync(CancellationToken ct);
+    Task StopAsync();
+}
+
+================
+File: Core/Templates/BehaviorTemplate.cs
+================
+// Core/Templates/BehaviorTemplate.cs
+
+using FractalCellCore.Core.Interfaces;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellCore.Core.Templates;
+
+/// <summary>
+/// Абстрактный базовый класс для поведения
+/// </summary>
+public abstract class BehaviorTemplate : IBehavior
+{
+    protected readonly ILogger? _logger;
+    protected IFractalCell? _attachedCell;
+    protected CancellationTokenSource? _cts;
+    protected bool _isAttached;
+
+    public abstract string BehaviorId { get; }
+
+    // Приоритет по умолчанию — средний (можно переопределить)
+    public virtual int Priority => 100;
+
+    protected BehaviorTemplate(ILogger? logger = null)
+    {
+        _logger = logger;
+    }
+
+    public virtual async Task AttachToAsync(IFractalCell cell, CancellationToken ct = default)
+    {
+        if (_isAttached)
+            throw new InvalidOperationException($"Behavior {BehaviorId} is already attached");
+
+        _attachedCell = cell;
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _isAttached = true;
+
+        _logger?.LogInformation("Behavior {BehaviorId} attached to cell {CellId}",
+            BehaviorId, cell.CellId);
+
+        await OnAttachedAsync(ct);
+    }
+
+    public virtual async Task DetachAsync(CancellationToken ct = default)
+    {
+        if (!_isAttached)
+            return;
+
+        _isAttached = false;
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+
+        await OnDetachedAsync(ct);
+
+        _logger?.LogInformation("Behavior {BehaviorId} detached", BehaviorId);
+        _attachedCell = null;
+    }
+
+    public virtual async Task ConfigureAsync(object? configuration = null, CancellationToken ct = default)
+    {
+        if (!_isAttached)
+            throw new InvalidOperationException($"Behavior {BehaviorId} is not attached");
+
+        _logger?.LogInformation("Configuring behavior {BehaviorId}", BehaviorId);
+        await OnConfigureAsync(configuration, ct);
+    }
+
+    // === НОВЫЕ МЕТОДЫ ДЛЯ РОУТЕРА ===
+    public virtual async Task<bool> CanHandleAsync(IApplicationEvent @event)
+    {
+        // По умолчанию поведение может обработать любое событие.
+        // Переопределите в наследниках для фильтрации.
+        return await Task.FromResult(true);
+    }
+
+    public virtual async Task HandleAsync(IApplicationEvent @event)
+    {
+        // По умолчанию ничего не делаем.
+        // Наследники должны переопределить этот метод.
+        _logger?.LogWarning("Behavior {BehaviorId} received event {EventId} but doesn't handle it",
+            BehaviorId, @event.EventId);
+        await Task.CompletedTask;
+    }
+
+    protected virtual Task OnAttachedAsync(CancellationToken ct) => Task.CompletedTask;
+    protected virtual Task OnDetachedAsync(CancellationToken ct) => Task.CompletedTask;
+    protected virtual Task OnConfigureAsync(object? configuration, CancellationToken ct) => Task.CompletedTask;
+
+    public virtual void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        GC.SuppressFinalize(this);
+    }
+}
+
+/// <summary>
+/// Базовое поведение с поддержкой событий определённого типа
+/// </summary>
+public abstract class EventBehaviorTemplate<TEvent> : BehaviorTemplate
+    where TEvent : IApplicationEvent
+{
+    protected EventBehaviorTemplate(ILogger? logger = null) : base(logger)
+    {
+    }
+
+    // Переопределяем методы для работы с конкретным типом событий
+    public override async Task<bool> CanHandleAsync(IApplicationEvent @event)
+    {
+        return await Task.FromResult(@event is TEvent);
+    }
+
+    public override async Task HandleAsync(IApplicationEvent @event)
+    {
+        if (@event is TEvent typedEvent)
+        {
+            _logger?.LogDebug("Handling event {EventId} in behavior {BehaviorId}",
+                @event.EventId, BehaviorId);
+            await HandleEventAsync(typedEvent);
+        }
+    }
+
+    protected abstract Task HandleEventAsync(TEvent @event);
+}
+
+/// <summary>
+/// Поведение с поддержкой фоновой работы
+/// </summary>
+public abstract class BackgroundBehaviorTemplate : BehaviorTemplate
+{
+    private Task? _backgroundTask;
+
+    protected BackgroundBehaviorTemplate(ILogger? logger = null) : base(logger)
+    {
+    }
+
+    protected override async Task OnAttachedAsync(CancellationToken ct)
+    {
+        _backgroundTask = Task.Run(async () => await BackgroundLoopAsync(ct), ct);
+        await base.OnAttachedAsync(ct);
+    }
+
+    protected override async Task OnDetachedAsync(CancellationToken ct)
+    {
+        if (_backgroundTask != null && !_backgroundTask.IsCompleted)
+        {
+            try
+            {
+                await _backgroundTask.WaitAsync(ct);
+            }
+            catch (OperationCanceledException)
+            {
+                // Нормальное завершение
+            }
+        }
+        await base.OnDetachedAsync(ct);
+    }
+
+    protected abstract Task BackgroundLoopAsync(CancellationToken ct);
+}
+
+================
+File: Core/Templates/ExternalBusTemplate.cs
+================
+// Core/Templates/ExternalBusTemplate.cs
+
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces;
+
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellCore.Core.Templates;
+
+public abstract class ExternalBusTemplate : IExternalBus
+{
+    protected readonly BusSettings Config;
+    protected readonly ILogger? _logger;
+    public string BusId { get; }
+
+    protected ExternalBusTemplate(string busId, BusSettings config, ILogger? logger = null)
+    {
+        BusId = busId;
+        Config = config;
+        _logger = logger;
+    }
+
+    public abstract Task ConnectToHubAsync(IFractalEventHub hub, string cellId);
+    public abstract Task SendToCellAsync(string targetCellId, IApplicationEvent @event);
+    public abstract Task BroadcastAsync(IApplicationEvent @event, Predicate<string>? filter = null);
+    public abstract IAsyncEnumerable<IApplicationEvent> ReadAllAsync(CancellationToken ct);
+
+    public virtual void Dispose()
+    {
+        GC.SuppressFinalize(this);
+    }
+}
+
+================
+File: Core/Templates/FractalCellTemplate.cs
+================
+// Core/Templates/FractalCellTemplate.cs
+
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellCore.Core.Templates;
+
+public abstract class FractalCellTemplate<TInternalBus, TExternalBus>
+    : BackgroundService, IFractalCell
+    where TInternalBus : IInternalBus
+    where TExternalBus : IExternalBus
+{
+    protected readonly TInternalBus InternalBusField;
+    protected readonly TExternalBus ExternalBusField;
+    protected readonly FractalCellConfiguration Configuration;
+    protected readonly ILogger Logger;
+    protected readonly List<BackgroundService> _backgroundServices = new();
+
+    // Список поведений
+    protected readonly List<IBehavior> _behaviors = new();
+    private readonly object _behaviorsLock = new();
+
+    public string CellId => Configuration.CellId;
+    public IInternalBus InternalBus => InternalBusField;
+    public IExternalBus ExternalBus => ExternalBusField;
+
+    protected FractalCellTemplate(
+        FractalCellConfiguration configuration,
+        TInternalBus internalBus,
+        TExternalBus externalBus,
+        ILogger logger)
+    {
+        Configuration = configuration;
+        InternalBusField = internalBus;
+        ExternalBusField = externalBus;
+        Logger = logger;
+    }
+
+    protected abstract IEnumerable<BackgroundService> CreateBackgroundServices();
+    protected abstract void ConfigureHandlers();
+
+    public async Task InitializeAsync()
+    {
+        ConfigureHandlers();
+        await Task.CompletedTask;
+    }
+
+    // === Управление поведениями ===
+    public void AddBehavior(IBehavior behavior)
+    {
+        lock (_behaviorsLock)
+        {
+            _behaviors.Add(behavior);
+            Logger.LogInformation("Behavior {BehaviorId} added to cell {CellId}",
+                behavior.BehaviorId, CellId);
+        }
+    }
+
+    public IReadOnlyList<IBehavior> GetBehaviors()
+    {
+        lock (_behaviorsLock)
+        {
+            return _behaviors.ToList().AsReadOnly();
+        }
+    }
+
+    // === Роутер событий ===
+    private async Task RouteEventToBehaviorsAsync(IApplicationEvent @event)
+    {
+        IBehavior[] behaviorsCopy;
+        lock (_behaviorsLock)
+        {
+            behaviorsCopy = _behaviors
+                .OrderBy(b => b.Priority)
+                .ToArray();
+        }
+
+        if (behaviorsCopy.Length == 0)
+        {
+            Logger.LogDebug("No behaviors registered for cell {CellId}", CellId);
+            return;
+        }
+
+        var handlingTasks = new List<Task>();
+
+        foreach (var behavior in behaviorsCopy)
+        {
+            try
+            {
+                if (await behavior.CanHandleAsync(@event))
+                {
+                    Logger.LogDebug("Behavior {BehaviorId} can handle event {EventId}",
+                        behavior.BehaviorId, @event.EventId);
+                    handlingTasks.Add(behavior.HandleAsync(@event));
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error checking behavior {BehaviorId} for event {EventId}",
+                    behavior.BehaviorId, @event.EventId);
+            }
+        }
+
+        if (handlingTasks.Count > 0)
+        {
+            await Task.WhenAll(handlingTasks);
+            Logger.LogDebug("Event {EventId} processed by {Count} behaviors",
+                @event.EventId, handlingTasks.Count);
+        }
+        else
+        {
+            Logger.LogDebug("No behavior could handle event {EventId}", @event.EventId);
+        }
+    }
+
+    // === НОВОЕ: Уведомления о жизненном цикле ===
+    private async Task NotifyLifecycleAsync(
+        Func<ILifecycleBehavior, CancellationToken, Task> action,
+        string phase,
+        CancellationToken ct)
+    {
+        IBehavior[] behaviorsCopy;
+        lock (_behaviorsLock)
+        {
+            behaviorsCopy = _behaviors.ToArray();
+        }
+
+        if (behaviorsCopy.Length == 0)
+            return;
+
+        var tasks = new List<Task>();
+
+        foreach (var behavior in behaviorsCopy)
+        {
+            if (behavior is ILifecycleBehavior lifecycleBehavior)
+            {
+                tasks.Add(action(lifecycleBehavior, ct));
+            }
+        }
+
+        if (tasks.Count > 0)
+        {
+            await Task.WhenAll(tasks);
+            Logger.LogDebug("Lifecycle {Phase} completed for {Count} behaviors in cell {CellId}",
+                phase, tasks.Count, CellId);
+        }
+    }
+
+    // === Переопределённые методы StartAsync и StopAsync ===
+    public override async Task StartAsync(CancellationToken cancellationToken)
+    {
+        Logger.LogInformation("FractalCell {CellId} starting", Configuration.CellId);
+
+        // 1. Уведомляем поведения о начале запуска
+        await NotifyLifecycleAsync(
+            (b, ct) => b.OnCellStartingAsync(ct),
+            nameof(ILifecycleBehavior.OnCellStartingAsync),
+            cancellationToken);
+
+        // 2. Запускаем фоновые сервисы
+        foreach (var bs in CreateBackgroundServices())
+        {
+            _backgroundServices.Add(bs);
+            await bs.StartAsync(cancellationToken);
+        }
+
+        await InternalBusField.StartAsync(cancellationToken);
+
+        // 3. Запускаем основной цикл обработки событий
+        _ = ExecuteAsync(cancellationToken);
+
+        // 4. Уведомляем поведения о завершении запуска
+        await NotifyLifecycleAsync(
+            (b, ct) => b.OnCellStartedAsync(ct),
+            nameof(ILifecycleBehavior.OnCellStartedAsync),
+            cancellationToken);
+
+        Logger.LogInformation("FractalCell {CellId} started successfully with {BehaviorCount} behaviors",
+            Configuration.CellId, _behaviors.Count);
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        Logger.LogInformation("FractalCell {CellId} stopping", Configuration.CellId);
+
+        // 1. Уведомляем поведения о начале остановки
+        await NotifyLifecycleAsync(
+            (b, ct) => b.OnCellStoppingAsync(ct),
+            nameof(ILifecycleBehavior.OnCellStoppingAsync),
+            cancellationToken);
+
+        // 2. Останавливаем внутреннюю шину и фоновые сервисы
+        await InternalBusField.StopAsync();
+
+        foreach (var bs in _backgroundServices)
+        {
+            await bs.StopAsync(cancellationToken);
+        }
+
+        // 3. Открепляем поведения
+        foreach (var behavior in _behaviors)
+        {
+            try
+            {
+                await behavior.DetachAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error detaching behavior {BehaviorId}", behavior.BehaviorId);
+            }
+        }
+        _behaviors.Clear();
+
+        // 4. Уведомляем поведения о завершении остановки
+        await NotifyLifecycleAsync(
+            (b, ct) => b.OnCellStoppedAsync(ct),
+            nameof(ILifecycleBehavior.OnCellStoppedAsync),
+            cancellationToken);
+
+        Logger.LogInformation("FractalCell {CellId} stopped", Configuration.CellId);
+    }
+
+    // === Основной цикл обработки событий ===
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        Logger.LogInformation("FractalCell {CellId} execute loop started", Configuration.CellId);
+
+        try
+        {
+            await foreach (var @event in ExternalBusField.ReadAllAsync(stoppingToken))
+            {
+                try
+                {
+                    // 1. Отправляем события в поведения через роутер
+                    await RouteEventToBehaviorsAsync(@event);
+                    // 2. Публикуем во внутреннюю шину (для обратной совместимости)
+                    await InternalBusField.PublishAsync(@event);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "Error processing event in cell {CellId}",
+                        Configuration.CellId);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogInformation("FractalCell {CellId} execute loop canceled", Configuration.CellId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FractalCell {CellId} execute loop error", Configuration.CellId);
+        }
+
+        Logger.LogInformation("FractalCell {CellId} execute loop finished", Configuration.CellId);
+    }
+}
+
+================
+File: Core/Templates/InternalBusTemplate.cs
+================
+// // Core/Templates/nternalBusTemplate.cs
+
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces;
+
+namespace FractalCellCore.Core.Templates;
+
+public abstract class InternalBusTemplate : IInternalBus
+{
+    protected readonly BusSettings Config;
+    public string BusId { get; }
+
+    protected InternalBusTemplate(string busId, BusSettings config)
+    {
+        BusId = busId;
+        Config = config;
+    }
+
+    public abstract Task PublishAsync<TEvent>(TEvent @event) where TEvent : IApplicationEvent;
+    public abstract IDisposable Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : IApplicationEvent;
+    public abstract Task StartAsync(CancellationToken ct);
+    public abstract Task StopAsync();
+}
+
+================
+File: FractalCellCore053.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
+	</ItemGroup>
+
+</Project>
+
+================
+File: Implementations/Channels/ChannelExternalBus.cs
+================
+// Implementations/Channels/ChannelExternalBus.cs
+
+using System.Threading.Channels;
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellCore.Implementations.Channels;
+
+public class ChannelExternalBus : ExternalBusTemplate
+{
+    private readonly Channel<IApplicationEvent> _incomingChannel;
+    private IFractalEventHub? _hub;
+    private string? _cellId;
+
+    public ChannelExternalBus(string busId, BusSettings config, ILogger? logger = null)
+        : base(busId, config, logger)
+    {
+        _incomingChannel = Channel.CreateBounded<IApplicationEvent>(
+            new BoundedChannelOptions(config.Capacity)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = false,
+                SingleWriter = false
+            });
+
+        _logger?.LogInformation("ChannelExternalBus {BusId} created with capacity {Capacity}",
+            busId, config.Capacity);
+    }
+
+    public override async Task ConnectToHubAsync(IFractalEventHub hub, string cellId)
+    {
+        _hub = hub;
+        _cellId = cellId;
+        await hub.RegisterChannelAsync(cellId, _incomingChannel);
+        _logger?.LogInformation("ChannelExternalBus {BusId} connected to hub for cell {CellId}",
+            BusId, cellId);
+    }
+
+    public override async Task SendToCellAsync(string targetCellId, IApplicationEvent @event)
+    {
+        if (_hub == null)
+            throw new InvalidOperationException("Hub not connected");
+
+        _logger?.LogInformation("ChannelExternalBus {BusId} sending event {EventId} to {TargetCell}",
+            BusId, @event.EventId, targetCellId);
+
+        await _hub.PublishAsync(targetCellId, @event);
+    }
+
+    public override async Task BroadcastAsync(IApplicationEvent @event, Predicate<string>? filter = null)
+    {
+        if (_hub == null)
+            throw new InvalidOperationException("Hub not connected");
+
+        _logger?.LogInformation("ChannelExternalBus {BusId} broadcasting event {EventId}",
+            BusId, @event.EventId);
+
+        await _hub.PublishToAllAsync(@event, filter);
+    }
+
+    public override async IAsyncEnumerable<IApplicationEvent> ReadAllAsync(CancellationToken ct)
+    {
+        _logger?.LogDebug("ChannelExternalBus {BusId} starting to read events", BusId);
+
+        var reader = _incomingChannel.Reader;
+        var buffer = Channel.CreateUnbounded<IApplicationEvent>();
+        var writer = buffer.Writer;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var @event in reader.ReadAllAsync(ct))
+                {
+                    await writer.WriteAsync(@event, ct);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _logger?.LogInformation("ChannelExternalBus {BusId} read loop canceled", BusId);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ChannelExternalBus {BusId} read loop error", BusId);
+            }
+            finally
+            {
+                writer.Complete();
+            }
+        }, ct);
+
+        await foreach (var @event in buffer.Reader.ReadAllAsync(ct))
+        {
+            yield return @event;
+        }
+
+        _logger?.LogDebug("ChannelExternalBus {BusId} finished reading events", BusId);
+    }
+
+    public override void Dispose()
+    {
+        _logger?.LogInformation("ChannelExternalBus {BusId} disposing", BusId);
+        _incomingChannel.Writer.Complete();
+        base.Dispose();
+    }
+}
+
+================
+File: Implementations/Channels/ChannelFractalCell.cs
+================
+// Implementations/Channels/ChannelFractalCell.cs
+// Implementations/Channels/ChannelFractalCell.cs
+
+using FractalCellCore.Core.Templates;
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces; // <-- добавить
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellCore.Implementations.Channels;
+
+public class ChannelBackgroundService : BackgroundService
+{
+    private readonly string _serviceId;
+    private readonly ChannelInternalBus _internalBus;
+    private readonly ILogger _logger;
+    private readonly FractalCellConfiguration _config;
+    private IDisposable? _subscription;
+
+    public ChannelBackgroundService(
+        string serviceId,
+        ChannelInternalBus internalBus,
+        ILogger logger,
+        FractalCellConfiguration config)
+    {
+        _serviceId = serviceId;
+        _internalBus = internalBus;
+        _logger = logger;
+        _config = config;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("ChannelBackgroundService {ServiceId} started", _serviceId);
+
+        _subscription = _internalBus.Subscribe<FractalEvent>(async @event =>
+        {
+            _logger.LogInformation(
+                "Service {ServiceId} processing event {EventId} of type {EventType}",
+                _serviceId, @event.EventId, @event.EventType);
+
+            await ProcessEventAsync(@event);
+        });
+
+        try
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await Task.Delay(1000, stoppingToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("ChannelBackgroundService {ServiceId} stopping", _serviceId);
+        }
+    }
+
+    private Task ProcessEventAsync(FractalEvent @event)
+    {
+        switch (@event.EventType)
+        {
+            case "ProcessData":
+                _logger.LogInformation(
+                    "Channel worker {ServiceId} processing data: {Payload}",
+                    _serviceId, @event.Payload);
+                break;
+
+            case "Heartbeat":
+                _logger.LogDebug(
+                    "Channel worker {ServiceId} heartbeat from {Source}",
+                    _serviceId, @event.SourceCellId);
+                break;
+
+            default:
+                _logger.LogWarning("Unknown event type: {EventType}", @event.EventType);
+                break;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public override void Dispose()
+    {
+        _subscription?.Dispose();
+        base.Dispose();
+    }
+}
+
+public class ChannelFractalCell : FractalCellTemplate<ChannelInternalBus, ChannelExternalBus>
+{
+    private readonly List<ChannelBackgroundService> _services = new();
+
+    // Существующий конструктор
+    public ChannelFractalCell(
+        FractalCellConfiguration configuration,
+        ChannelInternalBus internalBus,
+        ChannelExternalBus externalBus,
+        ILogger<ChannelFractalCell> logger)
+        : base(configuration, internalBus, externalBus, logger)
+    {
+    }
+
+    // === НОВЫЙ КОНСТРУКТОР С ПОВЕДЕНИЯМИ ===
+    public ChannelFractalCell(
+        FractalCellConfiguration configuration,
+        ChannelInternalBus internalBus,
+        ChannelExternalBus externalBus,
+        ILogger<ChannelFractalCell> logger,
+        IEnumerable<IBehavior> behaviors)
+        : base(configuration, internalBus, externalBus, logger)
+    {
+        foreach (var behavior in behaviors)
+        {
+            AddBehavior(behavior);
+        }
+    }
+
+    protected override IEnumerable<BackgroundService> CreateBackgroundServices()
+    {
+        for (int i = 0; i < Configuration.BackgroundServiceCount; i++)
+        {
+            var service = new ChannelBackgroundService(
+                $"{Configuration.CellId}-worker-{i}",
+                InternalBusField,
+                Logger,
+                Configuration);
+
+            _services.Add(service);
+            yield return service;
+        }
+    }
+
+    protected override void ConfigureHandlers()
+    {
+        // Стандартный обработчик (без изменений)
+        InternalBusField.Subscribe<FractalEvent>(async fractalEvent =>
+        {
+            Logger.LogInformation("Channel cell {CellId} received event: {EventType} from {Source}",
+                Configuration.CellId, fractalEvent.EventType, fractalEvent.SourceCellId);
+
+            if (!string.IsNullOrEmpty(fractalEvent.TargetCellId) &&
+                fractalEvent.TargetCellId != Configuration.CellId)
+            {
+                Logger.LogInformation("Forwarding event {EventId} to {TargetCell}",
+                    fractalEvent.EventId, fractalEvent.TargetCellId);
+
+                await ExternalBusField.SendToCellAsync(
+                    fractalEvent.TargetCellId, fractalEvent);
+            }
+        });
+    }
+}
+
+================
+File: Implementations/Channels/ChannelInternalBus.cs
+================
+// Implementations/Channels/ChannelInternalBus.cs
+
+using System.Collections.Concurrent;
+using System.Threading.Channels;
+
+using FractalCellCore.Core.Common;
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+
+namespace FractalCellCore.Implementations.Channels;
+
+public class ChannelInternalBus : InternalBusTemplate
+{
+    private readonly Channel<IApplicationEvent> _channel;
+    private readonly ConcurrentDictionary<Type, List<Func<IApplicationEvent, Task>>> _handlers = new();
+
+    public ChannelInternalBus(string busId, BusSettings config)
+        : base(busId, config)
+    {
+        _channel = Channel.CreateBounded<IApplicationEvent>(
+            new BoundedChannelOptions(config.Capacity)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = false,
+                SingleWriter = false
+            });
+    }
+
+    public override async Task PublishAsync<TEvent>(TEvent @event)
+    {
+        try
+        {
+            await _channel.Writer.WriteAsync(@event);
+        }
+        catch (ChannelClosedException)
+        {
+            // Канал закрыт, игнорируем
+        }
+    }
+
+    public override IDisposable Subscribe<TEvent>(Func<TEvent, Task> handler)
+    {
+        var eventType = typeof(TEvent);
+
+        var handlers = _handlers.GetOrAdd(eventType, _ => new List<Func<IApplicationEvent, Task>>());
+
+        var wrappedHandler = new Func<IApplicationEvent, Task>(e => handler((TEvent)e));
+
+        lock (handlers)
+        {
+            handlers.Add(wrappedHandler);
+        }
+
+        return new Unsubscriber(() =>
+        {
+            lock (handlers)
+            {
+                handlers.Remove(wrappedHandler);
+                if (handlers.Count == 0)
+                {
+                    _handlers.TryRemove(eventType, out _);
+                }
+            }
+        });
+    }
+
+    public override async Task StartAsync(CancellationToken ct)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var @event in _channel.Reader.ReadAllAsync(ct))
+                {
+                    var eventType = @event.GetType();
+
+                    if (_handlers.TryGetValue(eventType, out var handlers))
+                    {
+                        var handlersCopy = handlers.ToList();
+
+                        if (handlersCopy.Count == 1)
+                        {
+                            await handlersCopy[0](@event);
+                        }
+                        else if (handlersCopy.Count > 1)
+                        {
+                            await Task.WhenAll(handlersCopy.Select(h => h(@event)));
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Нормальное завершение
+            }
+            catch (Exception )
+            {
+                // Логируем ошибку
+            }
+        }, ct);
+
+        await Task.CompletedTask;
+    }
+
+    public override Task StopAsync()
+    {
+        _channel.Writer.Complete();
+        return Task.CompletedTask;
+    }
+}
+
+================
+File: Implementations/FractalEventHub.cs
+================
+// Implementations/FractalEventHub.cs
+
+using System.Collections.Concurrent;
+using System.Threading.Channels;
+
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces;
+
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellCore.Implementations;
+
+public class InMemoryFractalEventHub : IFractalEventHub
+{
+    private readonly ConcurrentDictionary<string, CellConnection> _connections = new();
+    private readonly ILogger<InMemoryFractalEventHub> _logger;
+    private readonly HubSettings _settings;
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
+
+    private record CellConnection(
+        Channel<IApplicationEvent>? Channel,
+        Func<IApplicationEvent, Task>? Consumer);
+
+    public InMemoryFractalEventHub(
+        ILogger<InMemoryFractalEventHub> logger,
+        HubSettings? settings = null)
+    {
+        _logger = logger;
+        _settings = settings ?? new HubSettings();
+        _logger.LogInformation("InMemoryFractalEventHub created");
+    }
+
+    public Task RegisterChannelAsync(string cellId, Channel<IApplicationEvent> incomingChannel)
+    {
+        _logger.LogInformation("Registering channel for cell {CellId}", cellId);
+        return RegisterInternalAsync(cellId, new CellConnection(incomingChannel, null));
+    }
+
+    public Task RegisterConsumerAsync(string cellId, Func<IApplicationEvent, Task> consumer)
+    {
+        _logger.LogInformation("Registering consumer for cell {CellId}", cellId);
+        return RegisterInternalAsync(cellId, new CellConnection(null, consumer));
+    }
+
+    private async Task RegisterInternalAsync(string cellId, CellConnection connection)
+    {
+        await _semaphore.WaitAsync();
+        try
+        {
+            if (_connections.TryAdd(cellId, connection))
+            {
+                _logger.LogInformation("Cell {CellId} registered successfully. Total cells: {Count}",
+                    cellId, _connections.Count);
+            }
+            else
+            {
+                _logger.LogWarning("Cell {CellId} already registered, updating", cellId);
+                _connections[cellId] = connection;
+            }
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+
+    public Task UnregisterCellAsync(string cellId)
+    {
+        if (_connections.TryRemove(cellId, out _))
+        {
+            _logger.LogInformation("Cell {CellId} unregistered", cellId);
+        }
+        return Task.CompletedTask;
+    }
+
+    public async Task PublishAsync(string targetCellId, IApplicationEvent @event)
+    {
+        _logger.LogInformation("Publishing event {EventId} to target cell {TargetCell}. Active cells: {Count}",
+            @event.EventId, targetCellId, _connections.Count);
+
+        if (_connections.TryGetValue(targetCellId, out var connection))
+        {
+            try
+            {
+                if (connection.Channel != null)
+                {
+                    _logger.LogDebug("Writing event {EventId} to channel of {TargetCell}",
+                        @event.EventId, targetCellId);
+                    await connection.Channel.Writer.WriteAsync(@event);
+                    _logger.LogInformation("Event {EventId} successfully sent to {TargetCell}",
+                        @event.EventId, targetCellId);
+                }
+                else if (connection.Consumer != null)
+                {
+                    _logger.LogDebug("Invoking consumer for event {EventId} in {TargetCell}",
+                        @event.EventId, targetCellId);
+                    await connection.Consumer(@event);
+                    _logger.LogInformation("Event {EventId} successfully consumed by {TargetCell}",
+                        @event.EventId, targetCellId);
+                }
+                else
+                {
+                    _logger.LogWarning("Cell {TargetCell} has no active connection", targetCellId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send event {EventId} to {TargetCell}",
+                    @event.EventId, targetCellId);
+                throw;
+            }
+        }
+        else
+        {
+            _logger.LogWarning("Target cell {TargetCell} not found. Available cells: {Cells}",
+                targetCellId, string.Join(", ", _connections.Keys));
+            throw new KeyNotFoundException($"Cell {targetCellId} not found");
+        }
+    }
+
+    public async Task PublishToAllAsync(IApplicationEvent @event, Predicate<string>? filter = null)
+    {
+        _logger.LogInformation("Broadcasting event {EventId} to all cells", @event.EventId);
+
+        var tasks = _connections
+            .Where(kvp => filter == null || filter(kvp.Key))
+            .Select(async kvp =>
+            {
+                try
+                {
+                    if (kvp.Value.Channel != null)
+                    {
+                        await kvp.Value.Channel.Writer.WriteAsync(@event);
+                        _logger.LogDebug("Event {EventId} broadcasted to {Cell}",
+                            @event.EventId, kvp.Key);
+                    }
+                    else if (kvp.Value.Consumer != null)
+                    {
+                        await kvp.Value.Consumer(@event);
+                        _logger.LogDebug("Event {EventId} consumed by {Cell}",
+                            @event.EventId, kvp.Key);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to broadcast to {Cell}", kvp.Key);
+                }
+            });
+
+        await Task.WhenAll(tasks);
+        _logger.LogInformation("Event {EventId} broadcasted to {Count} cells",
+            @event.EventId, tasks.Count());
+    }
+
+    public IReadOnlyCollection<string> GetActiveCells()
+    {
+        var cells = _connections.Keys.ToList().AsReadOnly();
+        _logger.LogDebug("Getting active cells: {Count} cells", cells.Count);
+        return cells;
+    }
+}
+
+================
+File: Implementations/TplDataflow/TplExternalBus.cs
+================
+// Implementations/TplDataflow/TplExternalBus.cs
+
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces;
+using Microsoft.Extensions.Logging;
+using System.Runtime.CompilerServices;
+using System.Threading.Channels;
+using System.Threading.Tasks.Dataflow;
+using FractalCellCore.Core.Templates;
+
+namespace FractalCellCore.Implementations.TplDataflow;
+
+public class TplExternalBus : ExternalBusTemplate
+{
+    private readonly BufferBlock<IApplicationEvent> _bufferBlock;
+    private readonly Channel<IApplicationEvent> _incomingChannel;
+    private IFractalEventHub? _hub;
+    private string? _cellId;
+    private CancellationTokenSource? _cts;
+
+    public TplExternalBus(string busId, BusSettings config, ILogger? logger = null)
+        : base(busId, config, logger)
+    {
+        _bufferBlock = new BufferBlock<IApplicationEvent>(
+            new DataflowBlockOptions
+            {
+                BoundedCapacity = config.Capacity,
+                EnsureOrdered = true
+            });
+
+        _incomingChannel = Channel.CreateBounded<IApplicationEvent>(
+            new BoundedChannelOptions(config.Capacity)
+            {
+                FullMode = BoundedChannelFullMode.Wait
+            });
+    }
+
+    public override async Task ConnectToHubAsync(IFractalEventHub hub, string cellId)
+    {
+        _hub = hub;
+        _cellId = cellId;
+        _cts = new CancellationTokenSource();
+
+        await hub.RegisterConsumerAsync(cellId, async @event =>
+        {
+            await _bufferBlock.SendAsync(@event, _cts.Token);
+        });
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var @event in _incomingChannel.Reader.ReadAllAsync(_cts.Token))
+                {
+                    await _bufferBlock.SendAsync(@event, _cts.Token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Нормальное завершение
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error in TplExternalBus forwarding task");
+            }
+        }, _cts.Token);
+    }
+
+    public override async Task SendToCellAsync(string targetCellId, IApplicationEvent @event)
+    {
+        if (_hub == null)
+            throw new InvalidOperationException("Hub not connected");
+
+        await _hub.PublishAsync(targetCellId, @event);
+    }
+
+    public override async Task BroadcastAsync(IApplicationEvent @event, Predicate<string>? filter = null)
+    {
+        if (_hub == null)
+            throw new InvalidOperationException("Hub not connected");
+
+        await _hub.PublishToAllAsync(@event, filter);
+    }
+
+    public override async IAsyncEnumerable<IApplicationEvent> ReadAllAsync(
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        _logger?.LogDebug("TplExternalBus {BusId} starting to read events", BusId);
+
+        var buffer = Channel.CreateUnbounded<IApplicationEvent>();
+        var writer = buffer.Writer;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    var @event = await _bufferBlock.ReceiveAsync(ct);
+                    await writer.WriteAsync(@event, ct);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _logger?.LogInformation("TplExternalBus {BusId} read loop canceled", BusId);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "TplExternalBus {BusId} read loop error", BusId);
+            }
+            finally
+            {
+                writer.Complete();
+            }
+        }, ct);
+
+        await foreach (var @event in buffer.Reader.ReadAllAsync(ct))
+        {
+            yield return @event;
+        }
+    }
+
+    public override void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        base.Dispose();
+    }
+}
+
+================
+File: Implementations/TplDataflow/TplFractalCell.cs
+================
+// Implementations/TplDataflow/TplFractalCell.cs
+
+using FractalCellCore;
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+// using FractalCellCore.Implementations.TplDataflow;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using System.Threading.Tasks.Dataflow;
+
+namespace FractalCellCore.Implementations.TplDataflow;
+
+public class TplBackgroundService : BackgroundService
+{
+    private readonly ActionBlock<IApplicationEvent> _workerBlock;
+    private readonly string _serviceId;
+    private readonly ILogger _logger;
+
+    public TplBackgroundService(
+        ActionBlock<IApplicationEvent> workerBlock,
+        string serviceId,
+        ILogger logger)
+    {
+        _workerBlock = workerBlock;
+        _serviceId = serviceId;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("TplBackgroundService {ServiceId} started", _serviceId);
+
+        try
+        {
+            await _workerBlock.Completion.WaitAsync(stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Нормальное завершение
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in TplBackgroundService {ServiceId}", _serviceId);
+        }
+    }
+
+    public override void Dispose()
+    {
+        _workerBlock.Complete();
+        base.Dispose();
+    }
+}
+
+public class TplFractalCell : FractalCellTemplate<TplInternalBus, TplExternalBus>
+{
+    private readonly BufferBlock<IApplicationEvent> _inputBuffer;
+    private readonly TransformBlock<IApplicationEvent, IApplicationEvent> _mainProcessingBlock;
+    private readonly BroadcastBlock<IApplicationEvent> _broadcastBlock;
+    private readonly List<ActionBlock<IApplicationEvent>> _workerBlocks = new();
+    private readonly List<IDisposable> _links = new();
+
+    public TplFractalCell(
+        FractalCellConfiguration configuration,
+        TplInternalBus internalBus,
+        TplExternalBus externalBus,
+        ILogger<TplFractalCell> logger)
+        : base(configuration, internalBus, externalBus, logger)
+    {
+        var options = new ExecutionDataflowBlockOptions
+        {
+            BoundedCapacity = configuration.BusSettings.Capacity,
+            MaxDegreeOfParallelism = configuration.BusSettings.MaxParallelism,
+            NameFormat = $"{configuration.CellId}-block-{{0}}"
+        };
+
+        _inputBuffer = new BufferBlock<IApplicationEvent>(options);
+
+        _mainProcessingBlock = new TransformBlock<IApplicationEvent, IApplicationEvent>(
+            async @event => await ProcessInMainBlockAsync(@event),
+            options);
+
+        _broadcastBlock = new BroadcastBlock<IApplicationEvent>(
+            e => e,
+            new DataflowBlockOptions
+            {
+                BoundedCapacity = configuration.BusSettings.Capacity
+            });
+
+        _links.Add(_inputBuffer.LinkTo(_mainProcessingBlock,
+            new DataflowLinkOptions { PropagateCompletion = true }));
+
+        _links.Add(_mainProcessingBlock.LinkTo(_broadcastBlock,
+            new DataflowLinkOptions { PropagateCompletion = true }));
+    }
+
+    // === НОВЫЙ КОНСТРУКТОР С ПОВЕДЕНИЯМИ ===
+    public TplFractalCell(
+        FractalCellConfiguration configuration,
+        TplInternalBus internalBus,
+        TplExternalBus externalBus,
+        ILogger<TplFractalCell> logger,
+        IEnumerable<IBehavior> behaviors)
+        : this(configuration, internalBus, externalBus, logger)
+    {
+        foreach (var behavior in behaviors)
+        {
+            AddBehavior(behavior);
+        }
+    }
+
+    private async Task<IApplicationEvent> ProcessInMainBlockAsync(IApplicationEvent @event)
+    {
+        Logger.LogInformation("Main block processing event {EventId}", @event.EventId);
+
+        try
+        {
+            await InternalBusField.PublishAsync(@event);
+
+            if (@event is FractalEvent fractalEvent &&
+                !string.IsNullOrEmpty(fractalEvent.TargetCellId))
+            {
+                await ExternalBusField.SendToCellAsync(
+                    fractalEvent.TargetCellId, fractalEvent);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in main block processing event {EventId}",
+                @event.EventId);
+        }
+
+        return @event;
+    }
+
+    protected override IEnumerable<BackgroundService> CreateBackgroundServices()
+    {
+        for (int i = 0; i < Configuration.BackgroundServiceCount; i++)
+        {
+            var workerBlock = new ActionBlock<IApplicationEvent>(
+                async @event => await ProcessInWorkerAsync(@event, i),
+                new ExecutionDataflowBlockOptions
+                {
+                    BoundedCapacity = Configuration.BusSettings.Capacity,
+                    MaxDegreeOfParallelism = 1,
+                    NameFormat = $"{Configuration.CellId}-worker-{i}"
+                });
+
+            _links.Add(_broadcastBlock.LinkTo(workerBlock,
+                new DataflowLinkOptions { PropagateCompletion = true }));
+
+            _workerBlocks.Add(workerBlock);
+
+            yield return new TplBackgroundService(workerBlock,
+                $"{Configuration.CellId}-worker-{i}", Logger);
+        }
+    }
+
+    protected override void ConfigureHandlers()
+    {
+        InternalBusField.Subscribe<FractalEvent>(async fractalEvent =>
+        {
+            await _inputBuffer.SendAsync(fractalEvent);
+        });
+    }
+
+    private async Task ProcessInWorkerAsync(IApplicationEvent @event, int workerId)
+    {
+        Logger.LogInformation("Worker {WorkerId} processing event {EventId}",
+            workerId, @event.EventId);
+
+        if (@event is FractalEvent fractalEvent)
+        {
+            try
+            {
+                switch (fractalEvent.EventType)
+                {
+                    case "ProcessData":
+                        await HandleProcessData(fractalEvent, workerId);
+                        break;
+                    case "Heartbeat":
+                        await HandleHeartbeat(fractalEvent, workerId);
+                        break;
+                    default:
+                        Logger.LogWarning("Unknown event type: {EventType}",
+                            fractalEvent.EventType);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Worker {WorkerId} error processing event {EventId}",
+                    workerId, @event.EventId);
+            }
+        }
+    }
+
+    private Task HandleProcessData(FractalEvent @event, int workerId)
+    {
+        Logger.LogInformation(
+            "Worker {WorkerId} processing data from {Source}: {Payload}",
+            workerId, @event.SourceCellId, @event.Payload);
+
+        return Task.Delay(100);
+    }
+
+    private Task HandleHeartbeat(FractalEvent @event, int workerId)
+    {
+        Logger.LogDebug(
+            "Worker {WorkerId} heartbeat from {Source}",
+            workerId, @event.SourceCellId);
+
+        return Task.CompletedTask;
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        Logger.LogInformation("Stopping TPL blocks...");
+
+        _inputBuffer.Complete();
+
+        try
+        {
+            await Task.WhenAll(
+                _inputBuffer.Completion,
+                _mainProcessingBlock.Completion,
+                _broadcastBlock.Completion,
+                Task.WhenAll(_workerBlocks.Select(b => b.Completion))
+            ).WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogWarning("Stop operation canceled");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error while stopping TPL blocks");
+        }
+
+        foreach (var link in _links)
+        {
+            link.Dispose();
+        }
+        _links.Clear();
+
+        await base.StopAsync(cancellationToken);
+    }
+}
+
+================
+File: Implementations/TplDataflow/TplInternalBus.cs
+================
+// Implementations/TplDataflow/TplInternalBus.cs
+
+using FractalCellCore.Core.Common;
+using FractalCellCore.Core.Configuration;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using System.Collections.Concurrent;
+using System.Threading.Tasks.Dataflow;
+
+namespace FractalCellCore.Implementations.TplDataflow;
+
+public class TplInternalBus : InternalBusTemplate
+{
+    private readonly ActionBlock<IApplicationEvent> _actionBlock;
+    private readonly ConcurrentDictionary<Type, List<Func<IApplicationEvent, Task>>> _handlers = new();
+
+    public TplInternalBus(string busId, BusSettings config)
+        : base(busId, config)
+    {
+        _actionBlock = new ActionBlock<IApplicationEvent>(
+            async @event => await ProcessEventAsync(@event),
+            new ExecutionDataflowBlockOptions
+            {
+                BoundedCapacity = config.Capacity,
+                MaxDegreeOfParallelism = config.MaxParallelism
+            });
+    }
+
+    private async Task ProcessEventAsync(IApplicationEvent @event)
+    {
+        if (_handlers.TryGetValue(@event.GetType(), out var handlers))
+        {
+            var handlersCopy = handlers.ToList();
+
+            if (handlersCopy.Count == 1)
+            {
+                await handlersCopy[0](@event);
+            }
+            else if (handlersCopy.Count > 1)
+            {
+                await Task.WhenAll(handlersCopy.Select(h => h(@event)));
+            }
+        }
+    }
+
+    public override async Task PublishAsync<TEvent>(TEvent @event)
+    {
+        await _actionBlock.SendAsync(@event);
+    }
+
+    public override IDisposable Subscribe<TEvent>(Func<TEvent, Task> handler)
+    {
+        var eventType = typeof(TEvent);
+        var handlers = _handlers.GetOrAdd(eventType, _ => new List<Func<IApplicationEvent, Task>>());
+
+        var wrappedHandler = new Func<IApplicationEvent, Task>(e => handler((TEvent)e));
+
+        lock (handlers)
+        {
+            handlers.Add(wrappedHandler);
+        }
+
+        return new Unsubscriber(() =>
+        {
+            lock (handlers)
+            {
+                handlers.Remove(wrappedHandler);
+                if (handlers.Count == 0)
+                {
+                    _handlers.TryRemove(eventType, out _);
+                }
+            }
+        });
+    }
+
+    public override Task StartAsync(CancellationToken ct)
+    {
+        return Task.CompletedTask;
+    }
+
+    public override Task StopAsync()
+    {
+        _actionBlock.Complete();
+        return _actionBlock.Completion;
+    }
+}
+
+================
+File: Model/FractalEvent.cs
+================
+// Model/FractalEvent.cs
+
+using FractalCellCore.Core.Interfaces;
+
+namespace FractalCellCore;
+
+public record FractalEvent(
+    string EventId,
+    DateTime Timestamp,
+    string SourceCellId,
+    string TargetCellId,
+    string EventType,
+    object Payload
+) : IApplicationEvent;
+
+================
+File: Model/FractalTimeEvent.cs
+================
+using FractalCellCore.Core.Interfaces;
+
+namespace FractalCellCore;
+
+/// <summary>
+/// Событие, несущее фрактальное время
+/// </summary>
+public record FractalTimeEvent : IApplicationEvent
+{
+    public string EventId { get; init; }
+    public DateTime Timestamp { get; init; }          // время создания события (UTC)
+    public string SourceCellId { get; init; }
+    public string TargetCellId { get; init; } = string.Empty; // broadcast
+    public string EventType => "FractalTime";
+
+    // Специфичные поля
+    public DateTimeOffset FractalTime { get; init; }   // само фрактальное время
+    public long Tick { get; init; }                    // порядковый номер тика
+    public bool IsSynchronized { get; init; }          // синхронизировано ли с внешним эталоном
+
+    public FractalTimeEvent(
+        string eventId,
+        DateTime timestamp,
+        string sourceCellId,
+        DateTimeOffset fractalTime,
+        long tick,
+        bool isSynchronized = true,
+        string targetCellId = "")
+    {
+        EventId = eventId;
+        Timestamp = timestamp;
+        SourceCellId = sourceCellId;
+        TargetCellId = targetCellId;
+        FractalTime = fractalTime;
+        Tick = tick;
+        IsSynchronized = isSynchronized;
+    }
+}
+
+
+
+
+
+================================================================
+End of Codebase
+================================================================

@@ -1,0 +1,201 @@
+﻿// 26.07.12 Done
+// Behaviors/DataProcessingBehavior.fixed.cs
+
+using System.Diagnostics;
+using System.Threading;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+
+namespace FractalCellApp.Behaviors;
+
+/// <summary>
+/// Поведение для обработки данных (исправленная версия)
+/// </summary>
+public class DataProcessingBehavior : EventBehaviorTemplate<FractalEvent>, ILifecycleBehavior
+{
+    private readonly Stopwatch _stopwatch = new();
+    private int _processedCount;
+    private readonly int _maxParallelProcessing;
+
+    // Новый семафор для ограничения параллельной обработки
+    private readonly SemaphoreSlim _semaphore;
+
+    public override string BehaviorId => "DataProcessingBehavior";
+
+    // Средний приоритет
+    public override int Priority => 20;
+
+    public DataProcessingBehavior(
+        ILogger<DataProcessingBehavior>? logger = null,
+        int maxParallelProcessing = 3)
+        : base(logger)
+    {
+        _maxParallelProcessing = maxParallelProcessing;
+        _semaphore = new SemaphoreSlim(_maxParallelProcessing, _maxParallelProcessing);
+    }
+
+    public DataProcessingBehavior() : this(null, 3) { }
+
+    public override Task<bool> CanHandleAsync(IApplicationEvent @event)
+    {
+        return Task.FromResult(@event is FractalEvent fe && fe.EventType == "ProcessData");
+    }
+
+    protected override async Task HandleEventAsync(FractalEvent @event)
+    {
+        await _semaphore.WaitAsync();
+
+        try
+        {
+            Interlocked.Increment(ref _processedCount);
+
+            _logger?.LogInformation(
+                "📊 [DataProcessing] Processing data: EventId={EventId}, Source={Source}, Payload={Payload}",
+                @event.EventId,
+                @event.SourceCellId,
+                @event.Payload);
+
+            // Имитация обработки данных
+            await Task.Delay(100);
+
+            _logger?.LogInformation(
+                "✅ [DataProcessing] Data processed successfully: {EventId}",
+                @event.EventId);
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+
+    // === Реализация ILifecycleBehavior ===
+
+    public async Task OnCellStartingAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("🚀 [DataProcessing] Cell starting, resetting counters");
+        Interlocked.Exchange(ref _processedCount, 0);
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStartedAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("✅ [DataProcessing] Cell started, ready to process data");
+        _stopwatch.Start();
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStoppingAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏹️ [DataProcessing] Cell stopping, final stats: {Count} items processed",
+            _processedCount);
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStoppedAsync(CancellationToken ct)
+    {
+        _stopwatch.Stop();
+        _logger?.LogInformation("🏁 [DataProcessing] Cell stopped. Total time: {Elapsed}, Items: {Count}",
+            _stopwatch.Elapsed, _processedCount);
+        await Task.CompletedTask;
+    }
+}
+
+
+
+/// 26.07.08
+//// //Behaviors/ DataProcessingBehavior.cs
+
+//using System.Diagnostics;
+//using FractalCellCore.Core.Interfaces;
+//using FractalCellCore.Core.Templates;
+//using Microsoft.Extensions.Logging;
+
+//namespace FractalCellApp.Behaviors;
+
+///// <summary>
+///// Поведение для обработки данных
+///// </summary>
+///// 
+
+//// Behaviors/DataProcessingBehavior.cs
+
+///// <summary>
+///// Поведение для обработки данных
+///// </summary>
+//public class DataProcessingBehavior : EventBehaviorTemplate<FractalEvent>, ILifecycleBehavior
+//{
+//    private readonly Stopwatch _stopwatch = new();
+//    private int _processedCount;
+//    private readonly int _maxParallelProcessing;
+
+//    public override string BehaviorId => "DataProcessingBehavior";
+
+//    // Средний приоритет (обрабатывается после Heartbeat, если оба подписаны)
+//    public override int Priority => 20;
+
+//    public DataProcessingBehavior(
+//        ILogger<DataProcessingBehavior>? logger = null,
+//        int maxParallelProcessing = 3)
+//        : base(logger)
+//    {
+//        _maxParallelProcessing = maxParallelProcessing;
+//    }
+
+//    // Конструктор без параметров (для Activator.CreateInstance)
+//    public DataProcessingBehavior() : this(null, 3)
+//    {
+//    }
+
+//    protected override async Task HandleEventAsync(FractalEvent @event)
+//    {
+//        if (@event.EventType != "ProcessData")
+//            return;
+
+//        Interlocked.Increment(ref _processedCount);
+
+//        _logger?.LogInformation(
+//            "📊 [DataProcessing] Processing data: EventId={EventId}, Source={Source}, Payload={Payload}",
+//            @event.EventId,
+//            @event.SourceCellId,
+//            @event.Payload);
+
+//        // Имитация обработки данных
+//        await Task.Delay(100);
+
+//        _logger?.LogInformation(
+//            "✅ [DataProcessing] Data processed successfully: {EventId}",
+//            @event.EventId);
+//    }
+
+//    // === Реализация ILifecycleBehavior ===
+//    public async Task OnCellStartingAsync(CancellationToken ct)
+//    {
+//        _logger?.LogInformation("🚀 [DataProcessing] Cell starting, resetting counters");
+//        Interlocked.Exchange(ref _processedCount, 0);
+//        await Task.CompletedTask;
+//    }
+
+//    public async Task OnCellStartedAsync(CancellationToken ct)
+//    {
+//        _logger?.LogInformation("✅ [DataProcessing] Cell started, ready to process data");
+//        _stopwatch.Start();
+//        await Task.CompletedTask;
+//    }
+
+//    public async Task OnCellStoppingAsync(CancellationToken ct)
+//    {
+//        _logger?.LogInformation("⏹️ [DataProcessing] Cell stopping, final stats: {Count} items processed",
+//            _processedCount);
+//        await Task.CompletedTask;
+//    }
+
+//    public async Task OnCellStoppedAsync(CancellationToken ct)
+//    {
+//        _stopwatch.Stop();
+//        _logger?.LogInformation("🏁 [DataProcessing] Cell stopped. Total time: {Elapsed}, Items: {Count}",
+//            _stopwatch.Elapsed, _processedCount);
+//        await Task.CompletedTask;
+//    }
+//}
+
