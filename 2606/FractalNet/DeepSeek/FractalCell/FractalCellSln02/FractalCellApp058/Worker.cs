@@ -3,7 +3,6 @@
 using FractalBehaviors;
 
 using FractalCellCore;
-using FractalCellApp.Behaviors;
 using FractalCellCore.Core.Configuration;
 using FractalCellCore.Core.Interfaces;
 using FractalCellCore.Implementations;
