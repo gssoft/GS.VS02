@@ -7,7 +7,9 @@
   </Folder>
   <Folder Name="/Branch02/">
     <Project Path="FractalCellApp055/FractalCellApp055.csproj" />
+    <Project Path="FractalCellApp058/FractalCellApp058.csproj" Id="9f4e4555-dcaa-455d-adcb-dd72939d78b4" />
     <Project Path="FractalCellCore055/FractalCellCore055.csproj" />
+    <Project Path="FractalCellCore058/FractalCellCore058.csproj" Id="ce983976-2734-4e4a-8cfe-2f847b465e63" />
   </Folder>
   <Project Path="WorkerService01/WorkerService01.csproj" />
 </Solution>
