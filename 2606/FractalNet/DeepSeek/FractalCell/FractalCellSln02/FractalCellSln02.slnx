@@ -9,8 +9,10 @@
     <Project Path="FractalBehaviorsLib/FractalBehaviorsLib.csproj" Id="2a6c32ce-5264-47d3-ada2-c94690683761" />
     <Project Path="FractalCellApp055/FractalCellApp055.csproj" />
     <Project Path="FractalCellApp058/FractalCellApp058.csproj" Id="9f4e4555-dcaa-455d-adcb-dd72939d78b4" />
+    <Project Path="FractalCellApp061/FractalCellApp061.csproj" Id="f91dd3e9-b6b7-4f86-a1dc-2c041c433dc9" />
     <Project Path="FractalCellCore055/FractalCellCore055.csproj" />
     <Project Path="FractalCellCore058/FractalCellCore058.csproj" Id="ce983976-2734-4e4a-8cfe-2f847b465e63" />
+    <Project Path="FractalCellCore061/FractalCellCore061.csproj" Id="95194239-65f0-41dd-ac01-6748fed395c2" />
   </Folder>
   <Project Path="WorkerService01/WorkerService01.csproj" />
 </Solution>
