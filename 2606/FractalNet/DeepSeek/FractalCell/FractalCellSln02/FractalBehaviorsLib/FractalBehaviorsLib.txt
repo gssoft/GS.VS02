@@ -1,0 +1,520 @@
+26.07.15 15:02
+================================================================
+Directory Structure
+================================================================
+DataProcessingBehavior.cs
+FractalBehaviorsLib.csproj
+HeartbeatBehavior.cs
+OrchestratorBehavior.cs
+TimeGenerationBehavior.cs
+TimeSynchronizationBehavior.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: DataProcessingBehavior.cs
+================
+// 26.07.12 Done
+// Behaviors/DataProcessingBehavior.fixed.cs
+
+using System.Diagnostics;
+using System.Threading;
+using FractalCellCore;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+
+namespace FractalBehaviors;
+
+/// <summary>
+/// Поведение для обработки данных (исправленная версия)
+/// </summary>
+public class DataProcessingBehavior : EventBehaviorTemplate<FractalEvent>, ILifecycleBehavior
+{
+    private readonly Stopwatch _stopwatch = new();
+    private int _processedCount;
+    private readonly int _maxParallelProcessing;
+
+    // Новый семафор для ограничения параллельной обработки
+    private readonly SemaphoreSlim _semaphore;
+
+    public override string BehaviorId => "DataProcessingBehavior";
+
+    // Средний приоритет
+    public override int Priority => 20;
+
+    public DataProcessingBehavior(
+        ILogger<DataProcessingBehavior>? logger = null,
+        int maxParallelProcessing = 3)
+        : base(logger)
+    {
+        _maxParallelProcessing = maxParallelProcessing;
+        _semaphore = new SemaphoreSlim(_maxParallelProcessing, _maxParallelProcessing);
+    }
+
+    public DataProcessingBehavior() : this(null, 3) { }
+
+    public override Task<bool> CanHandleAsync(IApplicationEvent @event)
+    {
+        return Task.FromResult(@event is FractalEvent fe && fe.EventType == "ProcessData");
+    }
+
+    protected override async Task HandleEventAsync(FractalEvent @event)
+    {
+        await _semaphore.WaitAsync();
+
+        try
+        {
+            Interlocked.Increment(ref _processedCount);
+
+            _logger?.LogInformation(
+                "📊 [DataProcessing] Processing data: EventId={EventId}, Source={Source}, Payload={Payload}",
+                @event.EventId,
+                @event.SourceCellId,
+                @event.Payload);
+
+            // Имитация обработки данных
+            await Task.Delay(100);
+
+            _logger?.LogInformation(
+                "✅ [DataProcessing] Data processed successfully: {EventId}",
+                @event.EventId);
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+
+    // === Реализация ILifecycleBehavior ===
+
+    public async Task OnCellStartingAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("🚀 [DataProcessing] Cell starting, resetting counters");
+        Interlocked.Exchange(ref _processedCount, 0);
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStartedAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("✅ [DataProcessing] Cell started, ready to process data");
+        _stopwatch.Start();
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStoppingAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏹️ [DataProcessing] Cell stopping, final stats: {Count} items processed",
+            _processedCount);
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStoppedAsync(CancellationToken ct)
+    {
+        _stopwatch.Stop();
+        _logger?.LogInformation("🏁 [DataProcessing] Cell stopped. Total time: {Elapsed}, Items: {Count}",
+            _stopwatch.Elapsed, _processedCount);
+        await Task.CompletedTask;
+    }
+}
+
+================
+File: FractalBehaviorsLib.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\FractalCellCore058\FractalCellCore058.csproj" />
+	</ItemGroup>
+
+</Project>
+
+================
+File: HeartbeatBehavior.cs
+================
+// 26.07.12
+// Behaviors/HeartbeatBehavior.fixed.cs
+
+using FractalCellCore;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+using System.Threading;
+
+namespace FractalBehaviors;
+
+/// <summary>
+/// Поведение для обработки heartbeat-событий (исправленная версия)
+/// </summary>
+public class HeartbeatBehavior : EventBehaviorTemplate<FractalEvent>
+{
+    private int _heartbeatCount;
+    private readonly TimeSpan _heartbeatInterval;
+
+    public override string BehaviorId => "HeartbeatBehavior";
+
+    // Высокий приоритет (обрабатывается раньше других)
+    public override int Priority => 10;
+
+    public HeartbeatBehavior(ILogger<HeartbeatBehavior>? logger = null, TimeSpan? interval = null)
+        : base(logger)
+    {
+        _heartbeatInterval = interval ?? TimeSpan.FromSeconds(5);
+    }
+
+    public HeartbeatBehavior() : this(null, null) { }
+
+    public override Task<bool> CanHandleAsync(IApplicationEvent @event)
+    {
+        // Строгая фильтрация по типу события
+        return Task.FromResult(@event is FractalEvent fe && fe.EventType == "Heartbeat");
+    }
+
+    protected override async Task HandleEventAsync(FractalEvent @event)
+    {
+        // Потокобезопасное увеличение счётчика
+        Interlocked.Increment(ref _heartbeatCount);
+
+        _logger?.LogInformation(
+            "❤️ [Heartbeat] Count: {Count}, Source: {Source}, Target: {Target}, Timestamp: {Timestamp}",
+            _heartbeatCount,
+            @event.SourceCellId,
+            @event.TargetCellId,
+            @event.Timestamp);
+
+        // Каждый третий heartbeat отправляем ответ
+        if (_heartbeatCount % 3 == 0 && _attachedCell != null)
+        {
+            _logger?.LogInformation("🔄 [Heartbeat] Sending response from {CellId}",
+                _attachedCell.CellId);
+
+            var responseEvent = new FractalEvent(
+                $"response-{DateTime.UtcNow.Ticks}",
+                DateTime.UtcNow,
+                _attachedCell.CellId,
+                @event.SourceCellId,
+                "HeartbeatResponse",
+                new
+                {
+                    ReceivedAt = DateTime.UtcNow,
+                    HeartbeatCount = _heartbeatCount
+                }
+            );
+
+            await _attachedCell.ExternalBus.SendToCellAsync(
+                @event.SourceCellId,
+                responseEvent
+            );
+        }
+
+        await Task.CompletedTask;
+    }
+}
+
+================
+File: OrchestratorBehavior.cs
+================
+using FractalCellCore;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+
+namespace FractalBehaviors;
+
+public class OrchestratorBehavior : BackgroundBehaviorTemplate
+{
+    private readonly Random _random = new();
+    private readonly TimeSpan _interval;
+    private int _counter;
+
+    public override string BehaviorId => "OrchestratorBehavior";
+    public override int Priority => 5; // высокий приоритет (опционально)
+
+    public OrchestratorBehavior(ILogger<OrchestratorBehavior>? logger = null, TimeSpan? interval = null)
+        : base(logger)
+    {
+        _interval = interval ?? TimeSpan.FromSeconds(3);
+    }
+
+    public OrchestratorBehavior() : this(null, null) { }
+
+    public override Task<bool> CanHandleAsync(IApplicationEvent @event)
+    {
+        // Оркестратор только отправляет, но не обрабатывает входящие события
+        return Task.FromResult(false);
+    }
+
+    protected override async Task BackgroundLoopAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("🎛️ OrchestratorBehavior started, interval: {Interval}", _interval);
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_interval, ct);
+
+                if (_attachedCell == null)
+                {
+                    _logger?.LogWarning("OrchestratorBehavior: no attached cell, skipping");
+                    continue;
+                }
+
+                // Выбираем случайный тип события
+                var eventTypes = new[] { "Heartbeat", "ProcessData" };
+                var eventType = eventTypes[_random.Next(eventTypes.Length)];
+
+                object eventData = eventType == "ProcessData"
+                    ? new { Value = _random.Next(100), Priority = _random.Next(1, 5) }
+                    : new { Interval = _random.Next(1, 10) };
+
+                var @event = new FractalEvent(
+                    $"{eventType.ToLower()}-{DateTime.UtcNow.Ticks}",
+                    DateTime.UtcNow,
+                    _attachedCell.CellId,
+                    string.Empty, // Broadcast – не указываем конкретную цель
+                    eventType,
+                    new
+                    {
+                        Timestamp = DateTime.UtcNow,
+                        Source = "OrchestratorBehavior",
+                        Data = eventData
+                    }
+                );
+
+                _logger?.LogInformation("📡 [Orchestrator] Broadcasting {EventType} from {CellId}",
+                    eventType, _attachedCell.CellId);
+
+                // Отправляем всем через внешнюю шину
+                await _attachedCell.ExternalBus.BroadcastAsync(@event);
+                _counter++;
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "OrchestratorBehavior error");
+            }
+        }
+
+        _logger?.LogInformation("🏁 OrchestratorBehavior stopped, total events sent: {Counter}", _counter);
+    }
+}
+
+================
+File: TimeGenerationBehavior.cs
+================
+using FractalCellCore;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+
+namespace FractalBehaviors;
+
+/// <summary>
+/// Поведение, генерирующее фрактальное время и рассылающее его всем ячейкам.
+/// </summary>
+public class TimeGenerationBehavior : BackgroundBehaviorTemplate, ILifecycleBehavior
+{
+    private readonly TimeSpan _interval;
+    private long _tick;
+    private DateTimeOffset _currentFractalTime;
+
+    public override string BehaviorId => "TimeGenerationBehavior";
+    public override int Priority => 5;
+
+    public TimeGenerationBehavior(
+        ILogger<TimeGenerationBehavior>? logger = null,
+        TimeSpan? interval = null)
+        : base(logger)
+    {
+        _interval = interval ?? TimeSpan.FromSeconds(1);
+    }
+
+    public TimeGenerationBehavior() : this(null, null) { }
+
+    protected override async Task BackgroundLoopAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGenerationBehavior started, interval: {Interval}", _interval);
+
+
+        // Это уже есть
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_interval, ct);
+
+                //if(_attachedCell != null)
+                //    _logger?.LogWarning("TimeGenerationBehavior: attached cell !!!");
+
+                if (_attachedCell == null)
+                {
+                    _logger?.LogWarning("TimeGenerationBehavior: no attached cell, skipping");
+                    continue;
+                }
+
+                Interlocked.Increment(ref _tick);
+                _currentFractalTime = DateTimeOffset.UtcNow; // прямое использование
+
+                var timeEvent = new FractalTimeEvent(
+                    eventId: $"ft-{Guid.NewGuid():N}",
+                    timestamp: DateTime.UtcNow,
+                    sourceCellId: _attachedCell.CellId,
+                    fractalTime: _currentFractalTime,
+                    tick: _tick,
+                    isSynchronized: true
+                );
+
+                _logger?.LogInformation("⏰ [TimeGen] Tick {Tick} at {Time}", _tick, _currentFractalTime);
+
+                await _attachedCell.ExternalBus.BroadcastAsync(timeEvent);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "TimeGenerationBehavior error");
+            }
+        }
+
+        _logger?.LogInformation("🏁 TimeGenerationBehavior stopped, total ticks: {Tick}", _tick);
+    }
+
+    public async Task OnCellStartingAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGeneration: cell starting, resetting tick counter");
+        Interlocked.Exchange(ref _tick, 0);
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStartedAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGeneration: cell started");
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStoppingAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGeneration: cell stopping, final tick: {Tick}", _tick);
+        await Task.CompletedTask;
+    }
+
+    public async Task OnCellStoppedAsync(CancellationToken ct)
+    {
+        _logger?.LogInformation("⏰ TimeGeneration: cell stopped");
+        await Task.CompletedTask;
+    }
+
+    // 26.07.10
+    public override Task<bool> CanHandleAsync(IApplicationEvent @event)
+    {
+        // Это поведение только генерирует события, но не обрабатывает входящие
+        return Task.FromResult(false);
+    }
+}
+
+================
+File: TimeSynchronizationBehavior.cs
+================
+// 26.07.12
+// 2 errors
+// Behaviors/TimeSynchronizationBehavior.fixed.cs
+
+using System.Threading;
+using FractalCellCore;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Core.Templates;
+using Microsoft.Extensions.Logging;
+
+namespace FractalBehaviors;
+
+public class TimeSynchronizationBehavior : EventBehaviorTemplate<FractalTimeEvent>
+{
+    private DateTimeOffset _currentTime;
+    private long _lastTick;
+
+    // fix: добавляем объект блокировки для потокобезопасного доступа к DateTimeOffset
+    private readonly object _timeLock = new();
+
+    public override string BehaviorId => "TimeSynchronizationBehavior";
+    public override int Priority => 10;
+
+    public TimeSynchronizationBehavior(ILogger<TimeSynchronizationBehavior>? logger = null)
+        : base(logger)
+    {
+    }
+
+    public TimeSynchronizationBehavior() : this(null) { }
+
+    /// <summary>
+    /// Текущее синхронизированное время (потокобезопасное чтение)
+    /// </summary>
+    public DateTimeOffset CurrentTime
+    {
+        get
+        {
+            lock (_timeLock)
+            {
+                return _currentTime;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Последний полученный тик (потокобезопасное чтение)
+    /// </summary>
+    public long LastTick => Interlocked.Read(ref _lastTick);  // long можно читать через Interlocked
+
+    public override Task<bool> CanHandleAsync(IApplicationEvent @event)
+    {
+        return Task.FromResult(@event is FractalTimeEvent);
+    }
+
+    protected override async Task HandleEventAsync(FractalTimeEvent @event)
+    {
+        // fix: потокобезопасная запись DateTimeOffset через lock
+        lock (_timeLock)
+        {
+            _currentTime = @event.FractalTime;
+        }
+        Interlocked.Exchange(ref _lastTick, @event.Tick);   // long можно обновлять через Interlocked
+
+        if (@event.Tick % 10 == 0 || @event.Tick == 1)
+        {
+            _logger?.LogInformation("⏱️ [TimeSync] Time updated to {Time}, tick {Tick}",
+                @event.FractalTime, @event.Tick);
+        }
+        else
+        {
+            _logger?.LogDebug("⏱️ [TimeSync] Time updated to {Time}, tick {Tick}",
+                @event.FractalTime, @event.Tick);
+        }
+
+        await Task.CompletedTask;
+    }
+}
+
+
+
+
+
+================================================================
+End of Codebase
+================================================================
