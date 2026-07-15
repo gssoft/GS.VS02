@@ -3,6 +3,7 @@
 
 using System.Diagnostics;
 using System.Threading;
+using FractalCellCore;
 using FractalCellCore.Core.Interfaces;
 using FractalCellCore.Core.Templates;
 using Microsoft.Extensions.Logging;

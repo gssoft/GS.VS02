@@ -1,6 +1,7 @@
 ﻿// 26.07.12
 // Behaviors/HeartbeatBehavior.fixed.cs
 
+using FractalCellCore;
 using FractalCellCore.Core.Interfaces;
 using FractalCellCore.Core.Templates;
 using Microsoft.Extensions.Logging;
