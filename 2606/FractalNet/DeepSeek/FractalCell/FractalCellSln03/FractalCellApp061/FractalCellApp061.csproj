@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FractalBehaviorsLib061\FractalBehaviorsLib061.csproj" />
+    <ProjectReference Include="..\FractalBehaviorsLib\FractalBehaviorsLib.csproj" />
     <ProjectReference Include="..\FractalCellCore061\FractalCellCore061.csproj" />
   </ItemGroup>
 	
