@@ -32,6 +32,12 @@ builder.Services.AddSingleton<HubSettings>(sp => new HubSettings
     MessageTimeout = TimeSpan.FromSeconds(30)
 });
 
+//// Пример в Program.cs
+//builder.Services.AddFractalNodeInfrastructure();
+//builder.Services.AddSingleton<IFractalEventHub, InMemoryFractalEventHub>(); // если ещё нет
+//builder.Services.AddSingleton<HubSettings>(sp => new HubSettings { ChannelCapacity = 1000, EnablePersistence = false, MessageTimeout = TimeSpan.FromSeconds(30) });
+
+
 // Регистрация поведений как Singleton для DI
 //builder.Services.AddSingleton<HeartbeatBehavior>();
 //builder.Services.AddSingleton<DataProcessingBehavior>();
@@ -46,6 +52,7 @@ Console.WriteLine("ℹ️ Press Ctrl+C to stop");
 Console.WriteLine("🎯 Behaviors: HeartbeatBehavior, DataProcessingBehavior");
 Console.WriteLine("📊 Events: Heartbeat, ProcessData");
 Console.WriteLine();
+
 
 await host.RunAsync();
 

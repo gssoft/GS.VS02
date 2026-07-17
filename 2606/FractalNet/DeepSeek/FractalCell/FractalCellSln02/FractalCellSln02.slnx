@@ -15,5 +15,10 @@
     <Project Path="FractalCellCore058/FractalCellCore058.csproj" Id="ce983976-2734-4e4a-8cfe-2f847b465e63" />
     <Project Path="FractalCellCore061/FractalCellCore061.csproj" Id="95194239-65f0-41dd-ac01-6748fed395c2" />
   </Folder>
+  <Folder Name="/Branch03/">
+    <File Path="Copilot.txt" />
+    <Project Path="FractalCellApp065/FractalCellApp065.csproj" Id="61995269-ef2d-4ff1-a7de-f34947c8a81a" />
+    <Project Path="FractalCellCore065/FractalCellCore065.csproj" Id="7c32f6ee-4dc8-4c73-b309-10d1df9abc0a" />
+  </Folder>
   <Project Path="WorkerService01/WorkerService01.csproj" />
 </Solution>

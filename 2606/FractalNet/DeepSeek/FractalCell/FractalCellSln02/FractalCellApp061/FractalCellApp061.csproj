@@ -17,5 +17,12 @@
     <ProjectReference Include="..\FractalBehaviorsLib061\FractalBehaviorsLib061.csproj" />
     <ProjectReference Include="..\FractalCellCore061\FractalCellCore061.csproj" />
   </ItemGroup>
-	
+
+	<ItemGroup>
+		<Content Include="topology.example.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+
+
 </Project>

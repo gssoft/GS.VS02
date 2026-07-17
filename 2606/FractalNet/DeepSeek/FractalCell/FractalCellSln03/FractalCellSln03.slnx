@@ -1,6 +1,8 @@
 <Solution>
-  <Project Path="FractalBehaviorsLib/FractalBehaviorsLib.csproj" />
-  <Project Path="FractalCellApp061/FractalCellApp061.csproj" />
-  <Project Path="FractalCellCore061/FractalCellCore061.csproj" />
+  <Folder Name="/FractalCell061/">
+    <Project Path="FractalBehaviorsLib/FractalBehaviorsLib.csproj" />
+    <Project Path="FractalCellApp061/FractalCellApp061.csproj" />
+    <Project Path="FractalCellCore061/FractalCellCore061.csproj" />
+  </Folder>
   <Project Path="WorkerService01/WorkerService01.csproj" />
 </Solution>
