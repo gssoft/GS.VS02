@@ -1,7 +1,6 @@
 ﻿// Core/Topology/TopologyLoader.cs
 using System.Text.Json;
 using FractalCellCore.Core.Interfaces;
-using FractalCellCore.Core.Topology;
 
 namespace FractalCellCore.Core.Topology;
 

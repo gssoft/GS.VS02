@@ -1,0 +1,49 @@
+﻿{
+  "NodeId": "root",
+  "Type": "CompositeOrchestrator",
+  "Children": [
+    {
+      "NodeId": "zone-data",
+      "Type": "CompositeOrchestrator",
+      "Children": [
+        {
+          "NodeId": "processor-1",
+          "Type": "FractalCell",
+          "Settings": {
+            "CellId": "processor-1",
+            "BackgroundServiceCount": 2,
+            "InternalBusType": "Channels",
+            "ExternalBusType": "Channels"
+          },
+          "Behaviors": [
+            "HeartbeatBehavior",
+            "DataProcessingBehavior"
+          ]
+        },
+        {
+          "NodeId": "processor-2",
+          "Type": "FractalCell",
+          "Settings": {
+            "CellId": "processor-2",
+            "BackgroundServiceCount": 1
+          },
+          "Behaviors": [
+            "TimeSynchronizationBehavior"
+          ]
+        }
+      ]
+    },
+    {
+      "NodeId": "fractal-time",
+      "Type": "FractalCell",
+      "Settings": {
+        "CellId": "fractal-time",
+        "BackgroundServiceCount": 1
+      },
+      "Behaviors": [
+        "TimeGenerationBehavior"
+      ]
+    }
+  ]
+}
+

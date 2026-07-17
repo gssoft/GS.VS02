@@ -1,7 +1,202 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+
+
+================================================================
+Directory Structure
+================================================================
+appsettings.Development.json
+appsettings.json
+FractalCellApp061.csproj
+Program.cs
+Properties/launchSettings.json
+Worker.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: FractalCellApp061.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-FractalCellApp061-00962670-4fcb-410d-925a-b45703c7e335</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FractalBehaviorsLib061\FractalBehaviorsLib061.csproj" />
+    <ProjectReference Include="..\FractalCellCore061\FractalCellCore061.csproj" />
+  </ItemGroup>
+
+	<ItemGroup>
+		<Content Include="topology.example.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+
+
+</Project>
+
+================
+File: Program.cs
+================
+// FractalCellApp/Program.cs
+
+using FractalBehaviors;
+using FractalCellApp;
+
+using FractalCellCore.Core.Configuration;
+
+// using FractalCellApp.Behaviors;
+using FractalCellCore.Core.Interfaces;
+using FractalCellCore.Implementations;
+using System.Text;
+
+Console.OutputEncoding = Encoding.UTF8;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+builder.Logging.SetMinimumLevel(LogLevel.Information);
+
+// Настройка конфигурации
+builder.Services.Configure<FractalCellConfiguration>(
+    builder.Configuration.GetSection("FractalCell"));
+
+// Регистрация Hub
+builder.Services.AddSingleton<IFractalEventHub, InMemoryFractalEventHub>();
+builder.Services.AddSingleton<HubSettings>(sp => new HubSettings
+{
+    ChannelCapacity = 1000,
+    EnablePersistence = false,
+    MessageTimeout = TimeSpan.FromSeconds(30)
+});
+
+//// Пример в Program.cs
+//builder.Services.AddFractalNodeInfrastructure();
+//builder.Services.AddSingleton<IFractalEventHub, InMemoryFractalEventHub>(); // если ещё нет
+//builder.Services.AddSingleton<HubSettings>(sp => new HubSettings { ChannelCapacity = 1000, EnablePersistence = false, MessageTimeout = TimeSpan.FromSeconds(30) });
+
+
+// Регистрация поведений как Singleton для DI
+//builder.Services.AddSingleton<HeartbeatBehavior>();
+//builder.Services.AddSingleton<DataProcessingBehavior>();
+
+// Регистрация Worker с поведением
+builder.Services.AddHostedService<Worker>();
+
+var host = builder.Build();
+
+Console.WriteLine("🚀 Starting Fractal System with Behaviors...");
+Console.WriteLine("ℹ️ Press Ctrl+C to stop");
+Console.WriteLine("🎯 Behaviors: HeartbeatBehavior, DataProcessingBehavior");
+Console.WriteLine("📊 Events: Heartbeat, ProcessData");
+Console.WriteLine();
+
+
+await host.RunAsync();
+
+Console.WriteLine("✅ Fractal System stopped");
+
+================
+File: Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "FractalCellApp061": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: Worker.cs
+================
 // Worker.cs (пример использования TopologyLoader и NodeRegistry)
 using FractalCellCore.Core.Interfaces;
 using FractalCellCore.Core.Topology;
-
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -373,3 +568,9 @@ public class Worker : BackgroundService
 //}
 
 
+
+
+
+================================================================
+End of Codebase
+================================================================

@@ -1,0 +1,22 @@
+Severity	Code	Description	Project	File	Line	Suppression State	Details
+Error (active)	CS0234	The type or namespace name 'Topology' does not exist in the namespace 'FractalCellCore.Core' (are you missing an assembly reference?)	FractalCellApp061	D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln02\FractalCellApp061\Worker.cs	3
+
+Severity	Code	Description	Project	File	Line	Suppression State	Details
+Error (active)	CS0246	The type or namespace name 'TopologyLoader' could not be found (are you missing a using directive or an assembly reference?)	FractalCellApp061	D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln02\FractalCellApp061\Worker.cs	12
+
+Severity	Code	Description	Project	File	Line	Suppression State	Details
+Error (active)	CS0246	The type or namespace name 'INodeRegistry' could not be found (are you missing a using directive or an assembly reference?)	FractalCellApp061	D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln02\FractalCellApp061\Worker.cs	13
+
+Severity	Code	Description	Project	File	Line	Suppression State	Details
+Error (active)	CS0246	The type or namespace name 'TopologyLoader' could not be found (are you missing a using directive or an assembly reference?)	FractalCellApp061	D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln02\FractalCellApp061\Worker.cs	16	
+
+Severity	Code	Description	Project	File	Line	Suppression State	Details
+Error (active)	CS0246	The type or namespace name 'INodeRegistry' could not be found (are you missing a using directive or an assembly reference?)	FractalCellApp061	D:\Projects\VS02\2606\FractalNet\DeepSeek\FractalCell\FractalCellSln02\FractalCellApp061\Worker.cs	16		
+
+	
+
+		
+
+		
+	
+	

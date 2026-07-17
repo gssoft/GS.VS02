@@ -1,13 +1,15 @@
 ﻿// Core/Adapters/FractalCellNodeAdapter.cs
+using System;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using FractalCellCore.Core.Interfaces;
-using FractalCellCore.Core;
 
 namespace FractalCellCore.Adapters;
 
 /// <summary>
 /// Адаптер, позволяющий использовать IFractalCell как INode (листовой узел).
-/// RouteAsync ожидает, что RouteRequest.Payload может быть FractalEvent,
-/// тогда адаптер публикует событие во внешнюю шину ячейки.
+/// RouteAsync принимает payload типа IApplicationEvent и пересылает его во внешнюю шину ячейки.
 /// </summary>
 public class FractalCellNodeAdapter : INode
 {
@@ -17,7 +19,7 @@ public class FractalCellNodeAdapter : INode
 
     public FractalCellNodeAdapter(IFractalCell cell)
     {
-        _cell = cell;
+        _cell = cell ?? throw new ArgumentNullException(nameof(cell));
     }
 
     public Task StartAsync(CancellationToken ct = default) => _cell.StartAsync(ct);
@@ -32,22 +34,39 @@ public class FractalCellNodeAdapter : INode
 
     public async Task<RouteResult> RouteAsync(RouteRequest request, CancellationToken ct = default)
     {
-        // Если payload — FractalEvent, отправляем его во внешнюю шину ячейки
-        if (request.Payload is FractalCellCore.Model.FractalEvent appEvent)
+        if (request == null) return RouteResult.Error("Request is null");
+
+        // Ожидаем общий контракт IApplicationEvent
+        if (request.Payload is IApplicationEvent appEvent)
         {
             try
             {
-                // Отправляем событие в ExternalBus целевой ячейки
-                await _cell.ExternalBus.SendToCellAsync(appEvent.TargetCellId, appEvent);
+                // Попытка извлечь TargetCellId через reflection, если такое свойство присутствует
+                string? targetCellId = null;
+
+                var prop = appEvent.GetType().GetProperty("TargetCellId", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (prop != null)
+                {
+                    var val = prop.GetValue(appEvent);
+                    if (val is string s && !string.IsNullOrWhiteSpace(s))
+                        targetCellId = s;
+                }
+
+                // Если TargetCellId не найден — отправляем в текущую ячейку
+                var destination = !string.IsNullOrWhiteSpace(targetCellId) ? targetCellId : _cell.CellId;
+
+                await _cell.ExternalBus.SendToCellAsync(destination, appEvent);
+
                 return RouteResult.Ok();
             }
             catch (Exception ex)
             {
-                return RouteResult.Error(ex.Message);
+                return RouteResult.Error($"Failed to route event: {ex.Message}");
             }
         }
 
-        return RouteResult.Error("Unsupported payload type for FractalCellNodeAdapter");
+        return RouteResult.Error("Unsupported payload type for FractalCellNodeAdapter; expected IApplicationEvent");
     }
 }
+
 
