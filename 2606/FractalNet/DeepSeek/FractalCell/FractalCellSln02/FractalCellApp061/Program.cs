@@ -36,6 +36,14 @@ builder.Services.AddSingleton<HubSettings>(_ => new HubSettings
     MessageTimeout = TimeSpan.FromSeconds(30)
 });
 
+// Register behaviors in host DI so factory can resolve them if needed
+builder.Services.AddSingleton<HeartbeatBehavior>();
+builder.Services.AddSingleton<DataProcessingBehavior>();
+builder.Services.AddSingleton<TimeGenerationBehavior>();
+builder.Services.AddSingleton<TimeSynchronizationBehavior>();
+builder.Services.AddSingleton<OrchestratorBehavior>();
+
+
 // Register node infrastructure: Node registry, factories, TopologyLoader, etc.
 // This call registers TopologyLoader and the INodeFactory implementations.
 builder.Services.AddFractalNodeInfrastructure();
