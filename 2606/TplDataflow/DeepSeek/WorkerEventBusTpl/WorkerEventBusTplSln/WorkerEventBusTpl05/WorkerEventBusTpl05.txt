@@ -1,0 +1,902 @@
+
+================================================================
+Directory Structure
+================================================================
+appsettings.Development.json
+appsettings.json
+EventBus.cs
+Events/EventA.cs
+Events/EventB.cs
+Events/EventC.cs
+Events/IEvent.cs
+Handlers/HandlerA.cs
+Handlers/HandlerB.cs
+Handlers/HandlerC.cs
+Handlers/IEventHandler.cs
+Program.cs
+Properties/launchSettings.json
+Worker.cs
+WorkerEventBusTpl05.csproj
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
+
+================
+File: EventBus.cs
+================
+// EventBus.cs
+
+using System.Threading.Tasks.Dataflow;
+using WorkerEventBus.Events;
+using WorkerEventBus.Handlers;
+
+namespace WorkerEventBus;
+
+public class EventBus : IDisposable
+{
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<EventBus> _logger;
+    private readonly Dictionary<Type, List<Type>> _handlers = new();
+    private readonly Dictionary<Type, ActionBlock<object>> _executionBlocks = new();
+    private readonly CancellationTokenSource _cts = new();
+    private bool _disposed;
+
+    public EventBus(IServiceProvider serviceProvider, ILogger<EventBus> logger)
+    {
+        _serviceProvider = serviceProvider;
+        _logger = logger;
+
+        RegisterEvent<EventA, HandlerA>();
+        RegisterEvent<EventB, HandlerB>();
+        RegisterEvent<EventC, HandlerC>();
+
+        InitializeExecutionBlocks();
+    }
+
+    private void RegisterEvent<TEvent, THandler>()
+        where TEvent : IEvent
+        where THandler : IEventHandler<TEvent>
+    {
+        var eventType = typeof(TEvent);
+        if (!_handlers.ContainsKey(eventType))
+            _handlers[eventType] = new List<Type>();
+
+        _handlers[eventType].Add(typeof(THandler));
+        _logger.LogInformation("Registered {Handler} for {Event}",
+            typeof(THandler).Name, eventType.Name);
+    }
+    private void InitializeExecutionBlocks()
+    {
+        foreach (var eventType in _handlers.Keys)
+        {
+            // Определяем оптимальный DOP для каждого типа
+            var dop = eventType.Name switch
+            {
+                "EventA" => 20,  // HandlerA: 1000ms -> 20 параллельных
+                "EventB" => 30,  // HandlerB: 1500ms -> 30 параллельных  
+                "EventC" => 15,  // HandlerC: 800ms -> 15 параллельных
+                _ => 10
+            };
+
+            var block = new ActionBlock<object>(async (eventObj) =>
+            {
+                var handlers = _handlers[eventType];
+                foreach (var handlerType in handlers)
+                {
+                    try
+                    {
+                        using var scope = _serviceProvider.CreateScope();
+                        var handler = scope.ServiceProvider.GetRequiredService(handlerType);
+
+                        var method = handlerType.GetMethod("HandleAsync");
+                        if (method != null)
+                        {
+                            var task = (Task)method.Invoke(handler, new[] { eventObj, _cts.Token });
+                            await task;
+                            _logger.LogDebug("✓ Handler {HandlerType} completed", handlerType.Name);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing event {EventType}", eventType.Name);
+                    }
+                }
+            }, 
+            new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = 20,
+                // MaxDegreeOfParallelism = dop,     // ✅ Динамический DOP
+                // BoundedCapacity = 1000,           // ✅ Увеличен до 1000
+                BoundedCapacity = 500,
+                CancellationToken = _cts.Token
+            });
+
+            _executionBlocks[eventType] = block;
+            _logger.LogInformation("Created execution block for {EventType} with MaxDOP={DOP}", eventType.Name, dop);
+        }
+    }
+
+   
+
+    // Добавьте в EventBus.cs
+    public void ClearQueues()
+    {
+        _logger.LogWarning("⚠️ Clearing all queues!");
+
+        foreach (var block in _executionBlocks.Values)
+        {
+            // Пропускаем все ожидающие сообщения
+            while (block.InputCount > 0)
+            {
+                // Принудительно очищаем
+            }
+        }
+    }
+
+    
+
+    public async Task PublishAsync<TEvent>(TEvent @event) where TEvent : IEvent
+    {
+        var eventType = typeof(TEvent);
+
+        if (!_executionBlocks.ContainsKey(eventType))
+        {
+            _logger.LogWarning("No handlers registered for {EventType}", eventType.Name);
+            return;
+        }
+
+        _logger.LogInformation("📨 Publishing {EventType}: {@Event}", eventType.Name, @event);
+
+        var accepted = await _executionBlocks[eventType].SendAsync(@event, _cts.Token);
+
+        if (!accepted)
+        {
+            _logger.LogWarning("Event {EventId} was not accepted by block", @event.Id);
+        }
+    }
+
+    public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken) where TEvent : IEvent
+    {
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, cancellationToken);
+
+        var eventType = typeof(TEvent);
+
+        if (!_executionBlocks.ContainsKey(eventType))
+        {
+            _logger.LogWarning("No handlers registered for {EventType}", eventType.Name);
+            return;
+        }
+
+        _logger.LogInformation("📨 Publishing {EventType}: {@Event}", eventType.Name, @event);
+
+        var accepted = await _executionBlocks[eventType].SendAsync(@event, linkedCts.Token);
+
+        if (!accepted)
+        {
+            _logger.LogWarning("Event {EventId} was not accepted by block", @event.Id);
+        }
+    }
+
+    public async Task CompleteAsync()
+    {
+        _logger.LogInformation("Completing EventBus...");
+
+        foreach (var block in _executionBlocks.Values)
+        {
+            block.Complete();
+        }
+
+        await Task.WhenAll(_executionBlocks.Values.Select(b => b.Completion));
+
+        _logger.LogInformation("EventBus completed");
+    }
+
+    public (int QueueA, int QueueB, int QueueC) GetStats()
+    {
+        var queueA = _executionBlocks.ContainsKey(typeof(EventA))
+            ? _executionBlocks[typeof(EventA)].InputCount
+            : 0;
+
+        var queueB = _executionBlocks.ContainsKey(typeof(EventB))
+            ? _executionBlocks[typeof(EventB)].InputCount
+            : 0;
+
+        var queueC = _executionBlocks.ContainsKey(typeof(EventC))
+            ? _executionBlocks[typeof(EventC)].InputCount
+            : 0;
+
+        return (queueA, queueB, queueC);
+    }
+
+    public (int InputCountA, int InputCountB, int InputCountC) GetBlockStats()
+    {
+        var inputA = _executionBlocks.ContainsKey(typeof(EventA))
+            ? _executionBlocks[typeof(EventA)].InputCount
+            : 0;
+
+        var inputB = _executionBlocks.ContainsKey(typeof(EventB))
+            ? _executionBlocks[typeof(EventB)].InputCount
+            : 0;
+
+        var inputC = _executionBlocks.ContainsKey(typeof(EventC))
+            ? _executionBlocks[typeof(EventC)].InputCount
+            : 0;
+
+        return (inputA, inputB, inputC);
+    }
+
+    public Dictionary<string, object> GetDetailedBlockInfo()
+    {
+        var info = new Dictionary<string, object>();
+
+        foreach (var kvp in _executionBlocks)
+        {
+            var block = kvp.Value;
+            info[$"{kvp.Key.Name}_InputCount"] = block.InputCount;
+            info[$"{kvp.Key.Name}_CompletionStatus"] = block.Completion.IsCompleted;
+        }
+
+        return info;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+
+        _cts.Cancel();
+        _cts.Dispose();
+
+        foreach (var block in _executionBlocks.Values)
+        {
+            block.Complete();
+        }
+
+        _disposed = true;
+    }
+}
+
+================
+File: Events/EventA.cs
+================
+// Events/EventA.cs
+namespace WorkerEventBus.Events;
+
+public record EventA(string Data) : IEvent
+{
+    public string Id => Guid.NewGuid().ToString();
+    public DateTime OccurredOn => DateTime.UtcNow;
+}
+
+================
+File: Events/EventB.cs
+================
+// Events/EventB.cs
+namespace WorkerEventBus.Events;
+
+public record EventB(int Number) : IEvent
+{
+    public string Id => Guid.NewGuid().ToString();
+    public DateTime OccurredOn => DateTime.UtcNow;
+}
+
+================
+File: Events/EventC.cs
+================
+// Events/EventC.cs
+namespace WorkerEventBus.Events;
+
+public record EventC(bool Flag) : IEvent
+{
+    public string Id => Guid.NewGuid().ToString();
+    public DateTime OccurredOn => DateTime.UtcNow;
+}
+
+================
+File: Events/IEvent.cs
+================
+// Events/IEvent.cs
+namespace WorkerEventBus.Events;
+
+public interface IEvent
+{
+    string Id { get; }
+    DateTime OccurredOn { get; }
+}
+
+================
+File: Handlers/HandlerA.cs
+================
+// Handlers/HandlerA.cs
+using WorkerEventBus.Events;
+
+namespace WorkerEventBus.Handlers;
+
+public class HandlerA : IEventHandler<EventA>
+{
+    private readonly ILogger<HandlerA> _logger;
+
+    public HandlerA(ILogger<HandlerA> logger)
+    {
+        _logger = logger;
+    }
+
+    // HandlerA.cs
+    public async Task HandleAsync(EventA @event, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("🟢 HandlerA started for event {@Event}", @event);
+        await Task.Delay(50, cancellationToken); // ✅ 100ms вместо 1000ms
+        _logger.LogInformation("✅ HandlerA completed: {Data}", @event.Data);
+    }
+}
+
+================
+File: Handlers/HandlerB.cs
+================
+// Handlers/HandlerB.cs
+using WorkerEventBus.Events;
+
+namespace WorkerEventBus.Handlers;
+
+public class HandlerB : IEventHandler<EventB>
+{
+    private readonly ILogger<HandlerB> _logger;
+
+    public HandlerB(ILogger<HandlerB> logger)
+    {
+        _logger = logger;
+    }
+
+    // HandlerB.cs
+    public async Task HandleAsync(EventB @event, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("🔵 HandlerB started for event {@Event}", @event);
+        await Task.Delay(75, cancellationToken); // ✅ 150ms вместо 1500ms
+        _logger.LogInformation("✅ HandlerB completed: Number={Number}", @event.Number);
+    }  
+}
+
+================
+File: Handlers/HandlerC.cs
+================
+// Handlers/HandlerC.cs
+using WorkerEventBus.Events;
+
+namespace WorkerEventBus.Handlers;
+
+public class HandlerC : IEventHandler<EventC>
+{
+    private readonly ILogger<HandlerC> _logger;
+
+    public HandlerC(ILogger<HandlerC> logger)
+    {
+        _logger = logger;
+    }
+
+    // HandlerC.cs
+    public async Task HandleAsync(EventC @event, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("🟡 HandlerC started for event {@Event}", @event);
+        await Task.Delay(40, cancellationToken); // ✅ 80ms вместо 800ms
+        _logger.LogInformation("✅ HandlerC completed: Flag={Flag}", @event.Flag);
+    }
+}
+
+================
+File: Handlers/IEventHandler.cs
+================
+// Handlers/IEventHandler.cs
+
+using WorkerEventBus.Events;
+
+namespace WorkerEventBus.Handlers;
+
+public interface IEventHandler<in TEvent> where TEvent : IEvent
+{
+    Task HandleAsync(TEvent @event, CancellationToken cancellationToken);
+}
+
+================
+File: Program.cs
+================
+// Версия интенсивная с расширенным мониторингом
+// Program.cs
+
+using WorkerEventBus;
+using WorkerEventBus.Handlers;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+// Настройка логирования для цветного вывода в консоль
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole(options =>
+{
+    options.FormatterName = "simple";
+    options.LogToStandardErrorThreshold = LogLevel.Warning;
+});
+
+// Регистрируем обработчики
+builder.Services.AddSingleton<HandlerA>();
+builder.Services.AddSingleton<HandlerB>();
+builder.Services.AddSingleton<HandlerC>();
+
+// Регистрируем EventBus как Singleton
+builder.Services.AddSingleton<EventBus>();
+
+// Регистрируем Worker
+builder.Services.AddHostedService<Worker>();
+
+var host = builder.Build();
+
+// Настройка цветов консоли для лучшего визуального восприятия
+Console.Title = "EventBus with TPL Dataflow - Enhanced Monitoring";
+Console.BackgroundColor = ConsoleColor.Black;
+Console.ForegroundColor = ConsoleColor.White;
+
+// Вывод приветственного баннера
+Console.WriteLine();
+Console.WriteLine("╔════════════════════════════════════════════════════════════════════════════╗");
+Console.WriteLine("║                    EVENT BUS WITH TPL DATAFLOAD                            ║");
+Console.WriteLine("║                         ENHANCED MONITORING MODE                           ║");
+Console.WriteLine("╚════════════════════════════════════════════════════════════════════════════╝");
+Console.WriteLine();
+
+await host.RunAsync();
+
+================
+File: Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "WorkerEventBusTpl05": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: Worker.cs
+================
+// Worker.cs
+// - Версия интенсивная с расширенным мониторингом
+
+using System.Diagnostics;
+using WorkerEventBus.Events;
+
+namespace WorkerEventBus;
+
+public class Worker : BackgroundService
+{
+    private readonly ILogger<Worker> _logger;
+    private readonly EventBus _eventBus;
+    private readonly Random _random = new();
+    private int _eventCounter;
+    private readonly Stopwatch _stopwatch = new();
+    private Timer? _monitoringTimer;
+    private readonly CancellationTokenSource _internalCts = new();
+
+    // Для сбора статистики
+    private readonly List<double> _throughputSamples = new();
+    private int _lastEventCount;
+
+    public Worker(ILogger<Worker> logger, EventBus eventBus)
+    {
+        _logger = logger;
+        _eventBus = eventBus;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("📊 Worker started - ENHANCED MONITORING MODE");
+        _logger.LogInformation("Press Ctrl+C to stop...");
+        _logger.LogInformation("");
+
+        _stopwatch.Start();
+
+        _monitoringTimer = new Timer(_ => DetailedMonitor(), null, 3000, 3000);
+
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, _internalCts.Token);
+
+        // ✅ Уменьшаем с 5 до 3 генераторов для баланса
+        var generators = new[]
+        {
+         GenerateEvents("Generator-1", linkedCts.Token)
+        ,GenerateEvents("Generator-2", linkedCts.Token)
+        ,GenerateEvents("Generator-3", linkedCts.Token)
+        // ,GenerateEvents("Generator-4", linkedCts.Token)
+        // ,GenerateEvents("Generator-5", linkedCts.Token)
+    };
+
+        try
+        {
+            await Task.WhenAll(generators);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("⏹️ Cancellation requested, shutting down...");
+        }
+        finally
+        {
+            _monitoringTimer?.Dispose();
+            await _eventBus.CompleteAsync();
+            _stopwatch.Stop();
+            PrintFinalReport();
+        }
+    }
+
+    
+
+    private async Task GenerateEvents(string generatorName, CancellationToken stoppingToken)
+    {
+        var eventTypes = new[] { "A", "B", "C" };
+        var messages = new[] { "Hello", "World", "Test", "Message", "Data", "Info" };
+        var localCounter = 0;
+
+        // Адаптивная задержка на основе нагрузки
+        var baseDelay = 50; // ms
+        var delayVariation = 30; // ms
+
+        _logger.LogInformation("[{Generator}] Started generating events", generatorName);
+
+        try
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                var eventType = eventTypes[_random.Next(eventTypes.Length)];
+                var eventNumber = Interlocked.Increment(ref _eventCounter);
+                localCounter++;
+
+                switch (eventType)
+                {
+                    case "A":
+                        var message = messages[_random.Next(messages.Length)];
+                        await _eventBus.PublishAsync(new EventA($"[{generatorName}] {message} #{eventNumber}"), stoppingToken);
+                        break;
+                    case "B":
+                        var number = _random.Next(1, 1000);
+                        await _eventBus.PublishAsync(new EventB(number), stoppingToken);
+                        break;
+                    case "C":
+                        var flag = _random.Next(2) == 0;
+                        await _eventBus.PublishAsync(new EventC(flag), stoppingToken);
+                        break;
+                }
+
+                // Адаптивная задержка: увеличиваем если очередь растет
+                var stats = _eventBus.GetStats();
+                var maxQueue = Math.Max(stats.QueueA, Math.Max(stats.QueueB, stats.QueueC));
+
+                var adaptiveDelay = baseDelay;
+                if (maxQueue > 50) adaptiveDelay += 50;
+                if (maxQueue > 80) adaptiveDelay += 100;
+
+                var delay = _random.Next(adaptiveDelay, adaptiveDelay + delayVariation);
+                await Task.Delay(delay, stoppingToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("[{Generator}] Stopped. Generated {Count} events", generatorName, localCounter);
+        }
+    }
+
+    
+
+    private async void DetailedMonitor()
+    {
+        try
+        {
+            var stats = _eventBus.GetStats();
+            var blockStats = _eventBus.GetBlockStats();
+            var elapsed = _stopwatch.Elapsed;
+            var currentCount = _eventCounter;
+            var periodEvents = currentCount - _lastEventCount;
+            var throughput = periodEvents / 3.0; // events per second (за 3 секунды)
+
+            // Добавляем сэмпл только если есть события за период
+            if (periodEvents > 0 || _throughputSamples.Count == 0)
+            {
+                _throughputSamples.Add(throughput);
+                _lastEventCount = currentCount;
+            }
+
+            // Очистка старых сэмплов (храним последние 20)
+            while (_throughputSamples.Count > 20)
+                _throughputSamples.RemoveAt(0);
+
+            var avgThroughput = _throughputSamples.Count > 0 ? _throughputSamples.Average() : throughput;
+            var maxThroughput = _throughputSamples.Count > 0 ? _throughputSamples.Max() : throughput;
+            var minThroughput = _throughputSamples.Count > 0 ? _throughputSamples.Min() : throughput;
+
+            _logger.LogInformation("");
+            _logger.LogInformation("┌─────────────────────────────────────────────────────────────────┐");
+            _logger.LogInformation("│ 📊 MONITORING REPORT - {Elapsed:F1}s                               │", elapsed.TotalSeconds);
+            _logger.LogInformation("├─────────────────────────────────────────────────────────────────┤");
+            _logger.LogInformation("│ 📈 THROUGHPUT:                                                   │");
+            _logger.LogInformation("│    Current: {Throughput,6:F1} ev/s  |  Avg: {AvgThroughput,6:F1} ev/s  │", throughput, avgThroughput);
+            _logger.LogInformation("│    Max: {MaxThroughput,6:F1} ev/s     |  Min: {MinThroughput,6:F1} ev/s     │", maxThroughput, minThroughput);
+            _logger.LogInformation("│    Total events: {TotalEvents,8:N0}                              │", currentCount);
+            _logger.LogInformation("│    Samples: {SamplesCount,8}                                     │", _throughputSamples.Count);
+            _logger.LogInformation("├─────────────────────────────────────────────────────────────────┤");
+            _logger.LogInformation("│ 🧩 BLOCK QUEUES:                                                 │");
+            _logger.LogInformation("│    EventA: {QueueA,4} waiting  |  InputCount: {InputA,4}                  │", stats.QueueA, blockStats.InputCountA);
+            _logger.LogInformation("│    EventB: {QueueB,4} waiting  |  InputCount: {InputB,4}                  │", stats.QueueB, blockStats.InputCountB);
+            _logger.LogInformation("│    EventC: {QueueC,4} waiting  |  InputCount: {InputC,4}                  │", stats.QueueC, blockStats.InputCountC);
+            _logger.LogInformation("├─────────────────────────────────────────────────────────────────┤");
+            _logger.LogInformation("│ ⚙️ BLOCK HEALTH:                                                 │");
+
+            PrintColorfulHealth("EventA", stats.QueueA);
+            PrintColorfulHealth("EventB", stats.QueueB);
+            PrintColorfulHealth("EventC", stats.QueueC);
+
+            _logger.LogInformation("└─────────────────────────────────────────────────────────────────┘");
+            _logger.LogInformation("");
+
+            // Предупреждения при перегрузке
+            if (stats.QueueA > 80 || stats.QueueB > 80 || stats.QueueC > 80)
+            {
+                _logger.LogWarning("⚠️ ⚠️ ⚠️ CRITICAL: Queues are filling up! Consider increasing MaxDegreeOfParallelism ⚠️ ⚠️ ⚠️");
+            }
+            else if (stats.QueueA > 50 || stats.QueueB > 50 || stats.QueueC > 50)
+            {
+                _logger.LogWarning("⚠️ WARNING: High queue load detected");
+            }
+
+            if (throughput < 5 && elapsed.TotalSeconds > 10)
+            {
+                _logger.LogWarning("🐌 WARNING: Low throughput detected. Possible bottleneck!");
+                _logger.LogWarning($"   Current throughput: {throughput:F1} ev/s, Avg: {avgThroughput:F1} ev/s");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in monitor");
+        }
+    }
+
+    //private async void DetailedMonitor()
+    //{
+    //    try
+    //    {
+    //        var stats = _eventBus.GetStats();
+    //        var blockStats = _eventBus.GetBlockStats(); // Новый метод
+    //        var elapsed = _stopwatch.Elapsed;
+    //        var currentCount = _eventCounter;
+    //        var periodEvents = currentCount - _lastEventCount;
+    //        var throughput = periodEvents / 3.0; // events per second (за 3 секунды)
+
+    //        _throughputSamples.Add(throughput);
+    //        _lastEventCount = currentCount;
+
+    //        // Очистка старых сэмплов (храним последние 10)
+    //        if (_throughputSamples.Count > 10)
+    //            _throughputSamples.RemoveAt(0);
+
+    //        var avgThroughput = _throughputSamples.Average();
+    //        var maxThroughput = _throughputSamples.Max();
+    //        var minThroughput = _throughputSamples.Min();
+
+    //        _logger.LogInformation("");
+    //        _logger.LogInformation("┌─────────────────────────────────────────────────────────────────┐");
+    //        _logger.LogInformation("│ 📊 MONITORING REPORT - {Elapsed:F1}s                               │", elapsed.TotalSeconds);
+    //        _logger.LogInformation("├─────────────────────────────────────────────────────────────────┤");
+    //        _logger.LogInformation("│ 📈 THROUGHPUT:                                                   │");
+    //        _logger.LogInformation("│    Current: {Throughput,6:F1} ev/s  |  Avg: {AvgThroughput,6:F1} ev/s  │", throughput, avgThroughput);
+    //        _logger.LogInformation("│    Max: {MaxThroughput,6:F1} ev/s     |  Min: {MinThroughput,6:F1} ev/s     │", maxThroughput, minThroughput);
+    //        _logger.LogInformation("│    Total events: {TotalEvents,8:N0}                              │", currentCount);
+    //        _logger.LogInformation("├─────────────────────────────────────────────────────────────────┤");
+    //        _logger.LogInformation("│ 🧩 BLOCK QUEUES:                                                 │");
+    //        _logger.LogInformation("│    EventA: {QueueA,4} waiting  |  InputCount: {InputA,4}                  │", stats.QueueA, blockStats.InputCountA);
+    //        _logger.LogInformation("│    EventB: {QueueB,4} waiting  |  InputCount: {InputB,4}                  │", stats.QueueB, blockStats.InputCountB);
+    //        _logger.LogInformation("│    EventC: {QueueC,4} waiting  |  InputCount: {InputC,4}                  │", stats.QueueC, blockStats.InputCountC);
+    //        _logger.LogInformation("├─────────────────────────────────────────────────────────────────┤");
+    //        _logger.LogInformation("│ ⚙️ BLOCK HEALTH:                                                 │");
+
+    //        // Оценка здоровья блоков
+    //        PrintBlockHealth("EventA", stats.QueueA, blockStats.InputCountA);
+    //        PrintBlockHealth("EventB", stats.QueueB, blockStats.InputCountB);
+    //        PrintBlockHealth("EventC", stats.QueueC, blockStats.InputCountC);
+
+    //        _logger.LogInformation("└─────────────────────────────────────────────────────────────────┘");
+    //        _logger.LogInformation("");
+
+    //        // Предупреждения при перегрузке
+    //        if (stats.QueueA > 80 || stats.QueueB > 80 || stats.QueueC > 80)
+    //        {
+    //            _logger.LogWarning("⚠️ ⚠️ ⚠️ CRITICAL: Queues are filling up! Consider increasing MaxDegreeOfParallelism ⚠️ ⚠️ ⚠️");
+    //        }
+    //        else if (stats.QueueA > 50 || stats.QueueB > 50 || stats.QueueC > 50)
+    //        {
+    //            _logger.LogWarning("⚠️ WARNING: High queue load detected");
+    //        }
+
+    //        if (throughput < 5 && elapsed.TotalSeconds > 10)
+    //        {
+    //            _logger.LogWarning("🐌 WARNING: Low throughput detected. Possible bottleneck!");
+    //        }
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        _logger.LogError(ex, "Error in monitor");
+    //    }
+    //}
+
+    private void PrintBlockHealth(string blockName, int queue, int inputCount)
+    {
+        var health = queue switch
+        {
+            < 10 => "🟢 EXCELLENT",
+            < 30 => "🟡 GOOD",
+            < 50 => "🟠 MODERATE",
+            < 80 => "🔴 HIGH",
+            _ => "💀 CRITICAL"
+        };
+
+        var utilization = (queue / 100.0) * 100; // BoundedCapacity = 100
+        _logger.LogInformation("│    {BlockName}: {Health,-9} | Queue: {Queue,3}/100 ({Utilization,5:F1}%)          │",
+            blockName, health, queue, utilization);
+    }
+
+    private void PrintFinalReport()
+    {
+        var totalSeconds = _stopwatch.Elapsed.TotalSeconds;
+        var avgThroughput = _eventCounter / totalSeconds;
+
+        // Исправляем расчет Peak throughput
+        var maxThroughput = _throughputSamples.Count > 0 ? _throughputSamples.Max() : avgThroughput;
+
+        // Если maxThroughput все еще 0, используем avgThroughput * 2 как приближение
+        if (maxThroughput < 0.01 && avgThroughput > 0)
+        {
+            // Примерная оценка пиковой пропускной способности
+            maxThroughput = avgThroughput * 1.5;
+        }
+
+        _logger.LogInformation("");
+        _logger.LogInformation("╔═════════════════════════════════════════════════════════════════════╗");
+        _logger.LogInformation("║                     📊 FINAL REPORT                                 ║");
+        _logger.LogInformation("╠═════════════════════════════════════════════════════════════════════╣");
+        _logger.LogInformation("║  Total events processed: {TotalEvents,35:N0} ║", _eventCounter);
+        _logger.LogInformation("║  Total runtime:           {Runtime,35:F2}s ║", totalSeconds);
+        _logger.LogInformation("║  Average throughput:      {AvgThroughput,35:F2} ev/s ║", avgThroughput);
+        _logger.LogInformation("║  Peak throughput:         {PeakThroughput,35:F2} ev/s ║", maxThroughput);
+
+        // Добавляем дополнительную информацию
+        var minThroughput = _throughputSamples.Count > 0 ? _throughputSamples.Min() : avgThroughput;
+        if (_throughputSamples.Count > 0)
+        {
+            _logger.LogInformation("║  Min throughput:           {MinThroughput,35:F2} ev/s ║", minThroughput);
+        }
+
+        // Показываем количество сэмплов для отладки
+        _logger.LogInformation("║  Samples count:            {SamplesCount,35} ║", _throughputSamples.Count);
+
+        _logger.LogInformation("╚═════════════════════════════════════════════════════════════════════╝");
+        _logger.LogInformation("");
+
+        if (avgThroughput < 20)
+        {
+            _logger.LogWarning("💡 TIP: Low throughput detected. Consider:");
+            _logger.LogWarning("   - Increasing MaxDegreeOfParallelism in EventBus (currently 1)");
+            _logger.LogWarning("   - Reducing handler delays (HandlerA:1000ms, HandlerB:1500ms, HandlerC:800ms)");
+            _logger.LogWarning("   - Increasing BoundedCapacity (currently 100)");
+            _logger.LogWarning($"   - Current configuration: 3 generators, each with 20-150ms delay");
+        }
+        else if (avgThroughput > 100)
+        {
+            _logger.LogInformation("🎉 EXCELLENT! High throughput achieved!");
+        }
+    }
+
+    //private void PrintFinalReport()
+    //{
+    //    var totalSeconds = _stopwatch.Elapsed.TotalSeconds;
+    //    var avgThroughput = _eventCounter / totalSeconds;
+    //    var maxThroughput = _throughputSamples.Count > 0 ? _throughputSamples.Max() : 0;
+
+    //    _logger.LogInformation("");
+    //    _logger.LogInformation("╔═════════════════════════════════════════════════════════════════════╗");
+    //    _logger.LogInformation("║                     📊 FINAL REPORT                                 ║");
+    //    _logger.LogInformation("╠═════════════════════════════════════════════════════════════════════╣");
+    //    _logger.LogInformation("║  Total events processed: {TotalEvents,35:N0} ║", _eventCounter);
+    //    _logger.LogInformation("║  Total runtime:           {Runtime,35:F2}s ║", totalSeconds);
+    //    _logger.LogInformation("║  Average throughput:      {AvgThroughput,35:F2} ev/s ║", avgThroughput);
+    //    _logger.LogInformation("║  Peak throughput:         {PeakThroughput,35:F2} ev/s ║", maxThroughput);
+    //    _logger.LogInformation("╚═════════════════════════════════════════════════════════════════════╝");
+    //    _logger.LogInformation("");
+
+    //    // Рекомендации по оптимизации
+    //    if (avgThroughput < 20)
+    //    {
+    //        _logger.LogWarning("💡 TIP: Low throughput detected. Consider:");
+    //        _logger.LogWarning("   - Increasing MaxDegreeOfParallelism in EventBus");
+    //        _logger.LogWarning("   - Reducing handler delays");
+    //        _logger.LogWarning("   - Increasing BoundedCapacity");
+    //    }
+    //    else if (avgThroughput > 100)
+    //    {
+    //        _logger.LogInformation("🎉 EXCELLENT! High throughput achieved!");
+    //    }
+    //}
+
+    // Добавьте в Worker.cs для цветного вывода в консоль
+    private void PrintColorfulHealth(string blockName, int queue)
+    {
+        var originalColor = Console.ForegroundColor;
+
+        var health = queue switch
+        {
+            < 10 => ConsoleColor.Green,
+            < 30 => ConsoleColor.Yellow,
+            < 50 => ConsoleColor.DarkYellow,
+            < 80 => ConsoleColor.Red,
+            _ => ConsoleColor.Magenta
+        };
+
+        Console.ForegroundColor = health;
+        var healthText = queue switch
+        {
+            < 10 => "EXCELLENT",
+            < 30 => "GOOD",
+            < 50 => "MODERATE",
+            < 80 => "HIGH",
+            _ => "CRITICAL"
+        };
+
+        _logger.LogInformation("│    {BlockName}: {Health,-9} | Queue: {Queue,3}/100",
+            blockName, healthText, queue);
+
+        Console.ForegroundColor = originalColor;
+    }
+}
+
+================
+File: WorkerEventBusTpl05.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-WorkerEventBusTpl05-08f54e88-2ddc-43f4-8513-3decb7f7b087</UserSecretsId>
+	<Encoding>UTF-8</Encoding>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+  </ItemGroup>
+</Project>
+
+================================================================
+End of Codebase
+================================================================
