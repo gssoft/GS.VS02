@@ -14,9 +14,4 @@
   <ItemGroup>
     <ProjectReference Include="..\Quote.ServiceDefaults\Quote.ServiceDefaults.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Models\" />
-    <Folder Include="Helpers\" />
-  </ItemGroup>
 </Project>
