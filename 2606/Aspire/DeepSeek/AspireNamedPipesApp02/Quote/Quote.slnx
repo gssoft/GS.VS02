@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Quote.AppHost/Quote.AppHost.csproj" />
+  <Project Path="Quote.ServiceDefaults/Quote.ServiceDefaults.csproj" />
+  <Project Path="QuoteClient1/QuoteClient1.csproj" />
+  <Project Path="QuoteClient2/QuoteClient2.csproj" />
+  <Project Path="QuoteServer/QuoteServer.csproj" />
+</Solution>
