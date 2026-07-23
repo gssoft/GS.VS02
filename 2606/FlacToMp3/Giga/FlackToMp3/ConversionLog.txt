@@ -1,0 +1,32 @@
+﻿2026-07-23 09:06:56 [OK]
+In : Dio - Holy Diver [Rhino Reserve 2026] Side A.flac
+   Size: 422,663.19 KB
+Out: Dio - Holy Diver [Rhino Reserve 2026] Side A.mp3
+   Size: 51,840.04 KB
+Msg: Конвертация успешна.
+Time : 00:10.74
+----------------------------------------
+2026-07-23 09:07:08 [OK]
+In : Dio - Holy Diver [Rhino Reserve 2026] Side B.flac
+   Size: 382,208.66 KB
+Out: Dio - Holy Diver [Rhino Reserve 2026] Side B.mp3
+   Size: 45,780.04 KB
+Msg: Конвертация успешна.
+Time : 00:12.26
+----------------------------------------
+2026-07-23 09:24:48 [OK]
+In : Dio - Holy Diver [Rhino Reserve 2026] Side A.flac
+   Size: 422,663.19 KB
+Out: Dio - Holy Diver [Rhino Reserve 2026] Side A.mp3
+   Size: 51,840.04 KB
+Msg: Конвертация успешна.
+Time : 00:26.16
+----------------------------------------
+2026-07-23 09:25:12 [OK]
+In : Dio - Holy Diver [Rhino Reserve 2026] Side B.flac
+   Size: 382,208.66 KB
+Out: Dio - Holy Diver [Rhino Reserve 2026] Side B.mp3
+   Size: 45,780.04 KB
+Msg: Конвертация успешна.
+Time : 00:23.15
+----------------------------------------
