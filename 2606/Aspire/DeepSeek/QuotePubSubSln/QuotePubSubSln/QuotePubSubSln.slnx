@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="docker-compose.yml" />
+  </Folder>
+  <Project Path="ClientA/ClientA.csproj" />
+  <Project Path="ClientB/ClientB.csproj" />
+  <Project Path="GeneratorConsumer/GeneratorConsumer.csproj" />
+  <Project Path="GeneratorEnergy/GeneratorEnergy.csproj" />
+  <Project Path="GeneratorFinance/GeneratorFinance.csproj" />
+  <Project Path="GeneratorTech/GeneratorTech.csproj" />
+  <Project Path="QuoteClientsHost/QuoteClientsHost.csproj" />
+  <Project Path="QuoteGeneratorsHost/QuoteGeneratorsHost.csproj" />
+  <Project Path="QuoteModels/QuoteModels.csproj" />
+  <Project Path="QuotePubSub/QuotePubSub.csproj" />
+  <Project Path="QuotePubSubSln.AppHost/QuotePubSubSln.AppHost.csproj" />
+  <Project Path="QuotePubSubSln.ServiceDefaults/QuotePubSubSln.ServiceDefaults.csproj" />
+</Solution>

@@ -1,0 +1,23 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.2.4">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>586fc2c6-be51-4c65-a97b-c6879c30c7bb</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClientA\ClientA.csproj" />
+    <ProjectReference Include="..\ClientB\ClientB.csproj" />
+    <ProjectReference Include="..\GeneratorConsumer\GeneratorConsumer.csproj" />
+    <ProjectReference Include="..\GeneratorEnergy\GeneratorEnergy.csproj" />
+    <ProjectReference Include="..\GeneratorFinance\GeneratorFinance.csproj" />
+    <ProjectReference Include="..\QuoteClientsHost\QuoteClientsHost.csproj" />
+    <ProjectReference Include="..\QuoteGeneratorsHost\QuoteGeneratorsHost.csproj" />
+    <ProjectReference Include="..\QuoteModels\QuoteModels.csproj" />
+    <ProjectReference Include="..\QuotePubSub\QuotePubSub.csproj" />
+  </ItemGroup>
+
+</Project>
