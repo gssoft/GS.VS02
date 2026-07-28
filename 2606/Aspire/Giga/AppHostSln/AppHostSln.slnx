@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="AppHost01/AppHost01.csproj" />
+  <Project Path="ServiceDefaults1/ServiceDefaults1.csproj" Id="05a9616d-b309-4dcc-b854-7577efc9ffe0" />
+</Solution>

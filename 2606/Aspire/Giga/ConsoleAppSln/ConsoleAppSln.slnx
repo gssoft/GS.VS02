@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="ClassLibrary1/ClassLibrary1.csproj" />
+  <Project Path="ConsoleApp1/ConsoleApp1.csproj" />
+  <Project Path="ServiceDefaults1/ServiceDefaults1.csproj" />
+</Solution>
