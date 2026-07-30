@@ -1,0 +1,64 @@
+﻿@page "/notifications"
+@using AspireApp1.Web.Services
+
+@inject NotificationHub Hub
+@implements IDisposable
+@rendermode InteractiveServer
+
+<PageTitle>Уведомления</PageTitle>
+
+<div class="container mt-4">
+    <h1>🔔 События Pub/Sub</h1>
+    <p class="text-muted">
+        Web получает события от ApiService через Dapr Pub/Sub (broker: Redis)
+    </p>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between">
+            <strong>Лента событий</strong>
+            <button class="btn btn-sm btn-outline-danger" @onclick="Clear">Очистить</button>
+        </div>
+        <ul class="list-group list-group-flush">
+            @if (_notifications.Count == 0)
+            {
+                <li class="list-group-item text-muted">Ожидание событий...</li>
+            }
+            else
+            {
+                @foreach (var note in _notifications)
+                {
+                    <li class="list-group-item">@note</li>
+                }
+            }
+        </ul>
+    </div>
+</div>
+
+@code {
+    private IReadOnlyList<string> _notifications = new List<string>();
+
+    protected override void OnInitialized()
+    {
+        _notifications = Hub.GetNotifications();
+        Hub.OnNotificationReceived += HandleNotification;
+    }
+
+    private void HandleNotification(string message)
+    {
+        InvokeAsync(() =>
+        {
+            _notifications = Hub.GetNotifications();
+            StateHasChanged();
+        });
+    }
+
+    private void Clear()
+    {
+        // Можно добавить метод Clear в NotificationHub
+    }
+
+    public void Dispose()
+    {
+        Hub.OnNotificationReceived -= HandleNotification;
+    }
+}

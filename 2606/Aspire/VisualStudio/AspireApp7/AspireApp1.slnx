@@ -1,4 +1,14 @@
 <Solution>
+  <Folder Name="/dapr/" />
+  <Folder Name="/dapr/components/">
+    <File Path="pubsub.yaml" />
+    <File Path="statestore.yaml" />
+  </Folder>
+  <Folder Name="/dapr1/" />
+  <Folder Name="/dapr1/components/">
+    <File Path="pubsub.yaml" />
+    <File Path="statestore.yaml" />
+  </Folder>
   <Project Path="AspireApp1.ApiService/AspireApp1.ApiService.csproj" />
   <Project Path="AspireApp1.AppHost/AspireApp1.AppHost.csproj" />
   <Project Path="AspireApp1.ServiceDefaults/AspireApp1.ServiceDefaults.csproj" />

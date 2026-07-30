@@ -8,10 +8,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AspireApp1.ServiceDefaults\AspireApp1.ServiceDefaults.csproj" />
+	  <PackageReference Include="Dapr.AspNetCore" Version="1.14.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.StackExchange.Redis.OutputCaching" Version="13.2.4" />
+    <PackageReference Include="Aspire.StackExchange.Redis.OutputCaching" Version="13.4.6" />
   </ItemGroup>
 
 </Project>

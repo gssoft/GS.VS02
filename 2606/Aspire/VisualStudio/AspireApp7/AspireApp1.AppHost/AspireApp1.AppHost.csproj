@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+﻿<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,13 +8,13 @@
     <UserSecretsId>28a55790-a5fc-4ee5-8cfd-a2765f67bcf1</UserSecretsId>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\AspireApp1.ApiService\AspireApp1.ApiService.csproj" />
-    <ProjectReference Include="..\AspireApp1.Web\AspireApp1.Web.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\AspireApp1.ApiService\AspireApp1.ApiService.csproj" />
+		<ProjectReference Include="..\AspireApp1.Web\AspireApp1.Web.csproj" />
 
-  <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
-  </ItemGroup>
+		<!-- ✅ ПРАВИЛЬНЫЙ пакет для AppHost (CommunityToolkit) -->
+		<PackageReference Include="CommunityToolkit.Aspire.Hosting.Dapr" Version="13.4.0-preview.1.260602-0230" />
 
+		<PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
+	</ItemGroup>
 </Project>
