@@ -1,0 +1,11 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "AspireApp1.AppHost\\AspireApp1.AppHost.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]
