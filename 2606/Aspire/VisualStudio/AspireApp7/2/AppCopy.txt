@@ -1,0 +1,942 @@
+
+================================================================
+Directory Structure
+================================================================
+appsettings.Development.json
+appsettings.json
+AspireApp1.ApiService.csproj
+AspireApp1.ApiService.csproj.user
+AspireApp1.ApiService.http
+Program.cs
+Properties/launchSettings.json
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: AspireApp1.ApiService.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+	<PackageReference Include="Dapr.AspNetCore" Version="1.18.5" />
+	<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AspireApp1.ServiceDefaults\AspireApp1.ServiceDefaults.csproj" />
+	  
+  </ItemGroup>
+
+</Project>
+
+================
+File: AspireApp1.ApiService.csproj.user
+================
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ActiveDebugProfile>https</ActiveDebugProfile>
+  </PropertyGroup>
+</Project>
+
+================
+File: AspireApp1.ApiService.http
+================
+@ApiService_HostAddress = http://localhost:5452
+
+GET {{ApiService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+================
+File: Program.cs
+================
+var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();
+builder.Services.AddProblemDetails();
+builder.Services.AddOpenApi();
+// builder.Services.AddDaprClient();  // 👈 ВРЕМЕННО УБРАЛИ
+
+var app = builder.Build();
+
+app.UseExceptionHandler();
+// app.UseCloudEvents();  // 👈 ВРЕМЕННО УБРАЛИ
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
+
+app.MapGet("/", () => "API service is running");
+
+app.MapGet("/weatherforecast", () =>
+{
+    var forecast = Enumerable.Range(1, 5).Select(index =>
+        new WeatherForecast
+        (
+            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+            Random.Shared.Next(-20, 55),
+            summaries[Random.Shared.Next(summaries.Length)]
+        ))
+    .ToArray();
+    return forecast;
+})
+.WithName("GetWeatherForecast");
+
+// app.MapSubscribeHandler();  // 👈 ВРЕМЕННО УБРАЛИ
+
+app.MapDefaultEndpoints();
+app.Run();
+
+record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+{
+    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+}
+
+//var builder = WebApplication.CreateBuilder(args);
+
+//builder.AddServiceDefaults();
+//builder.Services.AddProblemDetails();
+//builder.Services.AddOpenApi();
+
+//// Добавляем Dapr SDK
+//builder.Services.AddDaprClient();
+
+//var app = builder.Build();
+
+//app.UseExceptionHandler();
+//app.UseCloudEvents(); // 👈 ВАЖНО: middleware для CloudEvents
+
+//if (app.Environment.IsDevelopment())
+//{
+//    app.MapOpenApi();
+//}
+
+//string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
+
+//app.MapGet("/", () => "API service is running");
+
+//app.MapGet("/weatherforecast", async (Dapr.Client.DaprClient dapr, ILogger<Program> logger) =>
+//{
+//    var forecast = Enumerable.Range(1, 5).Select(index =>
+//        new WeatherForecast
+//        (
+//            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+//            Random.Shared.Next(-20, 55),
+//            summaries[Random.Shared.Next(summaries.Length)]
+//        ))
+//    .ToArray();
+
+//    // 🔥 Публикуем событие в Pub/Sub
+//    var forecastEvent = new ForecastGeneratedEvent
+//    {
+//        GeneratedAt = DateTime.UtcNow,
+//        ForecastCount = forecast.Length,
+//        AverageTempC = (int)forecast.Average(f => f.TemperatureC)
+//    };
+
+//    await dapr.PublishEventAsync(
+//        pubsubName: "pubsub",           // имя Dapr компонента
+//        topicName: "forecast-generated", // тема
+//        data: forecastEvent);            // данные события
+
+//    logger.LogInformation("📢 Published event: {Count} forecasts, avg temp {Avg}°C",
+//        forecast.Length, forecastEvent.AverageTempC);
+
+//    return forecast;
+//})
+//.WithName("GetWeatherForecast");
+
+//// Подписка на собственные события (для логирования)
+//app.MapSubscribeHandler();
+
+//app.MapDefaultEndpoints();
+//app.Run();
+
+//record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+//{
+//    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+//}
+
+//public class ForecastGeneratedEvent
+//{
+//    public DateTime GeneratedAt { get; set; }
+//    public int ForecastCount { get; set; }
+//    public int AverageTempC { get; set; }
+//}
+
+// -------------------------------------------------------------
+
+//var builder = WebApplication.CreateBuilder(args);
+
+//// Add service defaults & Aspire client integrations.
+//builder.AddServiceDefaults();
+
+//// Add services to the container.
+//builder.Services.AddProblemDetails();
+
+//// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+//builder.Services.AddOpenApi();
+
+//var app = builder.Build();
+
+//// Configure the HTTP request pipeline.
+//app.UseExceptionHandler();
+
+//if (app.Environment.IsDevelopment())
+//{
+//    app.MapOpenApi();
+//}
+
+//string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
+
+//app.MapGet("/", () => "API service is running. Navigate to /weatherforecast to see sample data.");
+
+//app.MapGet("/weatherforecast", () =>
+//{
+//    var forecast = Enumerable.Range(1, 5).Select(index =>
+//        new WeatherForecast
+//        (
+//            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+//            Random.Shared.Next(-20, 55),
+//            summaries[Random.Shared.Next(summaries.Length)]
+//        ))
+//        .ToArray();
+//    return forecast;
+//})
+//.WithName("GetWeatherForecast");
+
+//app.MapDefaultEndpoints();
+
+//app.Run();
+
+//record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+//{
+//    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+//}
+
+================
+File: Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5452",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://localhost:7539;http://localhost:5452",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+
+================================================================
+End of Codebase
+================================================================
+
+================================================================
+Directory Structure
+================================================================
+AppHost.cs
+appsettings.Development.json
+appsettings.json
+AspireApp1.AppHost.csproj
+Properties/launchSettings.json
+
+================================================================
+Files
+================================================================
+
+================
+File: AppHost.cs
+================
+var builder = DistributedApplication.CreateBuilder(args);
+
+var cache = builder.AddRedis("cache")
+    .WithEndpoint(port: 6380, targetPort: 6379);  // избегаем конфликта с dapr_redis
+
+var apiService = builder.AddProject<Projects.AspireApp1_ApiService>("apiservice")
+    .WithHttpHealthCheck("/health");
+// .WithDaprSidecar("apiservice")  // 👈 ВРЕМЕННО УБРАЛИ
+
+var web = builder.AddProject<Projects.AspireApp1_Web>("webfrontend")
+    .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health")
+    // .WithDaprSidecar("webfrontend")  // 👈 ВРЕМЕННО УБРАЛИ
+    .WithReference(cache)
+    .WaitFor(cache)
+    .WithReference(apiService)
+    .WaitFor(apiService);
+
+builder.Build().Run();
+
+//using CommunityToolkit.Aspire.Hosting.Dapr;
+
+//var builder = DistributedApplication.CreateBuilder(args);
+
+//// Инициализируем Dapr
+//builder.AddDapr();
+
+//// ✅ Redis для Output Cache на ДРУГОМ порту (не 6379!)
+//// dapr_redis уже занял 6379, поэтому используем 6380
+//var cache = builder.AddRedis("cache")
+//    .WithEndpoint(port: 6380, targetPort: 6379);
+
+//var apiService = builder.AddProject<Projects.AspireApp1_ApiService>("apiservice")
+//    .WithHttpHealthCheck("/health")
+//    .WithDaprSidecar("apiservice");
+
+//var web = builder.AddProject<Projects.AspireApp1_Web>("webfrontend")
+//    .WithExternalHttpEndpoints()
+//    .WithHttpHealthCheck("/health")
+//    .WithDaprSidecar("webfrontend")
+//    .WithReference(cache)
+//    .WaitFor(cache)
+//    .WithReference(apiService)
+//    .WaitFor(apiService);
+
+//builder.Build().Run();
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Aspire.Hosting.Dcp": "Warning"
+    }
+  }
+}
+
+================
+File: AspireApp1.AppHost.csproj
+================
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>28a55790-a5fc-4ee5-8cfd-a2765f67bcf1</UserSecretsId>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\AspireApp1.ApiService\AspireApp1.ApiService.csproj" />
+		<ProjectReference Include="..\AspireApp1.Web\AspireApp1.Web.csproj" />
+
+		<!-- ✅ ПРАВИЛЬНЫЙ пакет для AppHost (CommunityToolkit) -->
+		<PackageReference Include="CommunityToolkit.Aspire.Hosting.Dapr" Version="13.4.0-preview.1.260602-0230" />
+
+		<PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
+	</ItemGroup>
+</Project>
+
+================
+File: Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:17008;http://localhost:15141",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21133",
+        "ASPIRE_DASHBOARD_MCP_ENDPOINT_URL": "https://localhost:23063",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22139"
+      }
+    },
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:15141",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19100",
+        "ASPIRE_DASHBOARD_MCP_ENDPOINT_URL": "http://localhost:18037",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20133"
+      }
+    }
+  }
+}
+
+
+================================================================
+End of Codebase
+================================================================
+
+================================================================
+Directory Structure
+================================================================
+AspireApp1.ServiceDefaults.csproj
+Extensions.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: AspireApp1.ServiceDefaults.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAspireSharedProject>true</IsAspireSharedProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.8.0" />
+    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" Version="10.8.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Extensions.cs
+================
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ServiceDiscovery;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+
+namespace Microsoft.Extensions.Hosting;
+
+// Adds common Aspire services: service discovery, resilience, health checks, and OpenTelemetry.
+// This project should be referenced by each service project in your solution.
+// To learn more about using this project, see https://aka.ms/dotnet/aspire/service-defaults
+public static class Extensions
+{
+    private const string HealthEndpointPath = "/health";
+    private const string AlivenessEndpointPath = "/alive";
+
+    public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.ConfigureOpenTelemetry();
+
+        builder.AddDefaultHealthChecks();
+
+        builder.Services.AddServiceDiscovery();
+
+        builder.Services.ConfigureHttpClientDefaults(http =>
+        {
+            // Turn on resilience by default
+            http.AddStandardResilienceHandler();
+
+            // Turn on service discovery by default
+            http.AddServiceDiscovery();
+        });
+
+        // Uncomment the following to restrict the allowed schemes for service discovery.
+        // builder.Services.Configure<ServiceDiscoveryOptions>(options =>
+        // {
+        //     options.AllowedSchemes = ["https"];
+        // });
+
+        return builder;
+    }
+
+    public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.Logging.AddOpenTelemetry(logging =>
+        {
+            logging.IncludeFormattedMessage = true;
+            logging.IncludeScopes = true;
+        });
+
+        builder.Services.AddOpenTelemetry()
+            .WithMetrics(metrics =>
+            {
+                metrics.AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation()
+                    .AddRuntimeInstrumentation();
+            })
+            .WithTracing(tracing =>
+            {
+                tracing.AddSource(builder.Environment.ApplicationName)
+                    .AddAspNetCoreInstrumentation(tracing =>
+                        // Exclude health check requests from tracing
+                        tracing.Filter = context =>
+                            !context.Request.Path.StartsWithSegments(HealthEndpointPath)
+                            && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
+                    )
+                    // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
+                    //.AddGrpcClientInstrumentation()
+                    .AddHttpClientInstrumentation();
+            });
+
+        builder.AddOpenTelemetryExporters();
+
+        return builder;
+    }
+
+    private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+
+        if (useOtlpExporter)
+        {
+            builder.Services.AddOpenTelemetry().UseOtlpExporter();
+        }
+
+        // Uncomment the following lines to enable the Azure Monitor exporter (requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
+        //if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+        //{
+        //    builder.Services.AddOpenTelemetry()
+        //       .UseAzureMonitor();
+        //}
+
+        return builder;
+    }
+
+    public static TBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.Services.AddHealthChecks()
+            // Add a default liveness check to ensure app is responsive
+            .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
+
+        return builder;
+    }
+
+    public static WebApplication MapDefaultEndpoints(this WebApplication app)
+    {
+        // Adding health checks endpoints to applications in non-development environments has security implications.
+        // See https://aka.ms/dotnet/aspire/healthchecks for details before enabling these endpoints in non-development environments.
+        if (app.Environment.IsDevelopment())
+        {
+            // All health checks must pass for app to be considered ready to accept traffic after starting
+            app.MapHealthChecks(HealthEndpointPath);
+
+            // Only health checks tagged with the "live" tag must pass for app to be considered alive
+            app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
+            {
+                Predicate = r => r.Tags.Contains("live")
+            });
+        }
+
+        return app;
+    }
+}
+
+================================================================
+End of Codebase
+================================================================
+
+================================================================
+Directory Structure
+================================================================
+.repomixignore
+appsettings.Development.json
+appsettings.json
+AspireApp1.Web.csproj
+AspireApp1.Web.csproj.user
+Program.cs
+Services/NotificationHub.cs
+WeatherApiClient.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: .repomixignore
+================
+wwwroot
+Properties
+Components
+/wwwroot
+/Properties
+/Components
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: AspireApp1.Web.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AspireApp1.ServiceDefaults\AspireApp1.ServiceDefaults.csproj" />
+	  <PackageReference Include="Dapr.AspNetCore" Version="1.14.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.StackExchange.Redis.OutputCaching" Version="13.4.6" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: AspireApp1.Web.csproj.user
+================
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ActiveDebugProfile>https</ActiveDebugProfile>
+  </PropertyGroup>
+</Project>
+
+================
+File: Program.cs
+================
+using AspireApp1.Web;
+using AspireApp1.Web.Components;
+using AspireApp1.Web.Services;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();
+builder.AddRedisOutputCache("cache");
+
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
+// builder.Services.AddDaprClient();  // 👈 ВРЕМЕННО УБРАЛИ
+builder.Services.AddSingleton<NotificationHub>();  // 👈 ВРЕМЕННО УБРАЛИ
+
+builder.Services.AddHttpClient<WeatherApiClient>(client =>
+{
+    client.BaseAddress = new("https+http://apiservice");
+});
+
+var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseAntiforgery();
+app.UseOutputCache();  // 👈 РАСКОММЕНТИРОВАЛИ (должно быть!)
+
+// app.UseCloudEvents();  // 👈 ВРЕМЕННО УБРАЛИ
+
+app.MapStaticAssets();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+
+// УБРАЛИ эндпоинт подписки на события временно
+
+// app.MapSubscribeHandler();  // 👈 ВРЕМЕННО УБРАЛИ
+
+app.MapDefaultEndpoints();
+app.Run();
+
+// 2 using AspireApp1.Web;
+//using AspireApp1.Web.Components;
+
+//var builder = WebApplication.CreateBuilder(args);
+
+//builder.AddServiceDefaults();
+//builder.AddRedisOutputCache("cache");  // ← это подключится к порту 6380 автоматически
+
+//builder.Services.AddRazorComponents()
+//    .AddInteractiveServerComponents();
+
+//builder.Services.AddHttpClient<WeatherApiClient>(client =>
+//{
+//    client.BaseAddress = new("https+http://apiservice");
+//});
+
+//var app = builder.Build();
+
+//if (!app.Environment.IsDevelopment())
+//{
+//    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+//    app.UseHsts();
+//}
+
+//app.UseHttpsRedirection();
+//app.UseAntiforgery();
+//app.UseOutputCache();
+
+//app.MapStaticAssets();
+//app.MapRazorComponents<App>()
+//    .AddInteractiveServerRenderMode();
+
+//app.MapDefaultEndpoints();
+//app.Run();
+
+// 1 -----------------------
+//using AspireApp1.Web;
+//using AspireApp1.Web.Components;
+
+//var builder = WebApplication.CreateBuilder(args);
+
+//builder.AddServiceDefaults();
+//builder.AddRedisOutputCache("cache");
+
+//builder.Services.AddRazorComponents()
+//    .AddInteractiveServerComponents();
+
+//// Dapr SDK для подписки
+//builder.Services.AddDaprClient();
+
+//// Хранилище уведомлений (in-memory для демо)
+//builder.Services.AddSingleton<NotificationHub>();
+
+//builder.Services.AddHttpClient<WeatherApiClient>(client =>
+//{
+//    client.BaseAddress = new("https+http://apiservice");
+//});
+
+//var app = builder.Build();
+
+//if (!app.Environment.IsDevelopment())
+//{
+//    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+//    app.UseHsts();
+//}
+
+//app.UseHttpsRedirection();
+//app.UseAntiforgery();
+//app.UseOutputCache();
+//app.UseCloudEvents(); // 👈 ВАЖНО для Pub/Sub
+
+//app.MapStaticAssets();
+//app.MapRazorComponents<App>()
+//    .AddInteractiveServerRenderMode();
+
+//// 🔥 Эндпоинт для подписки на события
+//app.MapPost("/forecast-events", async (
+//    ForecastGeneratedEvent evt,
+//    NotificationHub hub,
+//    ILogger<Program> logger) =>
+//{
+//    logger.LogInformation("📥 Received event: {Count} forecasts at {Time}",
+//        evt.ForecastCount, evt.GeneratedAt);
+
+//    hub.AddNotification($"📢 Новый прогноз: {evt.ForecastCount} дней, средняя {evt.AverageTempC}°C");
+
+//    return Results.Ok();
+//})
+//.WithTopic("pubsub", "forecast-generated"); // 👈 Подписка на тему
+
+//app.MapSubscribeHandler();
+//app.MapDefaultEndpoints();
+//app.Run();
+
+//public class ForecastGeneratedEvent
+//{
+//    public DateTime GeneratedAt { get; set; }
+//    public int ForecastCount { get; set; }
+//    public int AverageTempC { get; set; }
+//}
+
+//public class NotificationHub
+//{
+//    private readonly List<string> _notifications = new();
+//    private readonly object _lock = new();
+
+//    public void AddNotification(string message)
+//    {
+//        lock (_lock)
+//        {
+//            _notifications.Insert(0, $"{DateTime.Now:HH:mm:ss} - {message}");
+//            if (_notifications.Count > 20)
+//                _notifications.RemoveAt(_notifications.Count - 1);
+//        }
+//        OnNotificationReceived?.Invoke(message);
+//    }
+
+//    public IReadOnlyList<string> GetNotifications()
+//    {
+//        lock (_lock) return _notifications.ToList();
+//    }
+
+//    public event Action<string>? OnNotificationReceived;
+//}
+//// ------------------------------------------------------------------------
+
+================
+File: Services/NotificationHub.cs
+================
+// Services/NotificationHub.cs
+
+namespace AspireApp1.Web.Services;
+
+public class NotificationHub
+{
+    private readonly List<string> _notifications = new();
+    private readonly object _lock = new();
+
+    public void AddNotification(string message)
+    {
+        lock (_lock)
+        {
+            _notifications.Insert(0, $"{DateTime.Now:HH:mm:ss} - {message}");
+            if (_notifications.Count > 20)
+                _notifications.RemoveAt(_notifications.Count - 1);
+        }
+        OnNotificationReceived?.Invoke(message);
+    }
+
+    public void Clear()
+    {
+        lock (_lock)
+        {
+            _notifications.Clear();
+        }
+        OnNotificationReceived?.Invoke(string.Empty);
+    }
+
+    public IReadOnlyList<string> GetNotifications()
+    {
+        lock (_lock) return _notifications.ToList();
+    }
+
+    public event Action<string>? OnNotificationReceived;
+}
+
+================
+File: WeatherApiClient.cs
+================
+namespace AspireApp1.Web;
+
+public class WeatherApiClient(HttpClient httpClient)
+{
+    public async Task<WeatherForecast[]> GetWeatherAsync(int maxItems = 10, CancellationToken cancellationToken = default)
+    {
+        List<WeatherForecast>? forecasts = null;
+
+        await foreach (var forecast in httpClient.GetFromJsonAsAsyncEnumerable<WeatherForecast>("/weatherforecast", cancellationToken))
+        {
+            if (forecasts?.Count >= maxItems)
+            {
+                break;
+            }
+            if (forecast is not null)
+            {
+                forecasts ??= [];
+                forecasts.Add(forecast);
+            }
+        }
+
+        return forecasts?.ToArray() ?? [];
+    }
+}
+
+public record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+{
+    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+}
+
+================================================================
+End of Codebase
+================================================================

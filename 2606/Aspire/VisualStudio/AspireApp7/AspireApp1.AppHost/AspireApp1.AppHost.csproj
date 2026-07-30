@@ -13,7 +13,7 @@
 		<ProjectReference Include="..\AspireApp1.Web\AspireApp1.Web.csproj" />
 
 		<!-- ✅ ПРАВИЛЬНЫЙ пакет для AppHost (CommunityToolkit) -->
-		<PackageReference Include="CommunityToolkit.Aspire.Hosting.Dapr" Version="13.4.0-preview.1.260602-0230" />
+		<!--<PackageReference Include="CommunityToolkit.Aspire.Hosting.Dapr" Version="13.4.0-preview.1.260602-0230" />-->
 
 		<PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
 	</ItemGroup>
