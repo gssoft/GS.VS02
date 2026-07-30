@@ -1,0 +1,14 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@* Исправлено имя директивы: убрано со второй строки и вынесено выше *@
+@using AspireApp1.Web.Components @* Добавлен импорт папки Components *@
+
+<PageTitle>Home</PageTitle>
+
+<h1>Hello, world!</h1>
+<p>Welcome to your new app.</p>
+
+<SurveyPrompt Title="How is Blazor working for you?" />
+
+<!-- Наш блок с данными из другого микросервиса -->
+<WeatherDisplay />  

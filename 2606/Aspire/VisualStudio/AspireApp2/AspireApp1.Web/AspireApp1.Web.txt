@@ -1,0 +1,171 @@
+m)
+
+
+================================================================
+Directory Structure
+================================================================
+.repomixignore
+appsettings.Development.json
+appsettings.json
+AspireApp1.Web.csproj
+AspireApp1.Web.csproj.user
+Program.cs
+WeatherApiClient.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: .repomixignore
+================
+wwwroot
+Properties
+Components
+/wwwroot
+/Properties
+/Components
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: AspireApp1.Web.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AspireApp1.ServiceDefaults\AspireApp1.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.StackExchange.Redis.OutputCaching" Version="13.2.4" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: AspireApp1.Web.csproj.user
+================
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ActiveDebugProfile>https</ActiveDebugProfile>
+  </PropertyGroup>
+</Project>
+
+================
+File: Program.cs
+================
+using AspireApp1.Web;
+using AspireApp1.Web.Components;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add service defaults & Aspire client integrations.
+builder.AddServiceDefaults();
+builder.AddRedisOutputCache("cache");
+
+// Add services to the container.
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
+builder.Services.AddHttpClient<WeatherApiClient>(client =>
+    {
+        // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
+        // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
+        client.BaseAddress = new("https+http://apiservice");
+    });
+
+var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+
+app.UseAntiforgery();
+
+app.UseOutputCache();
+
+app.MapStaticAssets();
+
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+
+app.MapDefaultEndpoints();
+
+app.Run();
+
+================
+File: WeatherApiClient.cs
+================
+namespace AspireApp1.Web;
+
+public class WeatherApiClient(HttpClient httpClient)
+{
+    public async Task<WeatherForecast[]> GetWeatherAsync(int maxItems = 10, CancellationToken cancellationToken = default)
+    {
+        List<WeatherForecast>? forecasts = null;
+
+        await foreach (var forecast in httpClient.GetFromJsonAsAsyncEnumerable<WeatherForecast>("/weatherforecast", cancellationToken))
+        {
+            if (forecasts?.Count >= maxItems)
+            {
+                break;
+            }
+            if (forecast is not null)
+            {
+                forecasts ??= [];
+                forecasts.Add(forecast);
+            }
+        }
+
+        return forecasts?.ToArray() ?? [];
+    }
+}
+
+public record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+{
+    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+}
+
+
+
+
+
+================================================================
+End of Codebase
+================================================================

@@ -1,0 +1,54 @@
+﻿@using Microsoft.AspNetCore.Components.Rendering
+@rendertype InteractiveServer
+@inject AspireApp1.Web.WeatherApiClient WeatherApi
+
+<h3>Погода из микросервиса ApiService</h3>
+
+@if (forecasts == null)
+{
+    <p><em>Загрузка данных...</em></p>
+}
+else if (!forecasts.Any())
+{
+    <p><em>Данные о погоде недоступны.</em></p>
+}
+else
+{
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Температура (C)</th>
+                <th>Температура (F)</th>
+                <th>Сводка</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var forecast in forecasts)
+            {
+                <tr>
+                    <td>@forecast.Date.ToShortDateString()</td>
+                    <td>@forecast.TemperatureC</td>
+                    <td>@forecast.TemperatureF</td>
+                    <td>@forecast.Summary</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private WeatherForecast[]? forecasts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Вызываем наш API-сервис.
+        // Благодаря Service Discovery запрос уйдет в нужный Docker-контейнер.
+        forecasts = await WeatherApi.GetWeatherAsync();
+    }
+
+    private void rendertype(RenderTreeBuilder builder)
+    {
+        throw new NotImplementedException();
+    }
+}
