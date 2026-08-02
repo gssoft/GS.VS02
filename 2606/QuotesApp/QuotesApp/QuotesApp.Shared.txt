@@ -1,0 +1,86 @@
+
+================================================================
+Directory Structure
+================================================================
+Models/PortfolioDefinition.cs
+Models/StockQuote.cs
+QuotesApp.Shared.csproj
+
+================================================================
+Files
+================================================================
+
+================
+File: Models/PortfolioDefinition.cs
+================
+namespace QuotesApp.Shared.Models;
+
+public static class PortfolioDefinition
+{
+    public static readonly Dictionary<string, PortfolioConfig> Portfolios = new()
+    {
+        ["tech"] = new PortfolioConfig
+        {
+            DisplayName = "TECH STOCKS",
+            Tickers = new List<string> { "GOOGL", "MSFT", "NVDA" },
+            Color = "Green"
+        },
+        ["consumer"] = new PortfolioConfig
+        {
+            DisplayName = "CONSUMER STOCKS",
+            Tickers = new List<string> { "AMZN", "AAPL" },
+            Color = "Yellow"
+        },
+        ["finance"] = new PortfolioConfig
+        {
+            DisplayName = "FINANCE STOCKS",
+            Tickers = new List<string> { "JPM", "BAC", "GS" },
+            Color = "Cyan"
+        },
+        ["energy"] = new PortfolioConfig
+        {
+            DisplayName = "ENERGY STOCKS",
+            Tickers = new List<string> { "XOM", "CVX" },
+            Color = "Red"
+        }
+    };
+}
+
+public class PortfolioConfig
+{
+    public string DisplayName { get; set; } = string.Empty;
+    public List<string> Tickers { get; set; } = new();
+    public string Color { get; set; } = "White";
+}
+
+================
+File: Models/StockQuote.cs
+================
+using System.Text.Json.Serialization;
+
+namespace QuotesApp.Shared.Models;
+
+public record StockQuote(
+    [property: JsonPropertyName("ticker")] string Ticker,
+    [property: JsonPropertyName("bid")] double Bid,
+    [property: JsonPropertyName("ask")] double Ask,
+    [property: JsonPropertyName("last")] double Last,
+    [property: JsonPropertyName("volume")] int Volume,
+    [property: JsonPropertyName("portfolio")] string Portfolio,
+    [property: JsonPropertyName("timestamp")] DateTime Timestamp
+);
+
+================
+File: QuotesApp.Shared.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>
+
+================================================================
+End of Codebase
+================================================================

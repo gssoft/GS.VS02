@@ -1,0 +1,1102 @@
+
+================================================================
+Directory Structure
+================================================================
+appsettings.json
+Program.cs
+Properties/launchSettings.json
+QuotesApp.ApiService.csproj
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: Program.cs
+================
+using System.Text.Json;
+using QuotesApp.Shared.Models;
+using StackExchange.Redis;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();
+builder.AddRedisClient("cache");
+builder.Services.AddProblemDetails();
+builder.Services.AddOpenApi();
+
+var app = builder.Build();
+
+app.UseExceptionHandler();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+app.MapGet("/quotes", async (IConnectionMultiplexer redis) =>
+{
+    var db = redis.GetDatabase();
+    var quotes = new List<StockQuote>();
+
+    foreach (var portfolio in PortfolioDefinition.Portfolios.Keys)
+    {
+        var entries = await db.HashGetAllAsync($"dashboard:{portfolio}");
+        foreach (var entry in entries)
+        {
+            var q = JsonSerializer.Deserialize<StockQuote>(entry.Value!);
+            if (q is not null) quotes.Add(q);
+        }
+    }
+
+    return Results.Ok(quotes);
+})
+.WithName("GetAllQuotes")
+.WithOpenApi();
+
+app.MapGet("/quotes/{portfolio}", async (string portfolio, IConnectionMultiplexer redis) =>
+{
+    if (!PortfolioDefinition.Portfolios.ContainsKey(portfolio))
+        return Results.NotFound($"Portfolio '{portfolio}' not found.");
+
+    var db = redis.GetDatabase();
+    var entries = await db.HashGetAllAsync($"dashboard:{portfolio}");
+    var quotes = entries
+        .Select(e => JsonSerializer.Deserialize<StockQuote>(e.Value!))
+        .Where(q => q is not null)
+        .ToList();
+
+    return Results.Ok(quotes);
+})
+.WithName("GetQuotesByPortfolio")
+.WithOpenApi();
+
+app.MapGet("/portfolios", () =>
+{
+    var list = PortfolioDefinition.Portfolios
+        .Select(p => new { p.Key, p.Value.DisplayName, Tickers = p.Value.Tickers })
+        .ToList();
+    return Results.Ok(list);
+})
+.WithName("GetPortfolios")
+.WithOpenApi();
+
+app.MapDefaultEndpoints();
+app.Run();
+
+================
+File: Properties/launchSettings.json
+================
+{
+  "profiles": {
+    "QuotesApp.ApiService": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:61566;http://localhost:61568"
+    }
+  }
+}
+
+================
+File: QuotesApp.ApiService.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\QuotesApp.Shared\QuotesApp.Shared.csproj" />
+    <ProjectReference Include="..\QuotesApp.ServiceDefaults\QuotesApp.ServiceDefaults.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.StackExchange.Redis" Version="13.2.4" />
+  </ItemGroup>
+</Project>
+
+================================================================
+End of Codebase
+================================================================
+
+================================================================
+Directory Structure
+================================================================
+appsettings.json
+Program.cs
+QuotesApp.AppHost.csproj
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Aspire.Hosting.Dcp": "Warning"
+    }
+  }
+}
+
+================
+File: Program.cs
+================
+var builder = DistributedApplication.CreateBuilder(args);
+
+var redis = builder.AddRedis("cache");
+
+var pipeServer = builder.AddProject<Projects.QuotesApp_PipeServer>("pipeserver")
+    .WithReference(redis)
+    .WaitFor(redis);
+
+var apiService = builder.AddProject<Projects.QuotesApp_ApiService>("apiservice")
+    .WithReference(redis)
+    .WaitFor(redis);
+
+builder.AddProject<Projects.QuotesApp_Web>("webfrontend")
+    .WithReference(apiService)
+    .WithReference(redis)
+    .WaitFor(apiService)
+    .WithExternalHttpEndpoints();
+
+builder.Build().Run();
+
+================
+File: QuotesApp.AppHost.csproj
+================
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>a1b2c3d4-e5f6-7890-abcd-ef1234567890</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\QuotesApp.PipeServer\QuotesApp.PipeServer.csproj" />
+    <ProjectReference Include="..\QuotesApp.ApiService\QuotesApp.ApiService.csproj" />
+    <ProjectReference Include="..\QuotesApp.Web\QuotesApp.Web.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" Version="13.4.6" />
+    <PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
+  </ItemGroup>
+</Project>
+
+================================================================
+End of Codebase
+================================================================
+
+================================================================
+Directory Structure
+================================================================
+appsettings.json
+Program.cs
+QuotesApp.PipeServer.csproj
+Services/QuoteGenerator.cs
+Services/QuotePublisherService.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "QuoteSettings": {
+    "IntervalMs": 1000
+  }
+}
+
+================
+File: Program.cs
+================
+using QuotesApp.PipeServer.Services;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+builder.AddServiceDefaults();
+builder.AddRedisClient("cache");
+
+builder.Services.AddHostedService<QuotePublisherService>();
+
+var host = builder.Build();
+host.Run();
+
+================
+File: QuotesApp.PipeServer.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\QuotesApp.Shared\QuotesApp.Shared.csproj" />
+    <ProjectReference Include="..\QuotesApp.ServiceDefaults\QuotesApp.ServiceDefaults.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.7" />
+    <PackageReference Include="Aspire.StackExchange.Redis" Version="13.2.4" />
+  </ItemGroup>
+</Project>
+
+================
+File: Services/QuoteGenerator.cs
+================
+using QuotesApp.Shared.Models;
+
+namespace QuotesApp.PipeServer.Services;
+
+public static class QuoteGenerator
+{
+    private static readonly Random _rnd = new();
+
+    private static readonly Dictionary<string, double> BasePrices = new()
+    {
+        ["GOOGL"] = 178.50, ["MSFT"] = 425.30, ["NVDA"] = 890.75,
+        ["AMZN"] = 185.20, ["AAPL"] = 232.40,
+        ["JPM"] = 205.60, ["BAC"] = 42.80, ["GS"] = 478.90,
+        ["XOM"] = 118.30, ["CVX"] = 162.50
+    };
+
+    public static StockQuote Generate(string ticker, string portfolio)
+    {
+        var basePrice = BasePrices.GetValueOrDefault(ticker, 100.0);
+        var change = (_rnd.NextDouble() - 0.5) * basePrice * 0.02;
+        var newPrice = basePrice + change;
+        var spread = Math.Round(newPrice * 0.001, 2);
+
+        return new StockQuote(
+            Ticker: ticker,
+            Bid: Math.Round(newPrice - spread, 2),
+            Ask: Math.Round(newPrice + spread, 2),
+            Last: Math.Round(newPrice, 2),
+            Volume: _rnd.Next(100, 50000),
+            Portfolio: portfolio,
+            Timestamp: DateTime.UtcNow
+        );
+    }
+}
+
+================
+File: Services/QuotePublisherService.cs
+================
+using System.Text.Json;
+using QuotesApp.Shared.Models;
+using StackExchange.Redis;
+
+namespace QuotesApp.PipeServer.Services;
+
+public class QuotePublisherService : BackgroundService
+{
+    private readonly IConnectionMultiplexer _redis;
+    private readonly ILogger<QuotePublisherService> _logger;
+    private readonly int _intervalMs;
+
+    public QuotePublisherService(
+        IConnectionMultiplexer redis,
+        ILogger<QuotePublisherService> logger,
+        IConfiguration configuration)
+    {
+        _redis = redis;
+        _logger = logger;
+        _intervalMs = configuration.GetValue<int>("QuoteSettings:IntervalMs", 1000);
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("QuotePublisherService started. Interval: {Interval}ms", _intervalMs);
+
+        var subscriber = _redis.GetSubscriber();
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                foreach (var (portfolioKey, config) in PortfolioDefinition.Portfolios)
+                {
+                    foreach (var ticker in config.Tickers)
+                    {
+                        var quote = QuoteGenerator.Generate(ticker, portfolioKey);
+                        var json = JsonSerializer.Serialize(quote);
+
+                        await subscriber.PublishAsync(
+                            RedisChannel.Literal($"quotes:{portfolioKey}"), json);
+
+                        await subscriber.PublishAsync(
+                            RedisChannel.Literal("quotes:all"), json);
+
+                        await _redis.GetDatabase().HashSetAsync(
+                            $"dashboard:{portfolioKey}", ticker, json);
+                    }
+                }
+
+                _logger.LogDebug("Published quotes for all portfolios");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Error publishing quotes");
+            }
+
+            await Task.Delay(_intervalMs, stoppingToken);
+        }
+    }
+}
+
+================================================================
+End of Codebase
+================================================================
+
+================================================================
+Directory Structure
+================================================================
+Extensions.cs
+QuotesApp.ServiceDefaults.csproj
+
+================================================================
+Files
+================================================================
+
+================
+File: Extensions.cs
+================
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+
+namespace Microsoft.Extensions.Hosting;
+
+public static class Extensions
+{
+    public static IHostApplicationBuilder AddServiceDefaults(this IHostApplicationBuilder builder)
+    {
+        builder.ConfigureOpenTelemetry();
+        builder.AddDefaultHealthChecks();
+        builder.Services.AddServiceDiscovery();
+        builder.Services.ConfigureHttpClientDefaults(http =>
+        {
+            http.AddStandardResilienceHandler();
+            http.AddServiceDiscovery();
+        });
+        return builder;
+    }
+
+    public static IHostApplicationBuilder ConfigureOpenTelemetry(this IHostApplicationBuilder builder)
+    {
+        builder.Logging.AddOpenTelemetry(logging =>
+        {
+            logging.IncludeFormattedMessage = true;
+            logging.IncludeScopes = true;
+        });
+
+        builder.Services.AddOpenTelemetry()
+            .WithMetrics(metrics =>
+            {
+                metrics.AddAspNetCoreInstrumentation()
+                       .AddHttpClientInstrumentation()
+                       .AddRuntimeInstrumentation();
+            })
+            .WithTracing(tracing =>
+            {
+                tracing.AddAspNetCoreInstrumentation()
+                       .AddHttpClientInstrumentation();
+            });
+
+        builder.AddOpenTelemetryExporters();
+        return builder;
+    }
+
+    private static IHostApplicationBuilder AddOpenTelemetryExporters(this IHostApplicationBuilder builder)
+    {
+        var useOtlpExporter = !string.IsNullOrWhiteSpace(
+            builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+
+        if (useOtlpExporter)
+        {
+            builder.Services.AddOpenTelemetry().UseOtlpExporter();
+        }
+        return builder;
+    }
+
+    public static IHostApplicationBuilder AddDefaultHealthChecks(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddHealthChecks()
+            .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
+        return builder;
+    }
+
+    public static WebApplication MapDefaultEndpoints(this WebApplication app)
+    {
+        app.MapHealthChecks("/health");
+        app.MapHealthChecks("/alive", new HealthCheckOptions
+        {
+            Predicate = r => r.Tags.Contains("live")
+        });
+        return app;
+    }
+}
+
+================
+File: QuotesApp.ServiceDefaults.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAspireSharedProject>true</IsAspireSharedProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.8.0" />
+    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" Version="10.8.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
+  </ItemGroup>
+</Project>
+================================================================
+End of Codebase
+================================================================
+
+================================================================
+Directory Structure
+================================================================
+Models/PortfolioDefinition.cs
+Models/StockQuote.cs
+QuotesApp.Shared.csproj
+
+================================================================
+Files
+================================================================
+
+================
+File: Models/PortfolioDefinition.cs
+================
+namespace QuotesApp.Shared.Models;
+
+public static class PortfolioDefinition
+{
+    public static readonly Dictionary<string, PortfolioConfig> Portfolios = new()
+    {
+        ["tech"] = new PortfolioConfig
+        {
+            DisplayName = "TECH STOCKS",
+            Tickers = new List<string> { "GOOGL", "MSFT", "NVDA" },
+            Color = "Green"
+        },
+        ["consumer"] = new PortfolioConfig
+        {
+            DisplayName = "CONSUMER STOCKS",
+            Tickers = new List<string> { "AMZN", "AAPL" },
+            Color = "Yellow"
+        },
+        ["finance"] = new PortfolioConfig
+        {
+            DisplayName = "FINANCE STOCKS",
+            Tickers = new List<string> { "JPM", "BAC", "GS" },
+            Color = "Cyan"
+        },
+        ["energy"] = new PortfolioConfig
+        {
+            DisplayName = "ENERGY STOCKS",
+            Tickers = new List<string> { "XOM", "CVX" },
+            Color = "Red"
+        }
+    };
+}
+
+public class PortfolioConfig
+{
+    public string DisplayName { get; set; } = string.Empty;
+    public List<string> Tickers { get; set; } = new();
+    public string Color { get; set; } = "White";
+}
+
+================
+File: Models/StockQuote.cs
+================
+using System.Text.Json.Serialization;
+
+namespace QuotesApp.Shared.Models;
+
+public record StockQuote(
+    [property: JsonPropertyName("ticker")] string Ticker,
+    [property: JsonPropertyName("bid")] double Bid,
+    [property: JsonPropertyName("ask")] double Ask,
+    [property: JsonPropertyName("last")] double Last,
+    [property: JsonPropertyName("volume")] int Volume,
+    [property: JsonPropertyName("portfolio")] string Portfolio,
+    [property: JsonPropertyName("timestamp")] DateTime Timestamp
+);
+
+================
+File: QuotesApp.Shared.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>
+
+================================================================
+End of Codebase
+================================================================
+
+================================================================
+Directory Structure
+================================================================
+appsettings.json
+Components/_Imports.razor
+Components/App.razor
+Components/Layout/MainLayout.razor
+Components/Pages/Home.razor
+Components/Routes.razor
+Program.cs
+Properties/launchSettings.json
+QuotesApiClient.cs
+QuotesApp.Web.csproj
+QuoteStreamService.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: Components/_Imports.razor
+================
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using QuotesApp.Web
+@using QuotesApp.Web.Components
+@using QuotesApp.Shared.Models
+
+================
+File: Components/App.razor
+================
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+<body>
+    <Routes @rendermode="InteractiveServer" />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>
+
+================
+File: Components/Layout/MainLayout.razor
+================
+@inherits LayoutComponentBase
+
+<div class="page">
+    <main>
+        @Body
+    </main>
+</div>
+
+================
+File: Components/Pages/Home.razor
+================
+@page "/"
+@using QuotesApp.Web
+@using QuotesApp.Shared.Models
+@inject QuotesApiClient ApiClient
+@inject QuoteStreamService StreamService
+@inject ILogger<Home> Logger
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+
+<PageTitle>QuotesApp — Котировки в реальном времени</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-0">
+                📈 Котировки акций
+                @if (_autoRefresh)
+                {
+                    <span class="badge bg-danger ms-2 live-badge">
+                        <span class="live-dot"></span> LIVE
+                    </span>
+                }
+            </h1>
+            @if (_lastUpdate != default)
+            {
+                <small class="text-muted">🕐 Обновлено: @_lastUpdate.ToString("HH:mm:ss")</small>
+            }
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="autoRefresh"
+                       checked="@_autoRefresh" @onchange="ToggleAutoRefresh" />
+                <label class="form-check-label" for="autoRefresh">Авто</label>
+            </div>
+            <select class="form-select form-select-sm" style="width:80px"
+                    @onchange="OnIntervalChanged" disabled="@(!_autoRefresh)">
+                <option value="3">3с</option>
+                <option value="5">5с</option>
+                <option value="10" selected>10с</option>
+                <option value="30">30с</option>
+                <option value="60">60с</option>
+            </select>
+            <select class="form-select form-select-sm" style="width:140px"
+                    @onchange="OnPortfolioChanged">
+                <option value="">Все портфели</option>
+                <option value="tech">🟢 Tech</option>
+                <option value="consumer">🟡 Consumer</option>
+                <option value="finance">🔵 Finance</option>
+                <option value="energy">🔴 Energy</option>
+            </select>
+            <button class="btn btn-sm btn-outline-primary" @onclick="ManualRefreshAsync">
+                🔄 Обновить
+            </button>
+        </div>
+    </div>
+
+    @if (_isLoading && _quotes.Count == 0)
+    {
+        <div class="alert alert-info">
+            <span class="spinner-border spinner-border-sm me-2"></span>
+            Загрузка котировок из ApiService...
+        </div>
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">
+            <strong>Ошибка:</strong> @_error
+            @if (_autoRefresh)
+            {
+                <small class="d-block mt-1">Автоповтор через @_intervalSec сек...</small>
+            }
+        </div>
+    }
+    else if (_filteredQuotes.Count > 0)
+    {
+        <div class="table-responsive">
+            <table class="table table-dark table-hover table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>Тикер</th>
+                        <th>Портфель</th>
+                        <th class="text-end">Bid</th>
+                        <th class="text-end">Ask</th>
+                        <th class="text-end">Last</th>
+                        <th class="text-end">Spread</th>
+                        <th class="text-end">Volume</th>
+                        <th class="text-end">Время</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var q in _filteredQuotes)
+                    {
+                        <tr class="@GetRowClass(q)">
+                            <td><strong>@q.Ticker</strong></td>
+                            <td>
+                                <span class="badge @GetPortfolioBadge(q.Portfolio)">
+                                    @q.Portfolio.ToUpper()
+                                </span>
+                            </td>
+                            <td class="text-end text-success">@q.Bid.ToString("F2")</td>
+                            <td class="text-end text-danger">@q.Ask.ToString("F2")</td>
+                            <td class="text-end fw-bold">@q.Last.ToString("F2")</td>
+                            <td class="text-end text-muted">@((q.Ask - q.Bid).ToString("F2"))</td>
+                            <td class="text-end">@q.Volume.ToString("N0")</td>
+                            <td class="text-end"><small>@q.Timestamp.ToString("HH:mm:ss")</small></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="text-muted small">
+            Всего: @_filteredQuotes.Count котировок
+            @if (!string.IsNullOrEmpty(_selectedPortfolio))
+            {
+                <span>(фильтр: @_selectedPortfolio)</span>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning">Нет данных для отображения.</div>
+    }
+</div>
+
+<style>
+    .live-badge { animation: pulse 1.5s infinite; }
+    .live-dot {
+        display: inline-block;
+        width: 8px; height: 8px;
+        background: white;
+        border-radius: 50%;
+        margin-right: 4px;
+        animation: blink 1s infinite;
+    }
+    @@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
+    @@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .quote-up { background-color: rgba(25, 135, 84, 0.1) !important; }
+    .quote-down { background-color: rgba(220, 53, 69, 0.1) !important; }
+</style>
+
+@code {
+    private List<StockQuote> _quotes = new();
+    private string? _error;
+    private bool _isLoading = true;
+    private bool _autoRefresh = true;
+    private int _intervalSec = 10;
+    private DateTime _lastUpdate;
+    private string _selectedPortfolio = "";
+    private System.Threading.Timer? _timer;
+    private readonly Dictionary<string, double> _prevPrices = new();
+
+    private List<StockQuote> _filteredQuotes =>
+        string.IsNullOrEmpty(_selectedPortfolio)
+            ? _quotes
+            : _quotes.Where(q => q.Portfolio == _selectedPortfolio).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        StreamService.OnQuoteReceived += OnRealTimeQuote;
+        await StreamService.StartAsync();
+
+        await ManualRefreshAsync();
+        StartAutoRefresh();
+    }
+
+    private async Task OnRealTimeQuote(StockQuote quote)
+    {
+        await InvokeAsync(() =>
+        {
+            var existing = _quotes.FindIndex(q => q.Ticker == quote.Ticker);
+            if (existing >= 0)
+                _quotes[existing] = quote;
+            else
+                _quotes.Add(quote);
+
+            _lastUpdate = DateTime.Now;
+            StateHasChanged();
+        });
+    }
+
+    private async Task ManualRefreshAsync()
+    {
+        try
+        {
+            _error = null;
+            var data = string.IsNullOrEmpty(_selectedPortfolio)
+                ? await ApiClient.GetQuotesAsync()
+                : await ApiClient.GetQuotesByPortfolioAsync(_selectedPortfolio);
+
+            foreach (var q in data)
+            {
+                _prevPrices[q.Ticker] = _quotes
+                    .FirstOrDefault(x => x.Ticker == q.Ticker)?.Last ?? q.Last;
+            }
+
+            _quotes = data;
+            _lastUpdate = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            Logger.LogError(ex, "Failed to fetch quotes");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void StartAutoRefresh()
+    {
+        _timer?.Dispose();
+        _timer = new System.Threading.Timer(
+            async _ => await InvokeAsync(ManualRefreshAsync),
+            null,
+            TimeSpan.FromSeconds(_intervalSec),
+            TimeSpan.FromSeconds(_intervalSec));
+    }
+
+    private void StopAutoRefresh()
+    {
+        _timer?.Dispose();
+        _timer = null;
+    }
+
+    private void ToggleAutoRefresh()
+    {
+        _autoRefresh = !_autoRefresh;
+        if (_autoRefresh) StartAutoRefresh();
+        else StopAutoRefresh();
+    }
+
+    private void OnIntervalChanged(ChangeEventArgs e)
+    {
+        _intervalSec = int.Parse(e.Value?.ToString() ?? "10");
+        if (_autoRefresh) StartAutoRefresh();
+    }
+
+    private async Task OnPortfolioChanged(ChangeEventArgs e)
+    {
+        _selectedPortfolio = e.Value?.ToString() ?? "";
+        await ManualRefreshAsync();
+    }
+
+    private string GetRowClass(StockQuote q)
+    {
+        if (_prevPrices.TryGetValue(q.Ticker, out var prev))
+        {
+            if (q.Last > prev) return "quote-up";
+            if (q.Last < prev) return "quote-down";
+        }
+        return "";
+    }
+
+    private string GetPortfolioBadge(string portfolio) => portfolio switch
+    {
+        "tech" => "bg-success",
+        "consumer" => "bg-warning text-dark",
+        "finance" => "bg-info",
+        "energy" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        StopAutoRefresh();
+        StreamService.OnQuoteReceived -= OnRealTimeQuote;
+        await ValueTask.CompletedTask;
+    }
+}
+
+================
+File: Components/Routes.razor
+================
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>
+
+================
+File: Program.cs
+================
+using QuotesApp.Web;
+using QuotesApp.Web.Components;
+using StackExchange.Redis;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();
+builder.AddRedisClient("cache");
+
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
+builder.Services.AddHttpClient<QuotesApiClient>(client =>
+{
+    client.BaseAddress = new Uri("https+http://apiservice");
+});
+
+builder.Services.AddSingleton<QuoteStreamService>();
+
+var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseAntiforgery();
+
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+
+app.MapDefaultEndpoints();
+app.Run();
+
+================
+File: Properties/launchSettings.json
+================
+{
+  "profiles": {
+    "QuotesApp.Web": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:61565;http://localhost:61567"
+    }
+  }
+}
+
+================
+File: QuotesApiClient.cs
+================
+using System.Net.Http.Json;
+using QuotesApp.Shared.Models;
+
+namespace QuotesApp.Web;
+
+public class QuotesApiClient(HttpClient httpClient)
+{
+    public async Task<List<StockQuote>> GetQuotesAsync(CancellationToken ct = default)
+    {
+        return await httpClient.GetFromJsonAsync<List<StockQuote>>("/quotes", ct)
+            ?? new List<StockQuote>();
+    }
+
+    public async Task<List<StockQuote>> GetQuotesByPortfolioAsync(
+        string portfolio, CancellationToken ct = default)
+    {
+        return await httpClient.GetFromJsonAsync<List<StockQuote>>($"/quotes/{portfolio}", ct)
+            ?? new List<StockQuote>();
+    }
+}
+
+================
+File: QuotesApp.Web.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\QuotesApp.Shared\QuotesApp.Shared.csproj" />
+    <ProjectReference Include="..\QuotesApp.ServiceDefaults\QuotesApp.ServiceDefaults.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.StackExchange.Redis" Version="13.2.4" />
+  </ItemGroup>
+</Project>
+
+================
+File: QuoteStreamService.cs
+================
+using System.Text.Json;
+using QuotesApp.Shared.Models;
+using StackExchange.Redis;
+
+namespace QuotesApp.Web;
+
+public class QuoteStreamService : IAsyncDisposable
+{
+    private readonly IConnectionMultiplexer _redis;
+    private readonly ILogger<QuoteStreamService> _logger;
+    private ISubscriber? _subscriber;
+
+    public event Func<StockQuote, Task>? OnQuoteReceived;
+
+    public QuoteStreamService(IConnectionMultiplexer redis, ILogger<QuoteStreamService> logger)
+    {
+        _redis = redis;
+        _logger = logger;
+    }
+
+    public async Task StartAsync()
+    {
+        _subscriber = _redis.GetSubscriber();
+
+        await _subscriber.SubscribeAsync(
+            RedisChannel.Literal("quotes:all"),
+            async (channel, message) =>
+            {
+                try
+                {
+                    var quote = JsonSerializer.Deserialize<StockQuote>(message!);
+                    if (quote is not null && OnQuoteReceived is not null)
+                    {
+                        await OnQuoteReceived.Invoke(quote);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deserializing quote from Redis");
+                }
+            });
+
+        _logger.LogInformation("Subscribed to quotes:all channel");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_subscriber is not null)
+        {
+            await _subscriber.UnsubscribeAsync(RedisChannel.Literal("quotes:all"));
+        }
+    }
+}
+================================================================
+End of Codebase
+================================================================

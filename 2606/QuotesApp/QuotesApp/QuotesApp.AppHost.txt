@@ -1,0 +1,73 @@
+
+================================================================
+Directory Structure
+================================================================
+appsettings.json
+Program.cs
+QuotesApp.AppHost.csproj
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Aspire.Hosting.Dcp": "Warning"
+    }
+  }
+}
+
+================
+File: Program.cs
+================
+var builder = DistributedApplication.CreateBuilder(args);
+
+var redis = builder.AddRedis("cache");
+
+var pipeServer = builder.AddProject<Projects.QuotesApp_PipeServer>("pipeserver")
+    .WithReference(redis)
+    .WaitFor(redis);
+
+var apiService = builder.AddProject<Projects.QuotesApp_ApiService>("apiservice")
+    .WithReference(redis)
+    .WaitFor(redis);
+
+builder.AddProject<Projects.QuotesApp_Web>("webfrontend")
+    .WithReference(apiService)
+    .WithReference(redis)
+    .WaitFor(apiService)
+    .WithExternalHttpEndpoints();
+
+builder.Build().Run();
+
+================
+File: QuotesApp.AppHost.csproj
+================
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>a1b2c3d4-e5f6-7890-abcd-ef1234567890</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\QuotesApp.PipeServer\QuotesApp.PipeServer.csproj" />
+    <ProjectReference Include="..\QuotesApp.ApiService\QuotesApp.ApiService.csproj" />
+    <ProjectReference Include="..\QuotesApp.Web\QuotesApp.Web.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" Version="13.4.6" />
+    <PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
+  </ItemGroup>
+</Project>
+
+================================================================
+End of Codebase
+================================================================
