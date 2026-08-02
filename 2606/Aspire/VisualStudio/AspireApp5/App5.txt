@@ -1,0 +1,893 @@
+
+================================================================
+Directory Structure
+================================================================
+AppHost.cs
+appsettings.Development.json
+appsettings.json
+AspireApp1.AppHost.csproj
+Properties/launchSettings.json
+
+================================================================
+Files
+================================================================
+
+================
+File: AppHost.cs
+================
+var builder = DistributedApplication.CreateBuilder(args);
+
+var cache = builder.AddRedis("cache");
+
+var apiService = builder.AddProject<Projects.AspireApp1_ApiService>("apiservice")
+    .WithHttpHealthCheck("/health");
+
+builder.AddProject<Projects.AspireApp1_Web>("webfrontend")
+    .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health")
+    .WithReference(cache)
+    .WaitFor(cache)
+    .WithReference(apiService)
+    .WaitFor(apiService);
+
+builder.Build().Run();
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Aspire.Hosting.Dcp": "Warning"
+    }
+  }
+}
+
+================
+File: AspireApp1.AppHost.csproj
+================
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>28a55790-a5fc-4ee5-8cfd-a2765f67bcf1</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AspireApp1.ApiService\AspireApp1.ApiService.csproj" />
+    <ProjectReference Include="..\AspireApp1.Web\AspireApp1.Web.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:17008;http://localhost:15141",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21133",
+        "ASPIRE_DASHBOARD_MCP_ENDPOINT_URL": "https://localhost:23063",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22139"
+      }
+    },
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:15141",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19100",
+        "ASPIRE_DASHBOARD_MCP_ENDPOINT_URL": "http://localhost:18037",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20133"
+      }
+    }
+  }
+}
+
+
+================================================================
+End of Codebase
+================================================================
+
+
+================================================================
+Directory Structure
+================================================================
+AspireApp1.ServiceDefaults.csproj
+Extensions.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: AspireApp1.ServiceDefaults.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAspireSharedProject>true</IsAspireSharedProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.8.0" />
+    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" Version="10.8.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Extensions.cs
+================
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ServiceDiscovery;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+
+namespace Microsoft.Extensions.Hosting;
+
+// Adds common Aspire services: service discovery, resilience, health checks, and OpenTelemetry.
+// This project should be referenced by each service project in your solution.
+// To learn more about using this project, see https://aka.ms/dotnet/aspire/service-defaults
+public static class Extensions
+{
+    private const string HealthEndpointPath = "/health";
+    private const string AlivenessEndpointPath = "/alive";
+
+    public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.ConfigureOpenTelemetry();
+
+        builder.AddDefaultHealthChecks();
+
+        builder.Services.AddServiceDiscovery();
+
+        builder.Services.ConfigureHttpClientDefaults(http =>
+        {
+            // Turn on resilience by default
+            http.AddStandardResilienceHandler();
+
+            // Turn on service discovery by default
+            http.AddServiceDiscovery();
+        });
+
+        // Uncomment the following to restrict the allowed schemes for service discovery.
+        // builder.Services.Configure<ServiceDiscoveryOptions>(options =>
+        // {
+        //     options.AllowedSchemes = ["https"];
+        // });
+
+        return builder;
+    }
+
+    public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.Logging.AddOpenTelemetry(logging =>
+        {
+            logging.IncludeFormattedMessage = true;
+            logging.IncludeScopes = true;
+        });
+
+        builder.Services.AddOpenTelemetry()
+            .WithMetrics(metrics =>
+            {
+                metrics.AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation()
+                    .AddRuntimeInstrumentation();
+            })
+            .WithTracing(tracing =>
+            {
+                tracing.AddSource(builder.Environment.ApplicationName)
+                    .AddAspNetCoreInstrumentation(tracing =>
+                        // Exclude health check requests from tracing
+                        tracing.Filter = context =>
+                            !context.Request.Path.StartsWithSegments(HealthEndpointPath)
+                            && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
+                    )
+                    // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
+                    //.AddGrpcClientInstrumentation()
+                    .AddHttpClientInstrumentation();
+            });
+
+        builder.AddOpenTelemetryExporters();
+
+        return builder;
+    }
+
+    private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+
+        if (useOtlpExporter)
+        {
+            builder.Services.AddOpenTelemetry().UseOtlpExporter();
+        }
+
+        // Uncomment the following lines to enable the Azure Monitor exporter (requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
+        //if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+        //{
+        //    builder.Services.AddOpenTelemetry()
+        //       .UseAzureMonitor();
+        //}
+
+        return builder;
+    }
+
+    public static TBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.Services.AddHealthChecks()
+            // Add a default liveness check to ensure app is responsive
+            .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
+
+        return builder;
+    }
+
+    public static WebApplication MapDefaultEndpoints(this WebApplication app)
+    {
+        // Adding health checks endpoints to applications in non-development environments has security implications.
+        // See https://aka.ms/dotnet/aspire/healthchecks for details before enabling these endpoints in non-development environments.
+        if (app.Environment.IsDevelopment())
+        {
+            // All health checks must pass for app to be considered ready to accept traffic after starting
+            app.MapHealthChecks(HealthEndpointPath);
+
+            // Only health checks tagged with the "live" tag must pass for app to be considered alive
+            app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
+            {
+                Predicate = r => r.Tags.Contains("live")
+            });
+        }
+
+        return app;
+    }
+}
+
+================================================================
+End of Codebase
+================================================================
+================================================================
+Directory Structure
+================================================================
+appsettings.Development.json
+appsettings.json
+AspireApp1.ApiService.csproj
+AspireApp1.ApiService.csproj.user
+AspireApp1.ApiService.http
+Program.cs
+Properties/launchSettings.json
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: AspireApp1.ApiService.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AspireApp1.ServiceDefaults\AspireApp1.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: AspireApp1.ApiService.csproj.user
+================
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ActiveDebugProfile>https</ActiveDebugProfile>
+  </PropertyGroup>
+</Project>
+
+================
+File: AspireApp1.ApiService.http
+================
+@ApiService_HostAddress = http://localhost:5452
+
+GET {{ApiService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+================
+File: Program.cs
+================
+var builder = WebApplication.CreateBuilder(args);
+
+// Add service defaults & Aspire client integrations.
+builder.AddServiceDefaults();
+
+// Add services to the container.
+builder.Services.AddProblemDetails();
+
+// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Services.AddOpenApi();
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+app.UseExceptionHandler();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
+
+app.MapGet("/", () => "API service is running. Navigate to /weatherforecast to see sample data.");
+
+app.MapGet("/weatherforecast", () =>
+{
+    var forecast = Enumerable.Range(1, 5).Select(index =>
+        new WeatherForecast
+        (
+            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+            Random.Shared.Next(-20, 55),
+            summaries[Random.Shared.Next(summaries.Length)]
+        ))
+        .ToArray();
+    return forecast;
+})
+.WithName("GetWeatherForecast");
+
+app.MapDefaultEndpoints();
+
+app.Run();
+
+record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+{
+    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+}
+
+================
+File: Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5452",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://localhost:7539;http://localhost:5452",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+================================================================
+End of Codebase
+================================================================
+
+================================================================
+Directory Structure
+================================================================
+.repomixignore
+appsettings.Development.json
+appsettings.json
+AspireApp1.Web.csproj
+AspireApp1.Web.csproj.user
+Program.cs
+WeatherApiClient.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: .repomixignore
+================
+wwwroot
+Properties
+Components
+/wwwroot
+/Properties
+/Components
+
+================
+File: appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: AspireApp1.Web.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AspireApp1.ServiceDefaults\AspireApp1.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.StackExchange.Redis.OutputCaching" Version="13.2.4" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: AspireApp1.Web.csproj.user
+================
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ActiveDebugProfile>https</ActiveDebugProfile>
+  </PropertyGroup>
+</Project>
+
+================
+File: Program.cs
+================
+using AspireApp1.Web;
+using AspireApp1.Web.Components;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add service defaults & Aspire client integrations.
+builder.AddServiceDefaults();
+builder.AddRedisOutputCache("cache");
+
+// Add services to the container.
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
+builder.Services.AddHttpClient<WeatherApiClient>(client =>
+    {
+        // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
+        // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
+        client.BaseAddress = new("https+http://apiservice");
+    });
+
+var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+
+app.UseAntiforgery();
+
+app.UseOutputCache();
+
+app.MapStaticAssets();
+
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+
+app.MapDefaultEndpoints();
+
+app.Run();
+
+================
+File: WeatherApiClient.cs
+================
+namespace AspireApp1.Web;
+
+public class WeatherApiClient(HttpClient httpClient)
+{
+    public async Task<WeatherForecast[]> GetWeatherAsync(int maxItems = 10, CancellationToken cancellationToken = default)
+    {
+        List<WeatherForecast>? forecasts = null;
+
+        await foreach (var forecast in httpClient.GetFromJsonAsAsyncEnumerable<WeatherForecast>("/weatherforecast", cancellationToken))
+        {
+            if (forecasts?.Count >= maxItems)
+            {
+                break;
+            }
+            if (forecast is not null)
+            {
+                forecasts ??= [];
+                forecasts.Add(forecast);
+            }
+        }
+
+        return forecasts?.ToArray() ?? [];
+    }
+}
+
+public record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+{
+    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+}
+
+================================================================
+End of Codebase
+================================================================
+@page "/"
+@using AspireApp1.Web
+@inject WeatherApiClient WeatherApiClient
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+
+<PageTitle>Прогноз погоды — Aspire Demo</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">
+            🌤️ Прогноз погоды
+            @if (_autoRefresh)
+            {
+                <span class="badge bg-success ms-2 fs-6" style="animation: pulse 1.5s infinite">
+                    <span class="me-1">●</span>LIVE
+                </span>
+            }
+        </h1>
+    </div>
+
+    <p class="text-muted">
+        Данные получены из <code>ApiService</code> через Aspire Service Discovery
+        (работает в Docker Desktop).
+    </p>
+
+    <!-- Панель управления автообновлением -->
+    <div class="card mb-4">
+        <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="autoRefreshSwitch"
+                       @bind="_autoRefresh" @bind:after="OnAutoRefreshChanged">
+                <label class="form-check-label" for="autoRefreshSwitch">
+                    Автообновление
+                </label>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <label for="intervalSelect" class="form-label mb-0">Период:</label>
+                <select id="intervalSelect" class="form-select form-select-sm" style="width: auto"
+                        @bind="_intervalSeconds" @bind:after="OnIntervalChanged">
+                    <option value="3">3 секунды</option>
+                    <option value="5">5 секунд</option>
+                    <option value="10">10 секунд</option>
+                    <option value="30">30 секунд</option>
+                    <option value="60">1 минута</option>
+                </select>
+            </div>
+
+            @if (_lastUpdate != default)
+            {
+                <small class="text-muted">
+                    🕐 Обновлено: @_lastUpdate.ToString("HH:mm:ss")
+                </small>
+            }
+
+            <button class="btn btn-sm btn-outline-primary ms-auto" @onclick="ManualRefreshAsync">
+                🔄 Обновить сейчас
+            </button>
+        </div>
+    </div>
+
+    <!-- Состояния -->
+    @if (_isLoading && _forecasts is null)
+    {
+        <div class="alert alert-info">
+            <span class="spinner-border spinner-border-sm me-2"></span>
+            Первичная загрузка данных из ApiService...
+        </div>
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">
+            <strong>Ошибка:</strong> @_error
+            @if (_autoRefresh)
+            {
+                <small class="d-block mt-1">
+                    Автообновление продолжит попытки через @_intervalSeconds сек.
+                </small>
+            }
+        </div>
+    }
+
+    <!-- Таблица прогнозов -->
+    @if (_forecasts is { Length: > 0 })
+    {
+        <div class="position-relative">
+            @if (_isRefreshing)
+            {
+                <div class="position-absolute top-0 end-0 m-2">
+                    <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                </div>
+            }
+
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Дата</th>
+                        <th>Темп. (°C)</th>
+                        <th>Темп. (°F)</th>
+                        <th>Описание</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var forecast in _forecasts)
+                    {
+                        <tr>
+                            <td>@forecast.Date.ToString("dd.MM.yyyy")</td>
+                            <td>@forecast.TemperatureC°C</td>
+                            <td>@forecast.TemperatureF°F</td>
+                            <td>
+                                <span class="badge @GetBadgeColor(forecast.TemperatureC)">
+                                    @forecast.Summary
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else if (!_isLoading)
+    {
+        <div class="alert alert-warning">Данные о погоде не получены.</div>
+    }
+</div>
+
+<style>
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+</style>
+
+@code {
+    private WeatherForecast[]? _forecasts;
+    private bool _isLoading = true;
+    private bool _isRefreshing;
+    private string? _error;
+    private DateTime _lastUpdate;
+
+    // Настройки автообновления
+    private bool _autoRefresh = true;
+    private int _intervalSeconds = 5;
+
+    // Управление жизненным циклом таймера
+    private PeriodicTimer? _timer;
+    private CancellationTokenSource? _cts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Первичная загрузка
+        await LoadWeatherAsync(isInitial: true);
+
+        // Запускаем цикл автообновления
+        StartAutoRefresh();
+    }
+
+    private void StartAutoRefresh()
+    {
+        // Останавливаем предыдущий таймер, если был
+        StopAutoRefresh();
+
+        _cts = new CancellationTokenSource();
+        _timer = new PeriodicTimer(TimeSpan.FromSeconds(_intervalSeconds));
+        var token = _cts.Token;
+
+        // Запускаем фоновый цикл (fire-and-forget)
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (await _timer.WaitForNextTickAsync(token))
+                {
+                    if (!_autoRefresh) continue;
+
+                    await LoadWeatherAsync(isInitial: false);
+
+                    // ВАЖНО: обновляем UI через InvokeAsync,
+                    // т.к. мы находимся не в UI-потоке Blazor
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Нормальное завершение при остановке — ничего не делаем
+            }
+            catch (Exception ex)
+            {
+                // Логируем, но не даём циклу упасть
+                Console.WriteLine($"[AutoRefresh] Ошибка: {ex.Message}");
+            }
+        }, token);
+    }
+
+    private void StopAutoRefresh()
+    {
+        _cts?.Cancel();
+        _timer?.Dispose();
+        _cts?.Dispose();
+        _timer = null;
+        _cts = null;
+    }
+
+    private async Task LoadWeatherAsync(bool isInitial)
+    {
+        if (isInitial)
+        {
+            _isLoading = true;
+        }
+        else
+        {
+            _isRefreshing = true;
+        }
+
+        _error = null;
+
+        try
+        {
+            _forecasts = await WeatherApiClient.GetWeatherAsync(maxItems: 10);
+            _lastUpdate = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+            _isRefreshing = false;
+        }
+    }
+
+    private async Task ManualRefreshAsync()
+    {
+        await LoadWeatherAsync(isInitial: false);
+    }
+
+    private void OnAutoRefreshChanged()
+    {
+        if (_autoRefresh && _timer is null)
+        {
+            StartAutoRefresh();
+        }
+    }
+
+    private void OnIntervalChanged()
+    {
+        // При смене интервала — перезапускаем таймер
+        if (_autoRefresh)
+        {
+            StartAutoRefresh();
+        }
+    }
+
+    private string GetBadgeColor(int tempC) => tempC switch
+    {
+        < 0 => "bg-primary",
+        < 10 => "bg-info",
+        < 20 => "bg-success",
+        < 30 => "bg-warning text-dark",
+        _ => "bg-danger"
+    };
+
+    // ВАЖНО: освобождаем ресурсы при уходе со страницы
+    public ValueTask DisposeAsync()
+    {
+        StopAutoRefresh();
+        return ValueTask.CompletedTask;
+    }
+}
+Очень хороший UI
+

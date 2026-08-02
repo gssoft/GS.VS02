@@ -1,4 +1,4 @@
-﻿namespace AspireApp1.ApiService.Service;
+﻿namespace AspireApp.ApiService.Service;
 // File: Services/QuotesGeneratorService.cs
 using Quotes.Shared.Contracts;
 using System.Threading.Channels;

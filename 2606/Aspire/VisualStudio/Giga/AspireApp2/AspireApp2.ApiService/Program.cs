@@ -1,47 +1,24 @@
-var builder = WebApplication.CreateBuilder(args);
+using Quotes.Shared.Contracts;
+using System.Threading.Channels;
 
-// Add service defaults & Aspire client integrations.
+using AspireApp.ApiService.Service;
+
+var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
-// Add services to the container.
-builder.Services.AddProblemDetails();
+// Регистрируем канал для передачи котировок внутри процесса
+builder.Services.AddSingleton(Channel.CreateUnbounded<QuoteDto>());
 
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+// Регистрируем наш генератор как фоновую службу
+builder.Services.AddHostedService<QuotesGeneratorService>();
+
+// Добавляем эндпоинт, чтобы отдавать данные Web-у
+builder.Services.AddControllers();
 
 var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-app.UseExceptionHandler();
-
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
-string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
-
-app.MapGet("/", () => "API service is running. Navigate to /weatherforecast to see sample data.");
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
-
 app.MapDefaultEndpoints();
+app.MapControllers(); // Для API endpoint
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+
