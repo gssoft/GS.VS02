@@ -1,0 +1,120 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+
+
+================================================================
+Directory Structure
+================================================================
+appsettings.json
+Program.cs
+QuotesApp.AppHost.csproj
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Aspire.Hosting.Dcp": "Warning"
+    }
+  }
+}
+
+================
+File: Program.cs
+================
+var builder = DistributedApplication.CreateBuilder(args);
+
+var redis = builder.AddRedis("cache");
+
+var pipeServer = builder.AddProject<Projects.QuotesApp_PipeServer>("pipeserver")
+    .WithReference(redis)
+    .WaitFor(redis);
+
+var apiService = builder.AddProject<Projects.QuotesApp_ApiService>("apiservice")
+    .WithReference(redis)
+    .WaitFor(redis);
+
+builder.AddProject<Projects.QuotesApp_Web>("webfrontend")
+    .WithReference(apiService)
+    .WithReference(redis)
+    .WaitFor(apiService)
+    .WithExternalHttpEndpoints();
+
+builder.Build().Run();
+
+================
+File: QuotesApp.AppHost.csproj
+================
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>a1b2c3d4-e5f6-7890-abcd-ef1234567890</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\QuotesApp.PipeServer\QuotesApp.PipeServer.csproj" />
+    <ProjectReference Include="..\QuotesApp.ApiService\QuotesApp.ApiService.csproj" />
+    <ProjectReference Include="..\QuotesApp.Web\QuotesApp.Web.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" Version="13.4.6" />
+    <PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
+  </ItemGroup>
+</Project>
+
+
+
+
+
+================================================================
+End of Codebase
+================================================================
