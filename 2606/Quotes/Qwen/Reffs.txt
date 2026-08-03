@@ -1,0 +1,11 @@
+Qwen, 260802
+https://chat.qwen.ai/c/67042a1b-d0c2-463f-aa13-24e74fcb092c
+или
+https://chat.qwen.ai/s/8b4089a0-2159-43d3-a1a4-36fb73d65581?fev=0.2.81
+
+Распаковка и создание проектов
+$ bash Qwen_bash_20260803_.sh
+🚀 Создаём проект QuotesApp...
+-------------------------------------------------------------------------------------------------
+DeepSeek, Quotes
+https://gsdeepseek.blogspot.com/2025/11/251014-deepseek-generator-random-markets.html

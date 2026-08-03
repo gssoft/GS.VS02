@@ -1,0 +1,169 @@
+
+================================================================
+Directory Structure
+================================================================
+appsettings.json
+Program.cs
+QuotesApp.PipeServer.csproj
+Services/QuoteGenerator.cs
+Services/QuotePublisherService.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "QuoteSettings": {
+    "IntervalMs": 1000
+  }
+}
+
+================
+File: Program.cs
+================
+using QuotesApp.PipeServer.Services;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+builder.AddServiceDefaults();
+builder.AddRedisClient("cache");
+
+builder.Services.AddHostedService<QuotePublisherService>();
+
+var host = builder.Build();
+host.Run();
+
+================
+File: QuotesApp.PipeServer.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\QuotesApp.Shared\QuotesApp.Shared.csproj" />
+    <ProjectReference Include="..\QuotesApp.ServiceDefaults\QuotesApp.ServiceDefaults.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.7" />
+    <PackageReference Include="Aspire.StackExchange.Redis" Version="13.2.4" />
+  </ItemGroup>
+</Project>
+
+================
+File: Services/QuoteGenerator.cs
+================
+using QuotesApp.Shared.Models;
+
+namespace QuotesApp.PipeServer.Services;
+
+public static class QuoteGenerator
+{
+    private static readonly Random _rnd = new();
+
+    private static readonly Dictionary<string, double> BasePrices = new()
+    {
+        ["GOOGL"] = 178.50, ["MSFT"] = 425.30, ["NVDA"] = 890.75,
+        ["AMZN"] = 185.20, ["AAPL"] = 232.40,
+        ["JPM"] = 205.60, ["BAC"] = 42.80, ["GS"] = 478.90,
+        ["XOM"] = 118.30, ["CVX"] = 162.50
+    };
+
+    public static StockQuote Generate(string ticker, string portfolio)
+    {
+        var basePrice = BasePrices.GetValueOrDefault(ticker, 100.0);
+        var change = (_rnd.NextDouble() - 0.5) * basePrice * 0.02;
+        var newPrice = basePrice + change;
+        var spread = Math.Round(newPrice * 0.001, 2);
+
+        return new StockQuote(
+            Ticker: ticker,
+            Bid: Math.Round(newPrice - spread, 2),
+            Ask: Math.Round(newPrice + spread, 2),
+            Last: Math.Round(newPrice, 2),
+            Volume: _rnd.Next(100, 50000),
+            Portfolio: portfolio,
+            Timestamp: DateTime.UtcNow
+        );
+    }
+}
+
+================
+File: Services/QuotePublisherService.cs
+================
+using System.Text.Json;
+using QuotesApp.Shared.Models;
+using StackExchange.Redis;
+
+namespace QuotesApp.PipeServer.Services;
+
+public class QuotePublisherService : BackgroundService
+{
+    private readonly IConnectionMultiplexer _redis;
+    private readonly ILogger<QuotePublisherService> _logger;
+    private readonly int _intervalMs;
+
+    public QuotePublisherService(
+        IConnectionMultiplexer redis,
+        ILogger<QuotePublisherService> logger,
+        IConfiguration configuration)
+    {
+        _redis = redis;
+        _logger = logger;
+        _intervalMs = configuration.GetValue<int>("QuoteSettings:IntervalMs", 1000);
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("QuotePublisherService started. Interval: {Interval}ms", _intervalMs);
+
+        var subscriber = _redis.GetSubscriber();
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                foreach (var (portfolioKey, config) in PortfolioDefinition.Portfolios)
+                {
+                    foreach (var ticker in config.Tickers)
+                    {
+                        var quote = QuoteGenerator.Generate(ticker, portfolioKey);
+                        var json = JsonSerializer.Serialize(quote);
+
+                        await subscriber.PublishAsync(
+                            RedisChannel.Literal($"quotes:{portfolioKey}"), json);
+
+                        await subscriber.PublishAsync(
+                            RedisChannel.Literal("quotes:all"), json);
+
+                        await _redis.GetDatabase().HashSetAsync(
+                            $"dashboard:{portfolioKey}", ticker, json);
+                    }
+                }
+
+                _logger.LogDebug("Published quotes for all portfolios");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Error publishing quotes");
+            }
+
+            await Task.Delay(_intervalMs, stoppingToken);
+        }
+    }
+}
+
+================================================================
+End of Codebase
+================================================================

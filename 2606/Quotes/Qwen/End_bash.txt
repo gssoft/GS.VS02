@@ -1,0 +1,6 @@
+# 28. README.md
+cat > QuotesApp/README.md << 'EOF'
+# QuotesApp — Real-time Stock Quotes (.NET Aspire)
+
+## Architecture
+
