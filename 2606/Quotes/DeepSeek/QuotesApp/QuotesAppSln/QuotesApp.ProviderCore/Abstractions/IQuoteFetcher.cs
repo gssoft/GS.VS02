@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using QuotesApp.Shared.Models;
 
-namespace QuotesApp.ProviderCore.Abstractions
+namespace QuotesApp.ProviderCore.Abstractions;
+
+public interface IQuoteFetcher
 {
-    internal class IQuoteFetcher
-    {
-    }
+    Task<StockQuote> FetchAsync(string ticker, string portfolio, CancellationToken ct);
 }

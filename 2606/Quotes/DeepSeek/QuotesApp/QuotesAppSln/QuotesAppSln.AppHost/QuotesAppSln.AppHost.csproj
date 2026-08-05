@@ -1,0 +1,21 @@
+﻿<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>f3054030-25cc-4f4a-8ddb-dfb223c7e013</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\QuotesApp.Providers.External\QuotesApp.Providers.External.csproj" />
+    <ProjectReference Include="..\QuotesApp.Providers.Simulator\QuotesApp.Providers.Simulator.csproj" />
+  </ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Aspire.Hosting.AppHost" Version="13.4.6" />
+		<PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
+	</ItemGroup>
+
+</Project>

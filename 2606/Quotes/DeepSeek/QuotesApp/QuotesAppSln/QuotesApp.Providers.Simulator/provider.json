@@ -1,0 +1,8 @@
+﻿{
+  "schemaVersion": 1,
+  "providerId": "simulator",
+  "displayName": "Simulator Provider",
+  "tickers": [ "GOOGL", "MSFT", "NVDA", "AMZN", "AAPL" ],
+  "portfolio": "tech",
+  "intervalMs": 1000
+}

@@ -1,3 +1,7 @@
 <Solution>
   <Project Path="QuotesApp.ProviderCore/QuotesApp.ProviderCore.csproj" />
+  <Project Path="QuotesApp.Providers.External/QuotesApp.Providers.External.csproj" />
+  <Project Path="QuotesApp.Providers.Simulator/QuotesApp.Providers.Simulator.csproj" />
+  <Project Path="QuotesAppSln.AppHost/QuotesAppSln.AppHost.csproj" />
+  <Project Path="QuotesAppSln.ServiceDefaults/QuotesAppSln.ServiceDefaults.csproj" />
 </Solution>
