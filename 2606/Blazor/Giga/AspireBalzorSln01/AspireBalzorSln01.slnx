@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="AspireBalzorSln01.ApiService/AspireBalzor.ApiService.csproj" />
+  <Project Path="AspireBalzorSln01.AppHost/AspireBalzor.AppHost.csproj" />
+  <Project Path="AspireBalzorSln01.ServiceDefaults/AspireBalzor.ServiceDefaults.csproj" />
+  <Project Path="AspireBalzorSln01.Web/AspireBalzor.Web.csproj" />
+  <Project Path="AspireBlazor.Shared/AspireBlazor.Shared.csproj" />
+</Solution>

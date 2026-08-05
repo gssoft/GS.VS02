@@ -1,0 +1,21 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.2.4">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>3c3d25cc-38c8-4a19-aad3-a4cf8be122a4</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AspireBlazorStarter.ApiService\AspireBlazorStarter.ApiService.csproj" />
+    <ProjectReference Include="..\AspireBlazorStarter.Web\AspireBlazorStarter.Web.csproj" />
+    <ProjectReference Include="..\WorkerServiceStarter\WorkerServiceStarter.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Redis" Version="13.2.4" />
+  </ItemGroup>
+
+</Project>
