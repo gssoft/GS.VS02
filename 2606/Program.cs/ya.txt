@@ -1,0 +1,128 @@
+Мы с Вами разобрали типовые Проекты для .Net Aspire и одобрили их.
+Обычно далее начинается самодеятельность.
+Потому что нет дальше ничего.
+DI - хорошая вещь, но поскольку далее стандартных средств нет начинается Творчество - Самопал.
+А хотелось, что бы и DI в Program.cs писали бы канонам.
+Возбмем к примеру стандартные зависимости redis, pub/sub итд - здеь все нормально, потому что больше ты сам такого не напишешь и не испортишь.
+А вот самопальное писание кода в Program.cs с DI - зависимостями часто 
+вызывает непонимание  - на первый взгляд это кажется Хаосом.
+Для написания кода в Prоgraм.cs нужны Типовые вещи, а не самодеятельность.
+Для Porogamюcs нужны Типовые 
+-- Структура кода
+-- Правилиа
+-- Манифест
+-- Паттерны
+
+
+Ответ
+Ответ
+
+Вы затронули самую болезненную точку современного .NET-развития. С появлением минимальных API и верхнего уровня Program.cs разработчики получили огромную свободу, которая очень быстро превратилась в хаос. 
+
+Действительно, Aspire отлично справляется с инфраструктурой (Redis, Postgres — тут не забалуешь), но как только дело доходит до регистрации бизнес-логики, каждый пишет кто во что горазд.
+
+Чтобы превратить этот «хаос» в канон, нужно перестать относиться к Program.cs просто как к скрипту инициализации и начать воспринимать его как манифест композиции приложения. 
+
+Ниже приведены типовые правила, структура и паттерны, которые превращают файл из мешанины кода в предсказуемую архитектуру.
+
+1. Манифест: Правило слоев DI (The Layered Registration Manifest)
+Главное правило: бизнес-сервисы никогда не регистрируются прямо в корневом Program.cs. Корневой файл должен знать только о границах системы, а не о ее внутренностях.
+
+Типовая иерархия расширений (IServiceCollection):
+Вместо того чтобы писать services.AddScoped<IOrderService, OrderService>() в Program.cs, используйте цепочку вызовов, отражающую слои:
+
+csharp
+Копировать
+// Program.cs (Только границы и инфраструктура)
+var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults(); // Aspire
+
+// 1. Ядро (Core) - интерфейсы домена, события
+builder.Services.AddDomainCore();
+
+// 2. Приложение (Application) - Use Case'ы, обработчики команд, MediatR
+builder.Services.AddApplicationLayer();
+
+// 3. Инфраструктура (Infrastructure) - реализации репозиториев, EF Core, клиенты внешних API
+builder.Services.AddInfrastructure(builder.Configuration);
+
+// 4. Входные точки (Presentation / Entry Points) - Minimal API эндпоинты, контроллеры
+builder.Services.AddPresentation();
+
+var app = builder.Build();
+app.MapDefaultEndpoints();
+app.MapGroup("/api/orders").MapOrdersApi(); // Регистрация конкретных маршрутов внутри слоя Presentation
+app.Run();
+Это создает манифест: любой разработчик, открыв файл, сразу видит архитектурный срез проекта.
+
+2. Структура кода: Конвенции расположения файлов
+Чтобы эта схема работала, зависимости должны лежать строго на своих местах. Самодеятельность здесь недопустима:
+
+/src/MyApp.Domain/DependencyInjection.cs -> метод AddDomainCore().
+/src/MyApp.Application/DependencyInjection.cs -> метод AddApplicationLayer().
+/src/MyApp.Infrastructure/DependencyInjection.cs -> метод AddInfrastructure().
+/src/MyApp.Api/DependencyInjection.cs (или Endpoints-файлы) -> метод AddPresentation().
+Каждый такой файл содержит только регистрацию зависимостей своего слоя. Это исключает ситуацию, когда инфраструктурный код случайно попадает в слой ядра.
+
+3. Паттерны для Program.cs
+Внутри этих методов расширения применяйте строгие паттерны вместо разрозненных строк:
+
+Паттерн А: Группировка по Bounded Contexts (Вертикальный разрез)
+Вместо плоского списка AddScoped<IFirst...>, AddScoped<ISecond...> группируйте логику по фичам.
+
+csharp
+Копировать
+// Внутри AddApplicationLayer()
+services.Scan(scan => scan
+    .FromAssemblyOf<CreateOrderCommand>()
+    .AddClasses(classes => classes.AssignableTo(typeof(ICommandHandler<>)))
+    .AsImplementedInterfaces()
+    .WithScopedLifetime());
+Если используете MediatR или Wolverine, они делают это автоматически через сканирование сборок.
+
+Паттерн Б: Явная регистрация инфраструктуры (Explicit Infrastructure)
+Внешние сервисы всегда регистрируются отдельными именованными блоками. Никаких скрытых магических настроек внутри сервисов.
+
+csharp
+Копировать
+// В файле Infrastructure/DependencyInjection.cs
+public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
+{
+    // Блок 1: Кеш
+    services.AddStackExchangeRedisCache(o => o.Configuration = config["Cache:Connection"]);
+    
+    // Блок 2: Почта (с обвязкой resilience из ServiceDefaults)
+    services.AddHttpClient<IEmailSender, SendGridEmailClient>(client =>
+    {
+        client.BaseAddress = new Uri(config["ExternalServices:SendGrid:Url"]);
+    })
+    .AddStandardResilienceHandler(); // Канон Aspire
+    
+    return services;
+}
+Паттерн В: Метод расширения MapXxx для Endpoint Grouping
+Весь хаос Minimal API тоже убирается из корня. Используйте группы конечных точек.
+
+csharp
+Копировать
+// Вместо десятка app.MapGet(...) в Program.cs
+app.MapGroup("/api/customers")
+    .RequireAuthorization()
+    .WithTags("Customers")
+    .MapCustomerEndpoints(); // Вся логика роутинга живет в CustomerEndpoints.cs
+4. Правила оформления (Каноны стиля)
+Чтобы Program.cs читался как конфигурационный YAML, соблюдайте формальные ограничения:
+
+Запрет сложной логики: Никаких циклов foreach, сложных условий if или ручного чтения конфигов кроме вызова .Bind() в корневом файле. Если нужна логика — спрячьте её в метод расширения соответствующего слоя.
+Порядок имеет значение: Всегда следуйте одной последовательности сверху вниз:
+Сервисы по умолчанию (.NET + Aspire).
+Конфигурация (связывание секций IOptions).
+Контейнер зависимостей (ваши слои от Domain к Presentation).
+Мiddleware pipeline (UseSerilog, UseHttpsRedirection...).
+Маппинг маршрутов (MapGroup...).
+Длина файла: Идеальный корневой Program.cs микросервиса занимает не более 15–20 строк чистого кода.
+Зачем нужен жесткий манифест?
+Когда новый человек приходит в проект, он не гадает, где искать настройку SMTP-клиента. Он знает: если это внешняя интеграция — идем в Infrastructure/DI. Нужна бизнес-правила заказа — идем в Application/DI. 
+
+Для вашего случая с несколькими парами Backend-Frontend в Aspire это критично: вы создаете один шаблон решения (Solution Template). Все проекты-бэкенды в нем будут иметь абсолютно идентичную структуру Program.cs, отличаясь только названием сборки в методах Scan(scan => scan.FromAssemblyOf<...>()).
+
