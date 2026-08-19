@@ -1,0 +1,12 @@
+Single Source of Truth
+i18n
+CRUD + Safety
+half-life of knowledge
+экзокортекс
+LangChain
+Скорость прототипирования
+Фокус на метаданных
+Antifragility
+графовые базы данных
+Property Graphs
+
