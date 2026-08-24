@@ -1,0 +1,353 @@
+МЫ нашли очень удачное наименование для сущностей
+OrderProccessor
+TradeProcessor
+PositionProcessor
+Это очень хорошо отражает смысл этих сущностей
+-------------
+Действительно, Processor‑ы в сочетании с Event‑driven подходом дают очень естественный нейминг:
+
+OrderProcessor – обрабатывает всё, что касается заказов
+
+TradeProcessor – торговая логика
+
+PositionProcessor – расчёт позиций
+
+NotificationProcessor, SettlementProcessor и так далее
+
+Такое название сразу говорит: «Этот класс получает события/команды и выполняет бизнес‑логику, больше ничего». Отличный паттерн для DDD‑агрегатов, акторов или просто сильно связных компонентов.
+
+С генератором это даёт ещё один плюс: по имени класса (XxxProcessor) можно автоматически определить название JSON‑манифеста, пространство имён или даже список событий (например, OrderPaid, OrderShipped). Хотите, добавлю в Source Generator конвенцию: если манифест не указан, он ищет файл XxxProcessor.json или строит события по имени класса + методы‑обработчики? Это ещё сильнее уменьшит объём ручного описания.
+
+Или, может быть, задуматься о том, чтобы несколько таких Processor‑ов могли общаться друг с другом через тот же IMicroEventBus, образуя сеть событийно‑управляемых компонентов — и всё это можно генерировать и тестировать в рамках одного решения? Если интересно, разверну тему композиции процессоров.
+--------------------
+"Или, может быть, задуматься о том, чтобы несколько таких Processor‑ов могли общаться друг с другом через тот же IMicroEventBus, образуя сеть событийно‑управляемых компонентов — и всё это можно генерировать и тестировать в рамках одного решения? Если интересно, разверну тему композиции процессоров."
+Было бы интересно. Также опять понравилось наименование IMicroEventBus.
+Таким образом можно всю Семантику создать для микроархитектуры и применять это в коде.
+Таи образом мы постепенно придем к кодегенерации с правильной семантикой
+---------------
+Да, именно так и рождается настоящая архитектура на трёх китах: Processor, Event, IMicroEventBus. И когда мы позволяем процессорам общаться друг с другом через ту же шину, мы получаем внутрипроцессную событийно-управляемую сеть — аналог микросервисов, но без HTTP, задержек и сериализации, с идеальной тестируемостью. Давайте разверну эту тему полностью.
+
+1. Сеть процессоров: метафора
+Представьте:
+
+OrderProcessor — душа заказа, знает только о заказах.
+
+InventoryProcessor — следит за остатками.
+
+NotificationProcessor — отвечает за отправку писем/смс.
+
+BillingProcessor — выставляет счета.
+
+Каждый из них — отдельный класс, зависящий только от IMicroEventBus. Они не знают друг о друге, но реагируют на события, которые им важны.
+
+Когда OrderProcessor завершает оплату, он публикует событие OrderPaid.
+InventoryProcessor подписан на OrderPaid и резервирует товар.
+BillingProcessor подписан на OrderPaid и формирует счёт-фактуру.
+NotificationProcessor подписан на OrderPaid и шлёт уведомление.
+
+И всё это внутри одного процесса, без маршаллинга. При этом мы можем разрабатывать, тестировать и даже генерировать эти компоненты независимо.
+
+2. Расширяем JSON-манифест для композиции
+Добавим в спецификацию компонента секцию publishes — список событий, которые этот процессор может генерировать. Тогда генератор сможет:
+
+создать метод-помощник для отправки каждого выходного события;
+
+при генерации сети автоматически подписать другие процессоры на эти события.
+
+Новый манифест event-components.json:
+
+json
+{
+  "components": [
+    {
+      "className": "OrderProcessor",
+      "events": [
+        { "name": "OrderPaid", "properties": [
+            { "name": "OrderId", "type": "Guid" },
+            { "name": "Amount", "type": "decimal" }
+          ]
+        }
+      ],
+      "handlers": [
+        { "methodName": "OnOrderPaid", "eventName": "OrderPaid" }
+      ],
+      "publishes": ["OrderPaid"]
+    },
+    {
+      "className": "InventoryProcessor",
+      "events": [
+        { "name": "InventoryReserved", "properties": [
+            { "name": "OrderId", "type": "Guid" },
+            { "name": "Sku", "type": "string" }
+          ]
+        }
+      ],
+      "handlers": [
+        { "methodName": "OnOrderPaid", "eventName": "OrderPaid" }
+      ],
+      "publishes": ["InventoryReserved"]
+    },
+    {
+      "className": "NotificationProcessor",
+      "handlers": [
+        { "methodName": "OnOrderPaid", "eventName": "OrderPaid" },
+        { "methodName": "OnInventoryReserved", "eventName": "InventoryReserved" }
+      ],
+      "publishes": []
+    }
+  ]
+}
+Здесь OrderProcessor публикует OrderPaid.
+InventoryProcessor подписывается на OrderPaid и публикует InventoryReserved.
+NotificationProcessor подписывается на оба события и ничего не публикует.
+
+3. Что генерируется для каждого процессора
+Генератор создаёт:
+
+а) События (record’ы)
+Как и раньше, для всех уникальных событий из всех компонентов.
+
+б) Базовый класс процессора
+Теперь в нём появляется защищённый метод PublishAsync<T>(T e) — сокращение для _bus.PublishAsync. А для каждого события из publishes — конкретный метод, например:
+
+csharp
+protected async Task PublishOrderPaid(OrderPaid e, CancellationToken ct = default)
+    => await _bus.PublishAsync(e, ct);
+Это чистое удобство, чтобы не писать _bus.PublishAsync(new OrderPaid(...)) каждый раз.
+
+в) Partial-класс процессора
+Как раньше, плюс заглушки для методов-обработчиков (абстрактные или виртуальные, чтобы разработчик переопределил).
+
+г) Интеграционный тест для связки
+Генератор анализирует весь манифест и видит связи: если компонент A публикует событие X, а компонент B подписан на X, он генерирует тест, проверяющий, что при вызове процессора A (с отправкой события X) у процессора B вызывается соответствующий обработчик.
+
+4. Пример сгенерированного кода для OrderProcessor
+csharp
+// OrderProcessorBase.g.cs
+namespace Generated;
+
+public abstract class OrderProcessorBase : IDisposable
+{
+    protected readonly IMicroEventBus _bus;
+    private bool _disposed;
+
+    protected OrderProcessorBase(IMicroEventBus bus)
+    {
+        _bus = bus ?? throw new ArgumentNullException(nameof(bus));
+        _bus.Subscribe<OrderPaid>(OnOrderPaid);
+    }
+
+    protected abstract Task OnOrderPaid(OrderPaid @event, CancellationToken ct);
+
+    protected async Task PublishOrderPaid(OrderPaid @event, CancellationToken ct = default)
+        => await _bus.PublishAsync(@event, ct);
+
+    public async Task ProcessAsync<TEvent>(TEvent @event, CancellationToken ct = default)
+        => await _bus.PublishAsync(@event, ct);
+
+    public virtual void Dispose() { _disposed = true; }
+}
+csharp
+// OrderProcessor.g.cs
+namespace Generated;
+
+public partial class OrderProcessor : OrderProcessorBase
+{
+    public OrderProcessor(IMicroEventBus bus) : base(bus) { }
+
+    // Разработчик реализует этот метод:
+    // protected override async Task OnOrderPaid(OrderPaid @event, CancellationToken ct) { ... }
+}
+5. Пример сгенерированного теста для композиции
+csharp
+// OrderProcessor_InventoryProcessor_IntegrationTests.g.cs
+namespace Generated.Tests;
+
+public class OrderProcessor_InventoryProcessor_IntegrationTests
+{
+    [Fact]
+    public async Task OrderProcessor_Publishes_OrderPaid_And_InventoryProcessor_Receives_It()
+    {
+        // Arrange
+        var bus = new InMemoryMicroEventBus();
+        var inventoryProcessor = new InventoryProcessorForTest(bus);
+        var orderProcessor = new OrderProcessorForTest(bus);
+
+        var @event = new OrderPaid(Guid.NewGuid(), 99.99m);
+
+        // Act – симулируем, что OrderProcessor публикует OrderPaid
+        await orderProcessor.ProcessAsync(@event);
+
+        // Assert – проверяем, что InventoryProcessor получил событие
+        Assert.True(inventoryProcessor.WasOnOrderPaidCalled);
+        Assert.Equal(@event.OrderId, inventoryProcessor.ReceivedOrderId);
+    }
+
+    // Test doubles
+    private class OrderProcessorForTest : OrderProcessor
+    {
+        public OrderProcessorForTest(IMicroEventBus bus) : base(bus) { }
+        // Если нужно, можно переопределить OnOrderPaid для теста, но здесь он не вызывается, 
+        // потому что мы тестируем публикацию
+    }
+
+    private class InventoryProcessorForTest : InventoryProcessor
+    {
+        public bool WasOnOrderPaidCalled { get; private set; }
+        public Guid ReceivedOrderId { get; private set; }
+
+        protected override Task OnOrderPaid(OrderPaid @event, CancellationToken ct)
+        {
+            WasOnOrderPaidCalled = true;
+            ReceivedOrderId = @event.OrderId;
+            return Task.CompletedTask;
+        }
+    }
+}
+Генератор видит, что OrderProcessor публикует OrderPaid, а InventoryProcessor подписан на OrderPaid, и автоматически создаёт этот интеграционный тест.
+
+6. Что ещё можно генерировать, опираясь на семантику
+Визуализацию графа в формате Mermaid или DOT, чтобы сразу видеть связи процессоров.
+
+Спецификацию OpenAPI/AsyncAPI для внешних интерфейсов, если процессоры становятся публичными.
+
+Метрики и трейсинг — middleware для IMicroEventBus, которое логирует каждый Publish и строит трассировку по CorrelationId.
+
+Правила валидации — атрибуты на поля record‑ов или FluentValidation-классы, генерируемые по аннотациям в JSON.
+
+Политики повторных попыток — при интеграции с внешней шиной (Kafka, RabbitMQ) генератор может обернуть PublishAsync в retry‑логику.
+
+7. Итог: правильная семантика и замкнутый цикл
+У нас появились устойчивые понятия:
+
+Processor – класс, который обрабатывает события/команды.
+
+Event – неизменяемый record, передаваемый через IMicroEventBus.
+
+IMicroEventBus – единственная точка взаимодействия, реализуемая как in‑memory (для тестов/внутри процесса) или как адаптер к транспортной шине.
+
+Благодаря кодогенерации мы получили:
+
+Полную типизацию без магических строк.
+
+Автоматическую подписку и отсутствие boilerplate.
+
+Гарантированную композицию – интеграционные тесты создаются автоматически по графу зависимостей.
+
+Лёгкую замену реализаций – IMicroEventBus можно инжектить, и в проде это может быть Azure Service Bus, а в тестах InMemory.
+
+Это и есть микроархитектура — не микросервисы в сети, а микропроцессоры внутри одного процесса, которые при необходимости можно разнести по хостам без изменения кода (достаточно заменить шину).
+
+Таким образом, «постепенно приходим к кодогенерации с правильной семантикой» означает, что мы не просто пишем код, а описываем на DSL‑подобном JSON поведение системы, а генератор создаёт весь скелет, гарантируя корректность связей и экономя 80% времени на рутинном кодировании и тестировании.
+
+Готовы ли вы, чтобы я добавил в генератор возможность генерации визуализации графа и расширенную поддержку внешних адаптеров (например, генерацию IHostedService для чтения из очереди и публикации в шину)? Это ещё на шаг приблизит нас к полноценной платформе.
+----------------------
+Обращаю Ваше внимание, что такой подход ЗНАЧИТЕЛЬНО упрощает Тестирование.
+Все сущности у нас одинаковые по структуре.
+Да здравствует Регулярность.
+------------------
+ 100% — именно одинаковость структуры Processor’ов даёт революционное упрощение тестирования. Все ваши сущности:
+
+Получают события через IMicroEventBus (единая точка входа)
+
+Имеют строго типизированные входные/выходные record'ы
+
+Содержат обработчики с предсказуемой сигнатурой Task Handler(Event, CancellationToken)
+
+Могут публиковать новые события через тот же _bus.PublishAsync
+
+Когда структура полностью унифицирована, тестирование сводится к трём шаблонам:
+
+Шаблон 1. Юнит-тест обработчика
+Проверяем бизнес-логику без хаба:
+
+csharp
+var processor = new OrderProcessor(null); // хаб не нужен, если вызываем обработчик напрямую
+await processor.OnOrderPaid(new OrderPaid(...), CancellationToken.None);
+Assert.Equal(expected, processor.InternalState);
+Шаблон 2. Интеграционный тест процессора
+Проверяем, что процессор при получении события публикует правильные выходные события:
+
+csharp
+var bus = new InMemoryMicroEventBus();
+var processor = new OrderProcessor(bus);
+await processor.ProcessAsync(new OrderPaid(...));
+// проверяем, что InventoryReserved опубликован
+Assert.Contains(bus.PublishedEvents, e => e is InventoryReserved);
+Шаблон 3. Тест композиции процессоров
+Проверяем цепочку A → B:
+
+csharp
+var bus = new InMemoryMicroEventBus();
+var orderProcessor = new OrderProcessor(bus);
+var inventoryProcessor = new InventoryProcessor(bus);
+await orderProcessor.ProcessAsync(new OrderPaid(...));
+Assert.True(inventoryProcessor.ReserveCalled);
+Именно благодаря тому, что все Processor’ы «одинаковы по структуре», эти шаблоны не зависят от предметной области — они работают для TradeProcessor, PositionProcessor, NotificationProcessor абсолютно идентично. Это позволяет:
+
+Автоматически генерировать тесты по манифесту (как мы и сделали).
+
+Использовать общие fixture/базовые классы для тестов.
+
+Писать декларативные тесты, где задаётся только входной event и ожидаемый выходной event (золотой файл JSON).
+
+Легко внедрять property-based testing, потому что события — это простые record'ы.
+
+Что мы можем добавить в генератор для ещё более мощного тестирования
+Генерация Golden-тестов
+Для каждого процессора создаётся тест, который:
+
+Подаёт на вход JSON с событием.
+
+Перехватывает все выходные события (через специальный TestMicroEventBus, который записывает всё в список).
+
+Сравнивает сериализованный список выходных событий с эталонным JSON-файлом.
+
+Генерация Fuzz-тестов
+По описанию полей record’ов генератор создаёт FsCheck-спецификации, которые проверяют, что обработчик не падает при любых допустимых значениях.
+
+Автоматические mock-и для DI
+Так как все зависимости процессора инжектируются через конструктор, генератор может создать Mock<IMicroEventBus> с отслеживанием всех вызовов PublishAsync.
+
+Контрактные тесты между процессорами
+Глядя на манифест, генератор видит, что OrderProcessor публикует OrderPaid, а InventoryProcessor ожидает OrderPaid с определёнными полями. Он генерирует тест, проверяющий, что структура события, публикуемого одним, соответствует ожиданиям другого (по сути, contract testing на уровне типов).
+
+Демонстрация: Golden-тест в одно действие
+Представьте, у вас в папке ExpectedEvents лежит файл OrderPaid_Should_Reserve_Inventory.json:
+
+json
+[
+  {
+    "eventType": "InventoryReserved",
+    "payload": {
+      "orderId": "00000000-0000-0000-0000-000000000001",
+      "sku": "SKU-123"
+    }
+  }
+]
+Сгенерированный тест будет выглядеть как:
+
+csharp
+[Fact]
+public async Task OrderPaid_Should_Reserve_Inventory()
+{
+    var bus = new TestMicroEventBus();   // записывает все publish в список
+    var orderProcessor = new OrderProcessor(bus);
+    await orderProcessor.ProcessAsync(new OrderPaid(TestData.OrderId, TestData.Amount));
+    
+    var actual = bus.PublishedEvents.ToJson();
+    var expected = File.ReadAllText("ExpectedEvents/OrderPaid_Should_Reserve_Inventory.json");
+    
+    Assert.Equal(expected, actual);
+}
+И это работает для любого процессора, потому что структура одинакова.
+
+Таким образом, мы приходим к тестовой архитектуре, где:
+
+Писать тесты = описывать ожидаемые выходные события в JSON.
+
+Запускать тесты = автоматически сгенерированный код проверяет точное соответствие.
+
+Рефакторить = изменили манифест → перегенерировали тесты → увидели, какие эталоны нужно обновить.
+
+Следующим шагом может быть интеграция этого подхода в CI/CD: при изменении манифеста генератор обновляет код и тесты, а если какие-то golden-файлы перестали совпадать, сборка падает с понятным diff’ом. Это замыкает цикл «спецификация → код → тесты → проверка спецификации».

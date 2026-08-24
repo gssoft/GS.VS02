@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- MassTransit v8, Apache 2.0. Version confirmed on nuget.org. v9 introduces a
+         commercial license (see our discussion earlier) - staying on the 8.x line here
+         is a deliberate, permanent choice for this project, not a placeholder. -->
+    <PackageReference Include="MassTransit" Version="8.5.7" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MicroPlatform.Core\MicroPlatform.Core.csproj" />
+  </ItemGroup>
+
+</Project>

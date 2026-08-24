@@ -1,0 +1,3 @@
+InMemoryMicroEventBusTests - 4 Tests OK
+
+ProcessorCompositionTests - 2 Test OK 

@@ -1,0 +1,249 @@
+================================================================
+Directory Structure
+================================================================
+MicroPlatform.Core/Events/OrderEvents.cs
+MicroPlatform.Core/IMicroEventBus.cs
+MicroPlatform.Core/InMemoryMicroEventBus.cs
+MicroPlatform.Core/MicroPlatform.Core.csproj
+MicroPlatform.Core/Processors/InventoryProcessor.cs
+MicroPlatform.Core/Processors/OrderProcessor.cs
+MicroPlatform.Demo/MicroPlatform.Demo.csproj
+MicroPlatform.Demo/Program.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: MicroPlatform.Core/Events/OrderEvents.cs
+================
+namespace MicroPlatform.Core.Events;
+
+public sealed record OrderPaid(Guid OrderId, decimal Amount);
+
+public sealed record InventoryReserved(Guid OrderId, string Sku);
+
+================
+File: MicroPlatform.Core/IMicroEventBus.cs
+================
+namespace MicroPlatform.Core;
+
+/// <summary>
+/// Minimal in-process event bus contract. TEvent is any type used as an event -
+/// there is no marker interface requirement, matching the "just a record" style
+/// used throughout this project.
+/// </summary>
+public interface IMicroEventBus
+{
+    void Subscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler);
+
+    void Unsubscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler);
+
+    Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default);
+}
+
+================
+File: MicroPlatform.Core/InMemoryMicroEventBus.cs
+================
+using System.Collections.Concurrent;
+using System.Collections.Immutable;
+
+namespace MicroPlatform.Core;
+
+/// <summary>
+/// In-process, in-memory implementation of <see cref="IMicroEventBus"/>.
+///
+
+public sealed class InMemoryMicroEventBus : IMicroEventBus
+{
+    private readonly ConcurrentDictionary<Type, ImmutableList<Delegate>> _handlers = new();
+
+    public void Subscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+
+        _handlers.AddOrUpdate(
+            typeof(TEvent),
+            addValueFactory: _ => ImmutableList.Create<Delegate>(handler),
+            updateValueFactory: (_, existing) => existing.Add(handler));
+    }
+
+    public void Unsubscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+
+        _handlers.AddOrUpdate(
+            typeof(TEvent),
+            addValueFactory: _ => ImmutableList<Delegate>.Empty,
+            updateValueFactory: (_, existing) => existing.Remove(handler));
+    }
+
+    public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(@event);
+
+        if (!_handlers.TryGetValue(typeof(TEvent), out var handlers) || handlers.IsEmpty)
+            return;
+
+        List<Exception>? exceptions = null;
+
+        // handlers is an immutable snapshot: safe to iterate even if another thread
+        // subscribes/unsubscribes for the same event type right now.
+        foreach (var handlerDelegate in handlers)
+        {
+            var handler = (Func<TEvent, CancellationToken, Task>)handlerDelegate;
+            try
+            {
+                await handler(@event, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                exceptions ??= new List<Exception>();
+                exceptions.Add(ex);
+            }
+        }
+
+        if (exceptions is { Count: > 0 })
+        {
+            throw new AggregateException(
+                $"One or more handlers for {typeof(TEvent).Name} threw an exception.",
+                exceptions);
+        }
+    }
+}
+
+================
+File: MicroPlatform.Core/MicroPlatform.Core.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+</Project>
+
+================
+File: MicroPlatform.Core/Processors/InventoryProcessor.cs
+================
+using MicroPlatform.Core.Events;
+
+namespace MicroPlatform.Core.Processors;
+
+public class InventoryProcessor : IDisposable
+{
+    private readonly IMicroEventBus _bus;
+    private readonly Func<InventoryReserved, CancellationToken, Task> _onInventoryReserved;
+    private bool _disposed;
+
+    public InventoryProcessor(IMicroEventBus bus)
+    {
+        _bus = bus ?? throw new ArgumentNullException(nameof(bus));
+        _onInventoryReserved = OnInventoryReserved;
+        _bus.Subscribe(_onInventoryReserved);
+    }
+
+    protected virtual Task OnInventoryReserved(InventoryReserved @event, CancellationToken ct)
+    {
+        Console.WriteLine($"[InventoryProcessor] Reserved sku '{@event.Sku}' for order {@event.OrderId}");
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _bus.Unsubscribe(_onInventoryReserved);
+        _disposed = true;
+    }
+}
+
+================
+File: MicroPlatform.Core/Processors/OrderProcessor.cs
+================
+using MicroPlatform.Core.Events;
+
+namespace MicroPlatform.Core.Processors;
+
+public class OrderProcessor : IDisposable
+{
+    private readonly IMicroEventBus _bus;
+
+    // Stored once as a field so the *same* delegate instance is used for both
+    // Subscribe and Unsubscribe - required for InMemoryMicroEventBus.Unsubscribe
+    // (which relies on Delegate equality) to actually find and remove it.
+    private readonly Func<OrderPaid, CancellationToken, Task> _onOrderPaid;
+
+    private bool _disposed;
+
+    public OrderProcessor(IMicroEventBus bus)
+    {
+        _bus = bus ?? throw new ArgumentNullException(nameof(bus));
+        _onOrderPaid = OnOrderPaid;
+        _bus.Subscribe(_onOrderPaid);
+    }
+
+    // virtual so tests can override it without needing a separate "ForTest" flag class.
+    protected virtual async Task OnOrderPaid(OrderPaid @event, CancellationToken ct)
+    {
+        // Business logic placeholder: in a real system this would look up the order,
+        // decide on a SKU, etc. Kept intentionally simple for this reference project.
+        await _bus.PublishAsync(new InventoryReserved(@event.OrderId, "DEFAULT-SKU"), ct)
+            .ConfigureAwait(false);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _bus.Unsubscribe(_onOrderPaid);
+        _disposed = true;
+    }
+}
+
+================
+File: MicroPlatform.Demo/MicroPlatform.Demo.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MicroPlatform.Core\MicroPlatform.Core.csproj" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: MicroPlatform.Demo/Program.cs
+================
+using MicroPlatform.Core;
+using MicroPlatform.Core.Events;
+using MicroPlatform.Core.Processors;
+
+var bus = new InMemoryMicroEventBus();
+
+using var orderProcessor = new OrderProcessor(bus);
+using var inventoryProcessor = new InventoryProcessor(bus);
+
+var orderId = Guid.NewGuid();
+Console.WriteLine($"Publishing OrderPaid for order {orderId}...");
+
+await bus.PublishAsync(new OrderPaid(orderId, 150.00m));
+
+Console.WriteLine("Done.");
+
+
+
+
+
+================================================================
+End of Codebase
+================================================================

@@ -1,0 +1,654 @@
+Давайте напишем сердце на C# для .NET — лёгкий внутрипроцессный EventHub, который дружит с DI, BackgroundService и .NET Aspire.
+
+Ядро: интерфейс и реализация
+csharp
+// IMicroEventBus.cs
+public interface IMicroEventBus
+{
+ void Subscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler);
+ void Unsubscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler);
+ Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default);
+}
+csharp
+// InMemoryMicroEventBus.cs
+using System.Collections.Concurrent;
+public class InMemoryMicroEventBus : IMicroEventBus
+{
+    private readonly ConcurrentDictionary<Type, List<Delegate>> _handlers = new();
+
+Копировать
+public void Subscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
+{
+    var eventType = typeof(TEvent);
+    _handlers.AddOrUpdate(eventType,
+        _ => new List<Delegate> { handler },
+        (_, list) =>
+        {
+            list.Add(handler);
+            return list;
+        });
+}
+
+public void Unsubscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
+{
+    if (_handlers.TryGetValue(typeof(TEvent), out var list))
+        list.Remove(handler);
+}
+
+public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
+{
+    if (_handlers.TryGetValue(typeof(TEvent), out var handlers))
+    {
+        foreach (var handler in handlers.Cast<Func<TEvent, CancellationToken, Task>>())
+        {
+            await handler(@event, cancellationToken);
+        }
+    }
+}
+}
+Это типобезопасный (через дженерики) и асинхронный хаб. Никаких строковых ключей.
+
+Встраивание в класс с автоматической подпиской
+Хотим, чтобы класс сам управлял своими обработчиками. Сделаем базовый вариант: в конструкторе подписываемся.
+csharp
+public class OrderProcessor
+{
+    private readonly IMicroEventBus _bus;
+
+Копировать
+public OrderProcessor(IMicroEventBus bus)
+{
+    _bus = bus;
+    // ручная подписка (пока)
+    _bus.Subscribe<OrderPaid>(OnOrderPaid);
+    _bus.Subscribe<OrderCancelled>(OnOrderCancelled);
+}
+
+private async Task OnOrderPaid(OrderPaid e, CancellationToken ct)
+{
+    Console.WriteLine($"Order {e.OrderId} paid, amount {e.Amount}");
+    // бизнес-логика...
+}
+
+private async Task OnOrderCancelled(OrderCancelled e, CancellationToken ct)
+{
+    Console.WriteLine($"Order {e.OrderId} cancelled: {e.Reason}");
+}
+
+// публичный метод для внешних команд (можно и через хаб напрямую)
+public async Task ProcessCommandAsync<T>(T command, CancellationToken ct = default)
+{
+    await _bus.PublishAsync(command, ct);
+}
+}
+
+// События
+public record OrderPaid(Guid OrderId, decimal Amount);
+public record OrderCancelled(Guid OrderId, string Reason);
+Регистрация в DI:
+
+csharp
+// Program.cs
+builder.Services.AddSingleton<IMicroEventBus, InMemoryMicroEventBus>();
+builder.Services.AddTransient<OrderProcessor>();  // или Scoped/Singleton по логике
+Теперь любой контроллер/сервис может инжектить OrderProcessor и вызывать ProcessCommandAsync.
+
+Автоматическая подписка через атрибуты (бонус)
+Чтобы убрать ручную подписку, можно добавить атрибут и хостед-сервис, который сканирует методы при старте.
+csharp
+[AttributeUsage(AttributeTargets.Method)]
+public class EventHandlerAttribute : Attribute { }
+
+public interface IEventHandlersRegistrar
+{
+    void Register(object handlerInstance);
+}
+
+// В InMemoryMicroEventBus добавляем метод регистрации по рефлексии (или отдельный registrar)
+Упростим: мы можем сделать класс-наследник EventDrivenComponent, который сам подписывает методы в конструкторе через рефлексию, но боюсь это будет уже сложнее, чем ручная подписка. Для микро-хаба ручная подписка остаётся самой прозрачной. Но можно создать абстрактный базовый класс:
+
+csharp
+public abstract class EventDrivenComponent : IDisposable
+{
+    protected readonly IMicroEventBus Bus;
+    private readonly List<Delegate> _subscriptions = new();
+
+Копировать
+protected EventDrivenComponent(IMicroEventBus bus)
+{
+    Bus = bus;
+    // рефлексия: находим методы с [EventHandler]
+    foreach (var method in GetType().GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
+    {
+        var attr = method.GetCustomAttribute<EventHandlerAttribute>();
+        if (attr == null) continue;
+        var parameters = method.GetParameters();
+        if (parameters.Length != 2 || parameters[1].ParameterType != typeof(CancellationToken))
+            continue;
+        var eventType = parameters[0].ParameterType;
+        // создаём делегат и подписываемся
+        var delegateType = typeof(Func<,,>).MakeGenericType(eventType, typeof(CancellationToken), typeof(Task));
+        var del = Delegate.CreateDelegate(delegateType, this, method);
+        // вызов Subscribe<T> для eventType
+        typeof(IMicroEventBus).GetMethod("Subscribe")
+            ?.MakeGenericMethod(eventType)
+            .Invoke(Bus, new[] { del });
+        _subscriptions.Add(del); // для отписки при Dispose
+    }
+}
+
+public void Dispose()
+{
+    foreach (var del in _subscriptions)
+    {
+        // отписка (можно через рефлексию)
+    }
+}
+}
+Теперь наш OrderProcessor может быть:
+
+csharp
+public class OrderProcessor : EventDrivenComponent
+{
+    public OrderProcessor(IMicroEventBus bus) : base(bus) { }
+
+Копировать
+[EventHandler]
+private async Task OnOrderPaid(OrderPaid e, CancellationToken ct) { ... }
+
+[EventHandler]
+private async Task OnOrderCancelled(OrderCancelled e, CancellationToken ct) { ... }
+}
+Это почти как MediatR, но меньше зависимостей.
+
+Интеграция с BackgroundService и .NET Aspire
+4.1 Фоновый сервис-подписчик
+Допустим, у нас есть внешние события (из очереди сообщений, откуда-то). Мы можем читать их в BackgroundService и публиковать в шину.
+csharp
+public class ExternalEventReaderService : BackgroundService
+{
+    private readonly IMicroEventBus _bus;
+
+Копировать
+public ExternalEventReaderService(IMicroEventBus bus)
+{
+    _bus = bus;
+}
+
+protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+{
+    while (!stoppingToken.IsCancellationRequested)
+    {
+        // представим, что мы читаем событие из Kafka/RabbitMQ
+        var someEvent = await ReadEventFromQueueAsync(stoppingToken);
+        await _bus.PublishAsync(someEvent, stoppingToken);
+    }
+}
+}
+4.2 В .NET Aspire
+Aspire добавляет распределённую трассировку, health checks и оркестрацию. Наш микро-хаб легко вписывается:
+
+Регистрируем IMicroEventBus как singleton.
+
+В проекты Aspire можно добавить health check, который проверяет, жив ли хаб (например, через публикацию тестового события).
+
+Используем в компонентах, которые являются Aspire.Hosting ресурсами, без проблем — это просто обычный DI.
+
+csharp
+// В AppHost проекте
+var builder = DistributedApplication.CreateBuilder(args);
+builder.AddProject<Projects.OrderService>("orderservice")
+       .WithReference(...);
+В самом сервисе внутри Program.cs:
+
+csharp
+builder.AddServiceDefaults(); // из Aspire
+builder.Services.AddSingleton<IMicroEventBus, InMemoryMicroEventBus>();
+builder.Services.AddTransient<OrderProcessor>();
+builder.Services.AddHostedService<ExternalEventReaderService>();
+И всё работает.
+
+Что мы получили
+Всего три абстракции: IMicroEventBus, события (рекорды), обработчики (методы).
+Совместимость с DI: регистрируется как любой сервис.
+
+Асинхронность: из коробки, уважает CancellationToken.
+
+Типобезопасность: события — типы, а не строки.
+
+Простота: внутри класса обработчики — приватные методы.
+
+Расширяемость: можно добавить декораторы, логирование, аудит (через middleware-обёртку шины).
+
+Готовность к генерации: структура настолько регулярна, что по YAML/JSON легко сгенерировать классы событий и класс-обработчик с атрибутами.
+
+Минимальный пример использования:
+
+csharp
+var processor = serviceProvider.GetRequiredService<OrderProcessor>();
+await processor.ProcessCommandAsync(new OrderPaid(Guid.NewGuid(), 99.99m));
+Хотите, я покажу, как написать простой кодогенератор (например, на C# через Source Generators), который по описанию в JSON создаст класс с микро-хабом и тестами? Это замкнёт цикл «автоматизация → генерация → тестирование».
+
+
+Ответ
+Отличная реализация! Вы показали, как этот паттерн выглядит в мире .NET — лаконично, строго типизированно и полностью интегрировано в современную экосистему.
+
+Ваша реализация на C# — это не просто «сердце», это уже готовый к продакшену компонент. Давайте разберём, почему это так.
+
+Анализ вашей реализации на C#
+Типобезопасность и асинхронность: Использование дженериков (IMicroEventBus) и CancellationToken — это золотой стандарт .NET. Это сразу решает проблемы с опечатками и позволяет корректно обрабатывать отмену операций, что критично для серверных приложений.
+Интеграция с DI: Класс InMemoryMicroEventBus идеально ложится в контейнер зависимостей. Регистрация его как Singleton (одна шина на всё приложение) или Scoped (шина на запрос) — это архитектурное решение, которое легко принять.
+Совместимость с Aspire: Вы абсолютно правы. В экосистеме .NET Aspire такой компонент будет работать «из коробки». Он не требует специальных адаптеров и легко поддаётся наблюдению (observability) через стандартные механизмы Aspire.
+Фоновые процессы: Пример с BackgroundService — это классика. Микро-шина становится мостом между внешними событиями (Kafka, RabbitMQ) и внутренней бизнес-логикой, позволяя разделить чтение данных и их обработку.
+Сравнение подходов: Python vs .NET
+Python: Акцент на динамике и минимализме. Мы используем строки для ключей, автоматический поиск методов по суффиксу (*_handler) и генерацию кода через шаблоны. Это гибко и быстро для прототипирования.
+.NET: Акцент на строгости и безопасности. Дженерики, атрибуты, рефлексия для автоматической подписки. Это даёт уверенность в корректности кода на этапе компиляции.
+Оба подхода решают одну задачу, но инструментами, привычными для своей экосистемы.
+
+Генерация кода в мире .NET
+Вы предложили написать генератор. В .NET есть два мощных пути для этого:
+
+T4 Templates или Roslyn Source Generators: Это «нативный» способ. Генератор может на этапе компиляции прочитать JSON-файл и сгенерировать классы событий и обработчики прямо в проект. Это очень производительно, но требует настройки.
+CLI-утилита (наш вариант): Написать консольное приложение (или скрипт на PowerShell), которое по пути к YAML/JSON файлу генерирует .cs файлы. Это проще для понимания и внедрения в любой проект.
+Я предлагаю пойти по второму пути — он нагляднее и отлично демонстрирует саму идею автоматизации.
+
+Готовы написать CLI-генератор на C#?
+
+Я подготовлю готовый к запуску проект, который:
+
+Принимает на вход YAML-файл (например, order_service.yaml).
+Генерирует файл OrderProcessor.cs с классом, конструктором, методами-обработчиками и публичным методом ProcessCommandAsync.
+Генерирует файл OrderEvents.cs с записями OrderPaid и OrderCancelled.
+Это будет финальный штрих, который превратит вашу идею в полноценный инструмент разработчика.
+
+
+
+
+
+
+Вопрос
+Отлично, давайте замкнём цикл. Напишем Source Generator на C#, который из JSON‑описания генерирует:
+
+record‑ы для событий
+
+базовый класс с IMicroEventBus, подписками и абстрактными обработчиками
+
+partial-класс, который разработчик дополняет бизнес‑логикой
+
+готовый шаблон xUnit-тестов
+
+Всё это на основе вашего микро‑EventHub из предыдущего шага.
+
+JSON‑манифест (вход генератора)
+Файл event-components.json помещаем в корень проекта и помечаем как AdditionalFiles (или EmbeddedResource, но для генератора удобнее AdditionalText).
+json
+{
+  "components": [
+    {
+      "className": "OrderProcessor",
+      "events": [
+        {
+          "name": "OrderPaid",
+          "properties": [
+            { "name": "OrderId", "type": "Guid" },
+            { "name": "Amount", "type": "decimal" }
+          ]
+        },
+        {
+          "name": "OrderCancelled",
+          "properties": [
+            { "name": "OrderId", "type": "Guid" },
+            { "name": "Reason", "type": "string" }
+          ]
+        }
+      ],
+      "handlers": [
+        { "methodName": "OnOrderPaid", "eventName": "OrderPaid" },
+        { "methodName": "OnOrderCancelled", "eventName": "OrderCancelled" }
+      ]
+    }
+  ]
+}
+2. Проект генератора
+Создаём .NET Standard 2.0 библиотеку (MicroEventGenerator) со ссылкой на Microsoft.CodeAnalysis.CSharp.
+
+xml
+
+<!-- MicroEventGenerator.csproj -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <DevelopmentDependency>true</DevelopmentDependency>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
+  </ItemGroup>
+</Project>
+3. Код генератора
+csharp
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.Json;
+[Generator]
+public class EventDrivenComponentGenerator : ISourceGenerator
+{
+    private const string ManifestFileName = "event-components.json";
+
+Копировать
+public void Initialize(GeneratorInitializationContext context)
+{
+    // Регистрируемся на отслеживание additional files
+    context.RegisterForAdditionalFileChanges();
+}
+
+public void Execute(GeneratorExecutionContext context)
+{
+    // Ищем наш манифест среди дополнительных файлов
+    AdditionalText? manifestFile = context.AdditionalFiles
+        .FirstOrDefault(f => Path.GetFileName(f.Path) == ManifestFileName);
+
+    if (manifestFile == null)
+        return;
+
+    string json = manifestFile.GetText()?.ToString() ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(json))
+        return;
+
+    Manifest? manifest;
+    try
+    {
+        manifest = JsonSerializer.Deserialize<Manifest>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+    }
+    catch
+    {
+        context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor("EG001", "Invalid manifest", "Failed to parse event-components.json", "EventGenerator", DiagnosticSeverity.Error, true), Location.None));
+        return;
+    }
+
+    if (manifest?.Components == null)
+        return;
+
+    foreach (var comp in manifest.Components)
+    {
+        GenerateComponentFiles(context, comp);
+    }
+}
+
+private void GenerateComponentFiles(GeneratorExecutionContext context, ComponentDefinition comp)
+{
+    // 1. Генерируем records для событий
+    foreach (var evt in comp.Events)
+    {
+        string recordCode = GenerateEventRecord(comp.ClassName, evt);
+        context.AddSource($"{comp.ClassName}_{evt.Name}.g.cs", SourceText.From(recordCode, Encoding.UTF8));
+    }
+
+    // 2. Генерируем базовый абстрактный класс
+    string baseClassCode = GenerateBaseClass(comp);
+    context.AddSource($"{comp.ClassName}Base.g.cs", SourceText.From(baseClassCode, Encoding.UTF8));
+
+    // 3. Генерируем partial класс-заготовку
+    string partialClassCode = GeneratePartialClass(comp);
+    context.AddSource($"{comp.ClassName}.g.cs", SourceText.From(partialClassCode, Encoding.UTF8));
+
+    // 4. Генерируем тесты
+    string testCode = GenerateTests(comp);
+    context.AddSource($"{comp.ClassName}Tests.g.cs", SourceText.From(testCode, Encoding.UTF8));
+}
+
+private string GenerateEventRecord(string className, EventDefinition evt)
+{
+    var props = string.Join("\n    ", evt.Properties.Select(p => $"public {p.Type} {p.Name} {{ get; init; }}"));
+    return $@"namespace Generated;
+public record {evt.Name}({string.Join(", ", evt.Properties.Select(p => $"{p.Type} {p.Name}"))});
+";
+    }
+
+Копировать
+private string GenerateBaseClass(ComponentDefinition comp)
+{
+    var className = comp.ClassName;
+    var handlerRegistrations = new StringBuilder();
+    var abstractMethods = new StringBuilder();
+
+    foreach (var h in comp.Handlers)
+    {
+        var eventType = h.EventName;
+        var methodName = h.MethodName;
+        handlerRegistrations.AppendLine($"            _bus.Subscribe<{eventType}>({methodName});");
+        abstractMethods.AppendLine($"    protected abstract Task {methodName}({eventType} @event, CancellationToken ct);");
+    }
+
+    return $@"using System;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Generated;
+
+public abstract class {className}Base : IDisposable
+{{
+    protected readonly IMicroEventBus _bus;
+    private bool _disposed;
+
+Копировать
+protected {className}Base(IMicroEventBus bus)
+{{
+    _bus = bus ?? throw new ArgumentNullException(nameof(bus));
+{handlerRegistrations}
+    }}
+
+{abstractMethods}
+
+Копировать
+public async Task ProcessAsync<TEvent>(TEvent @event, CancellationToken ct = default)
+{{
+    await _bus.PublishAsync(@event, ct);
+}}
+
+public virtual void Dispose()
+{{
+    if (!_disposed)
+    {{
+        // Если нужно отписаться – добавить логику
+        _disposed = true;
+    }}
+}}
+}}";
+    }
+
+Копировать
+private string GeneratePartialClass(ComponentDefinition comp)
+{
+    return $@"namespace Generated;
+public partial class {comp.ClassName} : {comp.ClassName}Base
+{{
+    public {comp.ClassName}(IMicroEventBus bus) : base(bus) {{ }}
+
+Копировать
+// Реализуйте обработчики здесь (override) или в отдельном файле
+}}";
+    }
+
+Копировать
+private string GenerateTests(ComponentDefinition comp)
+{
+    var testMethods = new StringBuilder();
+    foreach (var handler in comp.Handlers)
+    {
+        var eventType = handler.EventName;
+        var eventVar = char.ToLower(eventType[0]) + eventType.Substring(1);
+        var props = comp.Events.First(e => e.Name == eventType).Properties;
+        var ctorArgs = string.Join(", ", props.Select(p => p.Type switch
+        {
+            "Guid" => $"Guid.NewGuid()",
+            "string" => $"\"test_{p.Name}\"",
+            "decimal" => "100.0m",
+            _ => "default"
+        }));
+        testMethods.AppendLine($@"
+[Fact]
+public async Task {handler.MethodName}_Should_Be_Called_On_{eventType}()
+{{
+    // Arrange
+    var bus = new InMemoryMicroEventBus();
+    var component = new {comp.ClassName}ForTest(bus); // тестовый наследник
+    var @event = new {eventType}({ctorArgs});
+
+    // Act
+    await component.ProcessAsync(@event);
+
+    // Assert
+    Assert.True(component.Was{handler.MethodName}Called);
+}}");
+    }
+
+    return $@"using System.Threading;
+using System.Threading.Tasks;
+using Xunit;
+
+namespace Generated.Tests;
+
+public class {comp.ClassName}Tests
+{{
+    private class {comp.ClassName}ForTest : {comp.ClassName}
+    {{
+        public {comp.ClassName}ForTest(IMicroEventBus bus) : base(bus) {{ }}
+
+{string.Join("\n", comp.Handlers.Select(h => $"        public bool Was{h.MethodName}Called {{ get; private set; }}"))}
+
+{string.Join("\n", comp.Handlers.Select(h => $@"
+        protected override Task {h.MethodName}({h.EventName} @event, CancellationToken ct)
+        {{
+            Was{h.MethodName}Called = true;
+            return Task.CompletedTask;
+        }}"))}
+    }}
+
+{testMethods}
+}}";
+    }
+
+Копировать
+// Вспомогательные классы для десериализации манифеста
+private class Manifest
+{
+    public List<ComponentDefinition> Components { get; set; } = new();
+}
+
+private class ComponentDefinition
+{
+    public string ClassName { get; set; } = string.Empty;
+    public List<EventDefinition> Events { get; set; } = new();
+    public List<HandlerDefinition> Handlers { get; set; } = new();
+}
+
+private class EventDefinition
+{
+    public string Name { get; set; } = string.Empty;
+    public List<PropertyDefinition> Properties { get; set; } = new();
+}
+
+private class PropertyDefinition
+{
+    public string Name { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+}
+
+private class HandlerDefinition
+{
+    public string MethodName { get; set; } = string.Empty;
+    public string EventName { get; set; } = string.Empty;
+}
+}
+4. Подключение генератора к проекту
+В проекте, где вы хотите использовать генерацию (например, OrderService.csproj):
+
+xml
+<ItemGroup>
+  <ProjectReference Include="..\MicroEventGenerator\MicroEventGenerator.csproj" 
+                    OutputItemType="Analyzer" 
+                    ReferenceOutputAssembly="false"/>
+  <AdditionalFiles Include="event-components.json" />
+</ItemGroup>
+Файл event-components.json должен лежать в корне этого проекта.
+
+Что сгенерируется для OrderProcessor
+События:
+csharp
+public record OrderPaid(Guid OrderId, decimal Amount);
+public record OrderCancelled(Guid OrderId, string Reason);
+Базовый класс:
+
+csharp
+public abstract class OrderProcessorBase : IDisposable
+{
+    protected readonly IMicroEventBus _bus;
+    protected OrderProcessorBase(IMicroEventBus bus)
+    {
+        _bus = bus;
+        _bus.Subscribe<OrderPaid>(OnOrderPaid);
+        _bus.Subscribe<OrderCancelled>(OnOrderCancelled);
+    }
+
+Копировать
+protected abstract Task OnOrderPaid(OrderPaid @event, CancellationToken ct);
+protected abstract Task OnOrderCancelled(OrderCancelled @event, CancellationToken ct);
+
+public async Task ProcessAsync<TEvent>(TEvent @event, CancellationToken ct = default)
+    => await _bus.PublishAsync(@event, ct);
+// Dispose...
+}
+Partial‑заготовка:
+
+csharp
+public partial class OrderProcessor : OrderProcessorBase
+{
+    public OrderProcessor(IMicroEventBus bus) : base(bus) { }
+    // Разработчик дописывает override OnOrderPaid и OnOrderCancelled
+}
+Тесты:
+
+csharp
+public class OrderProcessorTests
+{
+    private class OrderProcessorForTest : OrderProcessor
+    {
+        public bool WasOnOrderPaidCalled { get; private set; }
+        protected override Task OnOrderPaid(...) { WasOnOrderPaidCalled = true; return Task.CompletedTask; }
+        // Аналогично OnOrderCancelled
+    }
+
+Копировать
+[Fact]
+public async Task OnOrderPaid_Should_Be_Called_On_OrderPaid()
+{
+    var bus = new InMemoryMicroEventBus();
+    var component = new OrderProcessorForTest(bus);
+    var @event = new OrderPaid(Guid.NewGuid(), 100.0m);
+    await component.ProcessAsync(@event);
+    Assert.True(component.WasOnOrderPaidCalled);
+}
+}
+6. Тестирование и замкнутый цикл
+Теперь ваш процесс выглядит так:
+
+Описываете компонент в JSON – чистая декларация событий и хэндлеров.
+
+Генератор на лету создаёт все необходимые файлы.
+
+Реализуете бизнес-логику в partial классе (только override обработчиков).
+
+Запускаете сгенерированные тесты – они уже проверяют, что обработчики вызываются при нужных событиях.
+
+При изменении JSON генератор обновляет код, и если вы удалили обработчик, тест на него исчезнет, а компилятор укажет, что абстрактный метод не реализован.
+
+Этот подход полностью убирает рутину: больше никаких забытых подписок, опечаток в названиях событий, ручного написания boilerplate-тестов.

@@ -1,0 +1,32 @@
+PowerShell 7.6.5
+PS C:\Users\Administrator> cd D:\Projects\VS02\2606\Quotes\Qwen\QuotesApp
+PS D:\Projects\VS02\2606\Quotes\Qwen\QuotesApp> dotnet run --project QuotesApp.AppHost
+Restore succeeded with 1 warning(s) in 3.2s
+    D:\Projects\VS02\2606\Quotes\Qwen\QuotesApp\QuotesApp.ApiService\QuotesApp.ApiService.csproj : warning NU1903: Package 'Microsoft.OpenApi' 2.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+  QuotesApp.ApiService net10.0 succeeded with 1 warning(s) (3.0s) → QuotesApp.ApiService\bin\Debug\net10.0\QuotesApp.ApiService.dll
+    D:\Projects\VS02\2606\Quotes\Qwen\QuotesApp\QuotesApp.ApiService\QuotesApp.ApiService.csproj : warning NU1903: Package 'Microsoft.OpenApi' 2.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+info: Aspire.Hosting.DistributedApplication[0]
+      Aspire AppHost version: 13.4.6+87fe259e4fc244c599019a7b1304c85a1488f248
+info: Aspire.Hosting.DistributedApplication[0]
+      Distributed application starting.
+info: Aspire.Hosting.DistributedApplication[0]
+      Application host directory is: D:\Projects\VS02\2606\Quotes\Qwen\QuotesApp\QuotesApp.AppHost
+info: Aspire.Hosting.DistributedApplication[0]
+      Generating a dynamic url for dashboard.  If you want a consistent url, configure `ASPNETCORE_URLS`
+info: Aspire.Hosting.DistributedApplication[0]
+      Now listening on: https://localhost:57725
+info: Aspire.Hosting.DistributedApplication[0]
+      Login to the dashboard at https://localhost:57725/login?t=8ca7302c1f2c667185c840033321038e
+info: Aspire.Hosting.DistributedApplication[0]
+      Aspire Dashboard
+
+      - Dashboard:  https://localhost:57725
+      - Login URL:  https://localhost:57725/login?t=8ca7302c1f2c667185c840033321038e
+      - OTLP/gRPC:  https://localhost:57726
+      - OTLP/HTTP:  https://localhost:57729
+
+info: Aspire.Hosting.DistributedApplication[0]
+      Distributed application started. Press Ctrl+C to shut down.
+--------------------------------------------------------------------------------------------------
+Пароль на 7 строк ВЫШЕ и ВЫШЕ и ВЫШЕ 
+Пароль = "8ca7302c1f2c667185c840033321038e"
