@@ -6,4 +6,7 @@
     <Project Path="Trading.Processors/Trading.Processors.csproj" />
     <Project Path="Trading.Storage/Trading.Storage.csproj" />
   </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Trading.Tests/Trading.Tests.csproj" />
+  </Folder>
 </Solution>

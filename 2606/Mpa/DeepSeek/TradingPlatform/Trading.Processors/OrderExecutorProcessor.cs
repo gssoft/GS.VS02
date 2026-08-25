@@ -32,7 +32,9 @@ public class OrderExecutorProcessor : EventDrivenProcessor<OrderRequested>
         }
         else
         {
-            var notFilled = new OrderNotFilled(order.OrderId, "Random rejection");
+            // var notFilled = new OrderNotFilled(order.OrderId, "Random rejection");
+
+            var notFilled = new OrderNotFilled(order.OrderId, order.Ticker, "Random rejection");
             await Bus.PublishAsync(notFilled, ct);
             Logger.LogInformation("Order {OrderId} NOT FILLED", order.OrderId);
         }
