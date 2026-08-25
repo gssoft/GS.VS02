@@ -1,0 +1,28 @@
+
+---------------------------------------------------------------------------------------------------
+Ticker -> Create Quotes -> New Quotes -> TradeStrategy() -> new Order -> OrderExecutor(Filled, NoFielled)   -> Trades(-1,0,+1) ->  OpenCloseNeutral(Position) -> Position(UpdatesPosition) -> Save Trade, Order, UpdatePosition in InMemoryDataBase -> New Quotes
+Портфель Tickers
+Пишу с Листа - Можно что-то добавитьб что-то убавить.
+Сервисы
+QuotesCreater
+QuotesFeeder
+Order
+Trades
+Positions
+Strategy(Position, Trades, Orders ), 
+можно по-другому Trades, Orders, Strategy(Position)
+Orders - OrderExecutor Filled, NoField - Random
+Все это в Цикле.
+Нам необходимо проверить свою архитектуру.
+У нас разные классы, которые взаимодействуют через наши EventHubs в Классах, там где они вызывают свои Handlers
+----------
+Это очень примерно.
+Нам важно сделать всю цепочку и проверить весь цикл для каждой сущности.
+В соотвествие с Нашей новой Архитектурой
+Главное, чтобы отдельные сущности получали свои Commands через EventHub,
+а обрабатывали в своих контекстах.
+--------------
+Я думаю Вы все поняли.
+Если я что-то не написал - пропустил - Дополни.
+Я думаю, что контекст тебе должен быть знаком и в сфере Trading и в сфере отдельных Сервисов, взаимодействующих между собой.
+------------------------------------------------------------------------- 

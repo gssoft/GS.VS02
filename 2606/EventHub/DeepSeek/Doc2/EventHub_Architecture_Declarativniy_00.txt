@@ -1,0 +1,311 @@
+https://giga.chat/link/gcsPNqNVie
+
+_Part00_
+
+Еще раз про EventHub и .NetCore
+
+Ответ
+
+Ниже представлена полная, готовая к сборке структура решения .NET Aspire на основе нашей дискуссии.
+DeepSeek. EvenHub in Every Class 
+Весь код разбит по файлам и проектам так, чтобы вы могли просто скопировать его в папки.
+
+Структура Solution (MicroPlatform.sln)
+
+Копировать
+src/
+├── MicroPlatform.Abstractions/          # Интерфейсы (IMicroEventBus)
+│   └── IMicroEventBus.cs
+│   └── MicroPlatform.Abstractions.csproj
+│
+├── MicroPlatform.Core/                  # InMemory шина для тестов
+│   └── InMemoryMicroEventBus.cs
+│   └── MicroPlatform.Core.csproj
+│
+├── MicroPlatform.Infrastructure/        # RabbitMQ адаптер с переподключением/retry
+│   └── RabbitMqMicroEventBus.cs
+│   └── MicroPlatform.Infrastructure.csproj
+│
+├── Processors/                          # Папка бизнес-логики
+│   ├── OrderProcessor/
+│   │   ├── processor-manifest.json      # Декларация событий генератора
+│   │   ├── OrderProcessor.cs            # Ваша реализация обработчиков
+│   │   └── OrderProcessor.csproj
+│   │
+│   ├── InventoryProcessor/
+│   │   ├── processor-manifest.json
+│   │   ├── InventoryProcessor.cs
+│   │   └── InventoryProcessor.csproj
+│   │
+│   └── InvoiceProcessor/
+│       ├── processor-manifest.json
+│       ├── InvoiceProcessor.cs
+│       └── InvoiceProcessor.csproj
+│
+└── MicroPlatform.AppHost/               # Точка входа (.NET Aspire Host)
+    └── Program.cs
+    └── MicroPlatform.AppHost.csproj
+
+tests/
+└── MicroPlatform.IntegrationTests/
+    └── MicroPlatform.IntegrationTests.csproj
+1. Микросервис: MicroPlatform.Abstractions
+
+Интерфейс шины — единственная зависимость процессоров от инфраструктуры.
+
+Файл: src/MicroPlatform.Abstractions/IMicroEventBus.cs
+
+csharp
+Копировать
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace MicroPlatform.Abstractions;
+
+public interface IMicroEventBus : IDisposable
+{
+    void Subscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler);
+    void Unsubscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler);
+    Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default);
+}
+
+Файл: src/MicroPlatform.Abstractions/MicroPlatform.Abstractions.csproj
+
+xml
+Копировать
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+</Project>
+2. Ядро: MicroPlatform.Core
+
+InMemory-реализация для локальной разработки и юнит-тестов.
+
+Файл: src/MicroPlatform.Core/InMemoryMicroEventBus.cs
+
+csharp
+Копировать
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using MicroPlatform.Abstractions;
+
+namespace MicroPlatform.Core;
+
+public class InMemoryMicroEventBus : IMicroEventBus
+{
+    private readonly ConcurrentDictionary<Type, List<Delegate>> _handlers = new();
+    private readonly ILogger<InMemoryMicroEventBus> _logger;
+    private readonly ActivitySource _activitySource = new("MicroEventBus");
+
+    public InMemoryMicroEventBus(ILogger<InMemoryMicroEventBus>? logger = null)
+    {
+        _logger = logger ?? NullLogger<InMemoryMicroEventBus>.Instance;
+    }
+
+    public void Subscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
+    {
+        var type = typeof(TEvent);
+        _handlers.AddOrUpdate(type, _ => new List<Delegate> { handler }, (_, list) =>
+        {
+            list.Add(handler);
+            return list;
+        });
+    }
+
+    public void Unsubscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
+    {
+        if (_handlers.TryGetValue(typeof(TEvent), out var list))
+            list.Remove(handler);
+    }
+
+    public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
+    {
+        using var activity = _activitySource.StartActivity($"Publish {typeof(TEvent).Name}", ActivityKind.Producer);
+        var type = typeof(TEvent);
+        
+        if (_handlers.TryGetValue(type, out var handlers))
+        {
+            foreach (var del in handlers.Cast<Func<TEvent, CancellationToken, Task>>())
+            {
+                await del(@event, cancellationToken);
+            }
+        }
+        _logger.LogDebug("Published {EventType}", type.Name);
+    }
+
+    public void Dispose() { /* Для InMemory ничего не требуется */ }
+}
+
+Файл: src/MicroPlatform.Core/MicroPlatform.Core.csproj
+
+xml
+Копировать
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MicroPlatform.Abstractions\MicroPlatform.Abstractions.csproj" />
+  </ItemGroup>
+</Project>
+3. Инфраструктура: MicroPlatform.Infrastructure
+
+Промышленный адаптер RabbitMQ с автоматическим восстановлением соединения, retry и Dead Letter Queue.
+
+Файл: src/MicroPlatform.Infrastructure/RabbitMqMicroEventBus.cs
+(Используйте полный код адаптера из предыдущего сообщения о «промышленном» Bus'е с OnConnectionShutdown, RebindAllHandlers и BasicAck/Nack).
+Убедитесь, что пространство имен: namespace MicroPlatform.Infrastructure;
+
+Файл: src/MicroPlatform.Infrastructure/MicroPlatform.Infrastructure.csproj
+
+xml
+Копировать
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="RabbitMQ.Client" Version="6.5.1" />
+    <ProjectReference Include="..\MicroPlatform.Abstractions\MicroPlatform.Abstractions.csproj" />
+  </ItemGroup>
+</Project>
+4. Бизнес-процессор: OrderProcessor (пример для остальных)
+
+Здесь живет только ваша логика. Кодогенерация подключается через анализатор.
+
+Файл манифеста: src/Processors/OrderProcessor/processor-manifest.json
+(Содержимое JSON из вашего последнего сообщения со списком events, publishes и goldenTests).
+
+Файл реализации: src/Processors/OrderProcessor/OrderProcessor.cs
+
+csharp
+Копировать
+// Этот файл НЕ будет перезаписан генератором благодаря модификатору partial
+namespace Generated 
+{
+    // Генератор создаст абстрактный базовый класс OrderProcessorBase,
+    // а этот partial-класс наследуется от него.
+    public partial class OrderProcessor 
+    {
+        protected override async Task OnOrderPaid(OrderPaid @event, CancellationToken ct)
+        {
+            // ВАША БИЗНЕС-ЛОГИКА
+            Console.WriteLine($"Обрабатываем оплату заказа {@event.OrderId} на сумму {@event.Amount}");
+            
+            // Методы-помощники уже сгенерированы в Base-классе!
+            await PublishInventoryReserved(new InventoryReserved(@event.OrderId, "SKU-123"), ct);
+            await PublishInvoiceCreated(new InvoiceCreated(@event.OrderId, @event.Amount), ct);
+        }
+    }
+}
+
+Файл проекта: src/Processors/OrderProcessor/OrderProcessor.csproj
+
+xml
+Копировать
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Ссылка на Source Generator -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\MicroPlatform.Generators\MicroPlatform.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
+  </ItemGroup>
+
+  <!-- Зависимости абстракций -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\MicroPlatform.Abstractions\MicroPlatform.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\MicroPlatform.Core\MicroPlatform.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Манифест для генератора -->
+  <ItemGroup>
+    <AdditionalFiles Include="processor-manifest.json" />
+  </ItemGroup>
+</Project>
+
+(Создайте аналогичные проекты для InventoryProcessor и InvoiceProcessor, изменив имена файлов).
+
+5. Оркестратор: MicroPlatform.AppHost
+
+Главный вход приложения .NET Aspire.
+
+Файл: src/MicroPlatform.AppHost/Program.cs
+
+csharp
+Копировать
+using Aspire.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using MicroPlatform.Abstractions;
+using MicroPlatform.Core;
+using MicroPlatform.Infrastructure;
+using RabbitMQ.Client;
+
+var builder = DistributedApplication.CreateBuilder(args);
+builder.AddServiceDefaults(); // OpenTelemetry, Health Checks (/healthz)
+
+// --- Регистрация брокера ---
+var messaging = builder.AddRabbitMQ("messaging");
+messaging.WithVolume("rabbit-data", "/var/lib/rabbitmq");
+
+// --- Регистрация шины (Инфраструктура или Core) ---
+// В продакшене:
+builder.Services.AddSingleton<IConnectionFactory>(_ => 
+    new ConnectionFactory { Uri = new Uri(messaging.GetConnectionString()) });
+
+builder.Services.AddSingleton<IMicroEventBus>(sp =>
+{
+    var factory = sp.GetRequiredService<IConnectionFactory>();
+    var logger = sp.GetRequiredService<ILogger<RabbitMqMicroEventBus>>();
+    return new RabbitMqMicroEventBus(factory, logger); // Используем наш промышленный адаптер
+});
+
+// Для быстрой локальной разработки раскомментируйте это и закомментируйте блок выше:
+// builder.Services.AddSingleton<IMicroEventBus, InMemoryMicroEventBus>();
+
+// --- Регистрация Процессоров ---
+builder.Services.AddOrderProcessor();
+builder.Services.AddInventoryProcessor();
+builder.Services.AddInvoiceProcessor();
+
+var app = builder.Build();
+app.MapDefaultEndpoints();
+app.Run();
+
+Файл проекта: src/MicroPlatform.AppHost/MicroPlatform.AppHost.csproj
+
+xml
+Копировать
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Processors\OrderProcessor\OrderProcessor.csproj" />
+    <ProjectReference Include="..\Processors\InventoryProcessor\InventoryProcessor.csproj" />
+    <ProjectReference Include="..\Processors\InvoiceProcessor\InvoiceProcessor.csproj" />
+    
+    <ProjectReference Include="..\MicroPlatform.Infrastructure\MicroPlatform.Infrastructure.csproj" />
+    
+    <PackageReference Include="Aspire.Hosting.RabbitMQ" Version="9.0.0-rc.1.24429.4" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
+  </ItemGroup>
+</Project>
+Как запустить без ошибок:
+Создайте пустое решение MicroPlatform.sln.
+Добавьте все указанные выше проекты строго в эту иерархию.
+Важно про генератор: Убедитесь, что библиотека MicroPlatform.Generators собрана до того, как вы начнете собирать процессорные проекты. Если IDE ругается на отсутствие пространства имен Generated, сделайте Build всей solution еще раз — файлы .g.cs появятся в папке obj/Debug/net8.0/generated/ каждого процессорного проекта после первого успешного прохода генерации.
+Запустите dotnet run --project src/MicroPlatform.AppHost. Откройте браузер по адресу https://localhost:15887 — там будет панель Aspire Dashboard с трассировкой ваших событий.

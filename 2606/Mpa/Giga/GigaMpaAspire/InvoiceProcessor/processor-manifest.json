@@ -1,0 +1,10 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace InvoiceProcessor
+{
+    class processor_manifest
+    {
+    }
+}

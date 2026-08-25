@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="MicroPlatform.Abstractions/MicroPlatform.Abstractions.csproj" />
+    <Project Path="MicroPlatform.Core/MicroPlatform.Core.csproj" />
+    <Project Path="MicroPlatform.Infrastructure/MicroPlatform.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Processors/">
+    <Project Path="InventoryProcessor/InventoryProcessor.csproj" />
+    <Project Path="InvoiceProcessor/InvoiceProcessor.csproj" />
+    <Project Path="OrderProcessor/OrderProcessor.csproj" />
+  </Folder>
+  <Project Path="GigaMpaAspire.AppHost/GigaMpaAspire.AppHost.csproj" />
+  <Project Path="GigaMpaAspire.ServiceDefaults/GigaMpaAspire.ServiceDefaults.csproj" />
+</Solution>

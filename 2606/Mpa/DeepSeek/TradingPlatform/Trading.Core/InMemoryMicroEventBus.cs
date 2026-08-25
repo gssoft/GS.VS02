@@ -1,0 +1,36 @@
+﻿// InMemoryMicroEventBus.cs
+using System.Collections.Concurrent;
+
+namespace Trading.Core;
+
+public class InMemoryMicroEventBus : IMicroEventBus
+{
+    private readonly ConcurrentDictionary<Type, List<Func<object, CancellationToken, Task>>> _handlers = new();
+
+    public void Subscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
+    {
+        var eventType = typeof(TEvent);
+        _handlers.AddOrUpdate(eventType,
+            _ => new List<Func<object, CancellationToken, Task>> { (e, ct) => handler((TEvent)e, ct) },
+            (_, list) =>
+            {
+                list.Add((e, ct) => handler((TEvent)e, ct));
+                return list;
+            });
+    }
+
+    public void Unsubscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
+    {
+        if (_handlers.TryGetValue(typeof(TEvent), out var list))
+            list.Remove((e, ct) => handler((TEvent)e, ct));
+    }
+
+    public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
+    {
+        if (_handlers.TryGetValue(typeof(TEvent), out var handlers))
+        {
+            foreach (var handler in handlers)
+                await handler(@event, cancellationToken);
+        }
+    }
+}

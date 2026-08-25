@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+	<!-- Ссылка на Source Generator -->
+	<ItemGroup>
+		<ProjectReference Include="..\..\..\MicroPlatform.Generators\MicroPlatform.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
+	</ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MicroPlatform.Abstractions\MicroPlatform.Abstractions.csproj" />
+    <ProjectReference Include="..\MicroPlatform.Core\MicroPlatform.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,10 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace InventoryProcessor
+{
+    class processor_manifest
+    {
+    }
+}
