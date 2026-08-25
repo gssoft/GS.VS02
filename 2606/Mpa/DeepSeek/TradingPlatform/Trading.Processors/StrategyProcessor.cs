@@ -27,14 +27,25 @@ public class StrategyProcessor : EventDrivenProcessor<NewQuotes>
             if (!hasPosition)
             {
                 // Открываем позицию
-                var order = new OrderRequested(quote.Ticker, quantity: 10, price: quote.Ask, side: "Buy");
+                var order = new OrderRequested(
+                    Ticker: quote.Ticker,
+                    Quantity: 10,
+                    Price: quote.Ask,
+                    Side: "Buy");
+
                 await Bus.PublishAsync(order, ct);
                 Logger.LogInformation("Strategy: Sending BUY order for {Ticker} at {Price}", quote.Ticker, quote.Ask);
             }
             else
             {
                 // Закрываем позицию
-                var order = new OrderRequested(quote.Ticker, quantity: pos.Quantity, price: quote.Bid, side: "Sell");
+
+                var order = new OrderRequested(
+                    Ticker: quote.Ticker,
+                    Quantity: pos.Quantity,
+                    Price: quote.Bid,
+                    Side: "Sell");
+
                 await Bus.PublishAsync(order, ct);
                 Logger.LogInformation("Strategy: Sending SELL order for {Ticker} at {Price}", quote.Ticker, quote.Bid);
             }

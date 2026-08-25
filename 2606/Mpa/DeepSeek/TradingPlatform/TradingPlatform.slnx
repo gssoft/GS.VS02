@@ -6,5 +6,4 @@
     <Project Path="Trading.Processors/Trading.Processors.csproj" />
     <Project Path="Trading.Storage/Trading.Storage.csproj" />
   </Folder>
-  <Project Path="ConsoleApp01/ConsoleApp01.csproj" />
 </Solution>
