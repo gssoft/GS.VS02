@@ -12,12 +12,16 @@ public class TradingWorker : BackgroundService
     private readonly IMicroEventBus _bus;
     private readonly QuotesFeederProcessor _quotesFeeder;
     private readonly ILogger<TradingWorker> _logger;
+
+    private readonly int LoopTimeoutInSec = 2;
     private readonly int StopTimeoutInSec = 5;
+
 
     public TradingWorker(
         IMicroEventBus bus,
         QuotesFeederProcessor quotesFeeder,
-        ILogger<TradingWorker> logger)
+        ILogger<TradingWorker> logger
+        )
     {
         _bus = bus;
         _quotesFeeder = quotesFeeder;
@@ -36,7 +40,7 @@ public class TradingWorker : BackgroundService
                 try
                 {
                     await _quotesFeeder.GenerateQuotesAsync(stoppingToken);
-                    await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                    await Task.Delay(TimeSpan.FromSeconds(LoopTimeoutInSec), stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
