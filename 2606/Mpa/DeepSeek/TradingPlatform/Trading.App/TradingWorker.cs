@@ -25,8 +25,7 @@ public class TradingWorker : BackgroundService
     {
         _bus = bus;
         _quotesFeeder = quotesFeeder;
-        _logger = logger;
-        
+        _logger = logger;    
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
