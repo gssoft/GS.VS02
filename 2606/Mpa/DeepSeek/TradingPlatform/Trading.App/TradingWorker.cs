@@ -1,7 +1,6 @@
 ﻿// TradingWorker.cs
 using Trading.Core;
 using Trading.Processors;
-using Trading.Storage;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -27,12 +26,22 @@ public class TradingWorker : BackgroundService
     {
         _logger.LogInformation("Trading cycle started.");
 
-        // Периодически генерируем котировки
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            await _quotesFeeder.GenerateQuotesAsync(stoppingToken);
-            await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await _quotesFeeder.GenerateQuotesAsync(stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Ожидаемая отмена при остановке
+            _logger.LogInformation("Ожидаемая отмена при остановке. Trading cycle stopping ...");
+        }
+        finally
+        {
+            _logger.LogInformation("Trading cycle stopped gracefully.");
         }
     }
 }
-
