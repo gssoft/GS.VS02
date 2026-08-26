@@ -1,8 +1,9 @@
 ﻿// TradingWorker.cs
-using Trading.Core;
-using Trading.Processors;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Collections.ObjectModel;
+using Trading.Core;
+using Trading.Processors;
 
 namespace Trading.App;
 
@@ -11,6 +12,7 @@ public class TradingWorker : BackgroundService
     private readonly IMicroEventBus _bus;
     private readonly QuotesFeederProcessor _quotesFeeder;
     private readonly ILogger<TradingWorker> _logger;
+    private readonly int StopTimeoutInSec = 5;
 
     public TradingWorker(
         IMicroEventBus bus,
@@ -20,6 +22,7 @@ public class TradingWorker : BackgroundService
         _bus = bus;
         _quotesFeeder = quotesFeeder;
         _logger = logger;
+        
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -30,14 +33,24 @@ public class TradingWorker : BackgroundService
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                await _quotesFeeder.GenerateQuotesAsync(stoppingToken);
-                await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                try
+                {
+                    await _quotesFeeder.GenerateQuotesAsync(stoppingToken);
+                    await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    // Это штатная остановка, выходим из цикла
+                    _logger.LogError("Это штатная остановка, выходим из цикла");
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    // Непредвиденная ошибка: логируем и делаем паузу перед повтором
+                    _logger.LogError(ex, "Unexpected error in trading cycle. Retrying in 5 seconds...");
+                    await Task.Delay(TimeSpan.FromSeconds(StopTimeoutInSec), stoppingToken);
+                }
             }
-        }
-        catch (OperationCanceledException)
-        {
-            // Ожидаемая отмена при остановке
-            _logger.LogInformation("Ожидаемая отмена при остановке. Trading cycle stopping ...");
         }
         finally
         {
