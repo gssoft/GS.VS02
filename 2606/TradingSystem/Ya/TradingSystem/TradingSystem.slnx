@@ -17,12 +17,6 @@
   <Folder Name="/src/Services/Exchange.Connector/">
     <Project Path="Exchange.Connector/Exchange.Connector.csproj" />
   </Folder>
-  <Folder Name="/src/Services/Exchange.Connector/Controllers/">
-    <File Path="OrdersController.cs" />
-  </Folder>
-  <Folder Name="/src/Services/Exchange.Connector/Properties/">
-    <File Path="launchSettings.json" />
-  </Folder>
   <Folder Name="/src/Services/MarketData.Generator/">
     <Project Path="MarketData.Generator/MarketData.Generator.csproj" />
   </Folder>
