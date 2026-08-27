@@ -1,4 +1,13 @@
 <Solution>
-  <Project Path="TradingSystem.AppHost/TradingSystem.AppHost.csproj" />
-  <Project Path="TradingSystem.ServiceDefaults/TradingSystem.ServiceDefaults.csproj" />
+  <Folder Name="/src/">
+    <Project Path="TradingSystem.AppHost/TradingSystem.AppHost.csproj" />
+    <Project Path="TradingSystem.ServiceDefaults/TradingSystem.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/src/Core/">
+    <Project Path="MessageBus.cs/Core.MessageBus.csproj" />
+  </Folder>
+  <Folder Name="/src/Core/Core.Models/">
+    <Project Path="TradingSystem.Core.Models/Core.Models.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
 </Solution>
