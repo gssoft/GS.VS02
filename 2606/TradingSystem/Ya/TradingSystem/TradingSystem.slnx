@@ -14,6 +14,12 @@
     <Project Path="TradingSystem.Core.Models/Core.Models.csproj" />
   </Folder>
   <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/Database.InMemory/">
+    <Project Path="Database.InMemory/Database.InMemory.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Database.Persistent/">
+    <Project Path="Database.Persistent/Database.Persistent.csproj" />
+  </Folder>
   <Folder Name="/src/Services/Exchange.Connector/">
     <Project Path="Exchange.Connector/Exchange.Connector.csproj" />
   </Folder>
