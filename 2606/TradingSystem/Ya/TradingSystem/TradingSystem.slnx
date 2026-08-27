@@ -13,6 +13,13 @@
   <Folder Name="/src/Core/Core.Models/">
     <Project Path="TradingSystem.Core.Models/Core.Models.csproj" />
   </Folder>
+  <Folder Name="/src/Gateway/" />
+  <Folder Name="/src/Gateway/ApiGateway/">
+    <Project Path="ApiGateway/ApiGateway.csproj" />
+  </Folder>
+  <Folder Name="/src/Gateway/BFF.Portfolio/">
+    <Project Path="BFF.Portfolio/BFF.Portfolio.csproj" />
+  </Folder>
   <Folder Name="/src/Services/" />
   <Folder Name="/src/Services/Database.InMemory/">
     <Project Path="Database.InMemory/Database.InMemory.csproj" />
@@ -36,4 +43,7 @@
     <Project Path="Strategy.Executor/Strategy.Executor.csproj" />
   </Folder>
   <Folder Name="/tests/" />
+  <Folder Name="/tests/TradingSystem.Tests/">
+    <Project Path="TradingSystem.Tests/TradingSystem.Tests.csproj" />
+  </Folder>
 </Solution>
