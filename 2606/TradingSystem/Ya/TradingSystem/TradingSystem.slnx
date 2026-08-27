@@ -4,6 +4,9 @@
     <Project Path="TradingSystem.ServiceDefaults/TradingSystem.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/src/Core/" />
+  <Folder Name="/src/Core/Core.Contracts/">
+    <Project Path="Core.Contracts/Core.Contracts.csproj" />
+  </Folder>
   <Folder Name="/src/Core/Core.MessageBus/">
     <Project Path="MessageBus.cs/Core.MessageBus.csproj" />
   </Folder>
