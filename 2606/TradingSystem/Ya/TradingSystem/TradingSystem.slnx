@@ -23,5 +23,11 @@
   <Folder Name="/src/Services/MarketData.Storage/">
     <Project Path="MarketData.Storage/MarketData.Storage.csproj" />
   </Folder>
+  <Folder Name="/src/Services/Portfolio.Manager/">
+    <Project Path="Portfolio.Manager/Portfolio.Manager.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Strategy.Executor/">
+    <Project Path="Strategy.Executor/Strategy.Executor.csproj" />
+  </Folder>
   <Folder Name="/tests/" />
 </Solution>
