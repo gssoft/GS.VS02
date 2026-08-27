@@ -1,0 +1,89 @@
+1. Проект сервиса: BackgroundService + Channels + NamedPipes
+Этот сервис будет слушать именованный канал (Named Pipe), вычитывать сообщения и отправлять их в Channel<string> для дальнейшей обработки (например, записи в БД или логирования).
+
+C#
+using System.IO.Pipes;
+using System.Threading.Channels;
+
+public class PipeWorker(ILogger<PipeWorker> logger, ChannelWriter<string> writer) : BackgroundService
+{
+    private const string PipeName = "aspire-data-pipe";
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        logger.LogInformation("Starting Named Pipe Server: {PipeName}", PipeName);
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                // 1. Создаем серверный стрим
+                using var pipeServer = new NamedPipeServerStream(
+                    PipeName,
+                    PipeDirection.In,
+                    maxNumberOfServerInstances: 5,
+                    PipeTransmissionMode.Byte,
+                    PipeOptions.Asynchronous);
+
+                // 2. Ждем подключения клиента
+                await pipeServer.WaitForConnectionAsync(stoppingToken);
+                logger.LogInformation("Client connected to pipe.");
+
+                // 3. Читаем данные и пишем в Channel
+                using var reader = new StreamReader(pipeServer);
+                while (!reader.EndOfStream && !stoppingToken.IsCancellationRequested)
+                {
+                    var message = await reader.ReadLineAsync(stoppingToken);
+                    if (message != null)
+                    {
+                        // Пишем в канал без блокировки потока чтения из Pipe
+                        await writer.WriteAsync(message, stoppingToken);
+                        logger.LogDebug("Received and channeled: {Message}", message);
+                    }
+                }
+            }
+            catch (OperationCanceledException) { /* Игнорируем при выключении */ }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error in PipeWorker. Restarting listener...");
+                await Task.Delay(1000, stoppingToken); // Пауза перед рестартом при ошибке
+            }
+        }
+    }
+}
+---------------
+2. Регистрация в Dependency Injection (Program.cs сервиса)
+В Aspire-приложениях важно правильно настроить DI. Мы создаем Channel как Singleton, чтобы другие службы могли из него читать.
+
+---------------
+var builder = Host.CreateApplicationBuilder(args);
+
+// Добавляем Aspire Service Defaults (логирование, метрики)
+builder.AddServiceDefaults();
+
+// Настраиваем Channel (Bounded — чтобы не переполнить память)
+builder.Services.AddSingleton(_ => Channel.CreateBounded<string>(new BoundedChannelOptions(1000) 
+{ 
+    FullMode = BoundedChannelFullMode.Wait 
+}));
+
+// Регистрируем Writer и Reader отдельно для чистоты кода
+builder.Services.AddSingleton(sp => sp.GetRequiredService<Channel<string>>().Writer);
+builder.Services.AddSingleton(sp => sp.GetRequiredService<Channel<string>>().Reader);
+
+// Наш фоновый сервис
+builder.Services.AddHostedService<PipeWorker>();
+
+var host = builder.Build();
+host.Run();
+------------------------
+AppHost Program.cs
+var builder = DistributedApplication.CreateBuilder(args);
+
+// Регистрируем ваш проект
+var pipeService = builder.AddProject<Projects.MyPipeService>("pipeservice")
+    // Можно добавить переменную окружения с именем канала, чтобы клиент знал, куда подключаться
+    .WithEnvironment("PIPE_NAME", "aspire-data-pipe");
+
+builder.Build().Run();
+________________________
