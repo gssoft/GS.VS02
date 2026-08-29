@@ -1,53 +1,7 @@
-This file is a merged representation of a subset of the codebase, containing files not matching ignore patterns, combined into a single document by Repomix.
-
-================================================================
-File Summary
-================================================================
-
-Purpose:
---------
-This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
-It is designed to be easily consumable by AI systems for analysis, code review,
-or other automated processes.
-
-File Format:
-------------
-The content is organized as follows:
-1. This summary section
-2. Repository information
-3. Directory structure
-4. Repository files (if enabled)
-5. Multiple file entries, each consisting of:
-  a. A separator line (================)
-  b. The file path (File: path/to/file)
-  c. Another separator line
-  d. The full contents of the file
-  e. A blank line
-
-Usage Guidelines:
------------------
-- This file should be treated as read-only. Any changes should be made to the
-  original repository files, not this packed version.
-- When processing this file, use the file path to distinguish
-  between different files in the repository.
-- Be aware that this file may contain sensitive information. Handle it with
-  the same level of security as you would the original repository.
-
-Notes:
-------
-- Some files may have been excluded based on .gitignore rules and Repomix's configuration
-- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
-- Files matching these patterns are excluded: wwwroot/, **/*.css
-- Files matching patterns in .gitignore are excluded
-- Files matching default ignore patterns are excluded
-- Files are sorted by Git change count (files with more changes are at the bottom)
-
 
 ================================================================
 Directory Structure
 ================================================================
-ConsoleApp01/ConsoleApp01.csproj
-ConsoleApp01/Program.cs
 Trading.App/Program.cs
 Trading.App/Trading.App.csproj
 Trading.App/TradingWorker.cs
@@ -79,27 +33,11 @@ Files
 ================================================================
 
 ================
-File: ConsoleApp01/ConsoleApp01.csproj
-================
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-
-</Project>
-
-================
-File: ConsoleApp01/Program.cs
-================
-Console.WriteLine("Hello, World!");
-
-================
 File: Trading.App/Program.cs
 ================
+// 26.08.29
+// Program.cs
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -113,6 +51,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddSingleton<IMicroEventBus, InMemoryMicroEventBus>();
 builder.Services.AddSingleton<InMemoryDatabase>();
 
+// QuotesFeederProcessor с явным указанием тикеров
 builder.Services.AddSingleton<QuotesFeederProcessor>(sp =>
 {
     var bus = sp.GetRequiredService<IMicroEventBus>();
@@ -121,25 +60,27 @@ builder.Services.AddSingleton<QuotesFeederProcessor>(sp =>
     return new QuotesFeederProcessor(bus, loggerFactory, tickers);
 });
 
+// Остальные процессоры
 builder.Services.AddSingleton<StrategyProcessor>();
 builder.Services.AddSingleton<OrderExecutorProcessor>();
 builder.Services.AddSingleton<TradeProcessor>();
 builder.Services.AddSingleton<PositionProcessor>();
 builder.Services.AddSingleton<PortfolioProcessor>();
 
+// Регистрируем все процессоры как Hosted Services
+builder.Services.AddHostedService(sp => sp.GetRequiredService<QuotesFeederProcessor>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<StrategyProcessor>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<OrderExecutorProcessor>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<TradeProcessor>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PositionProcessor>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PortfolioProcessor>());
+
 builder.Services.AddHostedService<TradingWorker>();
 
 var host = builder.Build();
-
-// Принудительно создаём все процессоры, чтобы они подписались на события
-host.Services.GetRequiredService<StrategyProcessor>();
-host.Services.GetRequiredService<OrderExecutorProcessor>();
-host.Services.GetRequiredService<TradeProcessor>();
-host.Services.GetRequiredService<PositionProcessor>();
-host.Services.GetRequiredService<PortfolioProcessor>();
-
 await host.RunAsync();
 
+// 26.08.26
 //using Microsoft.Extensions.DependencyInjection;
 //using Microsoft.Extensions.Hosting;
 //using Microsoft.Extensions.Logging;
@@ -150,62 +91,34 @@ await host.RunAsync();
 
 //var builder = Host.CreateApplicationBuilder(args);
 
-//// Шина
 //builder.Services.AddSingleton<IMicroEventBus, InMemoryMicroEventBus>();
-
-//// Хранилище
 //builder.Services.AddSingleton<InMemoryDatabase>();
 
-//// Регистрация QuotesFeederProcessor с явным указанием тикеров
 //builder.Services.AddSingleton<QuotesFeederProcessor>(sp =>
 //{
 //    var bus = sp.GetRequiredService<IMicroEventBus>();
 //    var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-//    var tickers = new[] { "AAPL", "MSFT", "GOOGL" };  // можно загружать из конфигурации
+//    var tickers = new[] { "AAPL", "MSFT", "GOOGL" };
 //    return new QuotesFeederProcessor(bus, loggerFactory, tickers);
 //});
 
-//// Остальные процессоры
 //builder.Services.AddSingleton<StrategyProcessor>();
 //builder.Services.AddSingleton<OrderExecutorProcessor>();
 //builder.Services.AddSingleton<TradeProcessor>();
 //builder.Services.AddSingleton<PositionProcessor>();
 //builder.Services.AddSingleton<PortfolioProcessor>();
 
-//// Worker
 //builder.Services.AddHostedService<TradingWorker>();
 
 //var host = builder.Build();
-//await host.RunAsync();
 
+//// Принудительно создаём все процессоры, чтобы они подписались на события
+//host.Services.GetRequiredService<StrategyProcessor>();
+//host.Services.GetRequiredService<OrderExecutorProcessor>();
+//host.Services.GetRequiredService<TradeProcessor>();
+//host.Services.GetRequiredService<PositionProcessor>();
+//host.Services.GetRequiredService<PortfolioProcessor>();
 
-//using Trading.App;
-//using Trading.Core;
-//using Trading.Processors;
-//using Trading.Storage;
-//using Microsoft.Extensions.DependencyInjection;
-//using Microsoft.Extensions.Hosting;
-
-//var builder = Host.CreateApplicationBuilder(args);
-
-//// Шина
-//builder.Services.AddSingleton<IMicroEventBus, InMemoryMicroEventBus>();
-
-//// Хранилище
-//builder.Services.AddSingleton<InMemoryDatabase>();
-
-//// Процессоры (singleton, чтобы жили всё время)
-//builder.Services.AddSingleton<QuotesFeederProcessor>();
-//builder.Services.AddSingleton<StrategyProcessor>();
-//builder.Services.AddSingleton<OrderExecutorProcessor>();
-//builder.Services.AddSingleton<TradeProcessor>();
-//builder.Services.AddSingleton<PositionProcessor>();
-//builder.Services.AddSingleton<PortfolioProcessor>();
-
-//// Worker
-//builder.Services.AddHostedService<TradingWorker>();
-
-//var host = builder.Build();
 //await host.RunAsync();
 
 ================
@@ -332,53 +245,103 @@ public interface IMicroEventBus
 ================
 File: Trading.Core/InMemoryMicroEventBus.cs
 ================
+// 26.08.29
 // InMemoryMicroEventBus.cs
+//
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 
 namespace Trading.Core;
 
 public class InMemoryMicroEventBus : IMicroEventBus
 {
-    private readonly ConcurrentDictionary<Type, List<Func<object, CancellationToken, Task>>> _handlers = new();
+    private readonly ConcurrentDictionary<Type, ImmutableList<Func<object, CancellationToken, Task>>> _handlers = new();
 
     public void Subscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
     {
         var eventType = typeof(TEvent);
-        _handlers.AddOrUpdate(eventType,
-            _ => new List<Func<object, CancellationToken, Task>> { (e, ct) => handler((TEvent)e, ct) },
-            (_, list) =>
-            {
-                list.Add((e, ct) => handler((TEvent)e, ct));
-                return list;
-            });
+        var wrappedHandler = new Func<object, CancellationToken, Task>((e, ct) => handler((TEvent)e, ct));
+
+        while (true)
+        {
+            var currentList = _handlers.TryGetValue(eventType, out var list)
+                ? list
+                : ImmutableList<Func<object, CancellationToken, Task>>.Empty;
+            var newList = currentList.Add(wrappedHandler);
+            if (_handlers.TryUpdate(eventType, newList, currentList))
+                break;
+        }
     }
 
     public void Unsubscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
     {
-        if (_handlers.TryGetValue(typeof(TEvent), out var list))
-            list.Remove((e, ct) => handler((TEvent)e, ct));
+        var eventType = typeof(TEvent);
+        // Для простоты удаление не поддерживается (в текущем коде не используется)
+        // Можно реализовать через поиск по ссылке на wrapped делегат, если потребуется.
+        throw new NotSupportedException("Unsubscribe is not supported in this implementation.");
     }
 
     public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
     {
         if (_handlers.TryGetValue(typeof(TEvent), out var handlers))
         {
-            foreach (var handler in handlers)
-                await handler(@event, cancellationToken);
+            // Запускаем все обработчики параллельно
+            var tasks = handlers.Select(h => h(@event, cancellationToken));
+            await Task.WhenAll(tasks);
         }
     }
 }
 
+// 26.08.26
+//// InMemoryMicroEventBus.cs
+//using System.Collections.Concurrent;
+
+//namespace Trading.Core;
+
+//public class InMemoryMicroEventBus : IMicroEventBus
+//{
+//    private readonly ConcurrentDictionary<Type, List<Func<object, CancellationToken, Task>>> _handlers = new();
+
+//    public void Subscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
+//    {
+//        var eventType = typeof(TEvent);
+//        _handlers.AddOrUpdate(eventType,
+//            _ => new List<Func<object, CancellationToken, Task>> { (e, ct) => handler((TEvent)e, ct) },
+//            (_, list) =>
+//            {
+//                list.Add((e, ct) => handler((TEvent)e, ct));
+//                return list;
+//            });
+//    }
+
+//    public void Unsubscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
+//    {
+//        if (_handlers.TryGetValue(typeof(TEvent), out var list))
+//            list.Remove((e, ct) => handler((TEvent)e, ct));
+//    }
+
+//    public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
+//    {
+//        if (_handlers.TryGetValue(typeof(TEvent), out var handlers))
+//        {
+//            foreach (var handler in handlers)
+//                await handler(@event, cancellationToken);
+//        }
+//    }
+//}
+
 ================
 File: Trading.Core/ProcessorBase.cs
 ================
+// 26.08.29
 // ProcessorBase.cs
 using System.Threading.Channels;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Trading.Core;
 
-public abstract class ProcessorBase<TMessage> : IAsyncDisposable
+public abstract class ProcessorBase<TMessage> : IHostedService, IAsyncDisposable
 {
     private readonly Channel<TMessage> _channel;
     private readonly CancellationTokenSource _cts = new();
@@ -396,6 +359,7 @@ public abstract class ProcessorBase<TMessage> : IAsyncDisposable
             FullMode = BoundedChannelFullMode.Wait
         });
 
+        // Запускаем обработку немедленно (можно перенести в StartAsync, но разницы мало)
         _processingTask = Task.Run(ProcessMessagesAsync);
     }
 
@@ -415,7 +379,6 @@ public abstract class ProcessorBase<TMessage> : IAsyncDisposable
                 catch (Exception ex)
                 {
                     Logger.LogError(ex, "Error handling message {MessageType}", typeof(TMessage).Name);
-                    // Политика обработки ошибок: здесь можно добавить повтор или dead-letter
                 }
             }
         }
@@ -431,14 +394,94 @@ public abstract class ProcessorBase<TMessage> : IAsyncDisposable
 
     protected abstract Task HandleAsync(TMessage message, CancellationToken ct);
 
+    public virtual Task StartAsync(CancellationToken cancellationToken)
+    {
+        // Обработка уже запущена в конструкторе, ничего не делаем
+        return Task.CompletedTask;
+    }
+
+    public virtual async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await DisposeAsync();
+    }
+
     public virtual async ValueTask DisposeAsync()
     {
-        _channel.Writer.TryComplete();   // Больше не принимаем новые сообщения
-        await _processingTask;           // Дожидаемся завершения обработки всех оставшихся
-        _cts.Cancel();                   // Отменяем токен (на случай, если кто-то ещё держит)
+        _cts.Cancel();                    // Прекращаем чтение канала
+        _channel.Writer.TryComplete();    // Больше не принимаем новые сообщения
+        await _processingTask;            // Дожидаемся завершения обработки
         _cts.Dispose();
     }
 }
+
+// 26.08.26
+//// ProcessorBase.cs
+//using System.Threading.Channels;
+//using Microsoft.Extensions.Logging;
+
+//namespace Trading.Core;
+
+//public abstract class ProcessorBase<TMessage> : IAsyncDisposable
+//{
+//    private readonly Channel<TMessage> _channel;
+//    private readonly CancellationTokenSource _cts = new();
+//    private readonly Task _processingTask;
+
+//    protected readonly IMicroEventBus Bus;
+//    protected readonly ILogger Logger;
+
+//    protected ProcessorBase(IMicroEventBus bus, ILoggerFactory loggerFactory, int capacity = 1000)
+//    {
+//        Bus = bus;
+//        Logger = loggerFactory.CreateLogger(GetType());
+//        _channel = Channel.CreateBounded<TMessage>(new BoundedChannelOptions(capacity)
+//        {
+//            FullMode = BoundedChannelFullMode.Wait
+//        });
+
+//        _processingTask = Task.Run(ProcessMessagesAsync);
+//    }
+
+//    protected async Task EnqueueAsync(TMessage message, CancellationToken ct = default)
+//        => await _channel.Writer.WriteAsync(message, ct);
+
+//    private async Task ProcessMessagesAsync()
+//    {
+//        try
+//        {
+//            await foreach (var message in _channel.Reader.ReadAllAsync(_cts.Token))
+//            {
+//                try
+//                {
+//                    await HandleAsync(message, _cts.Token);
+//                }
+//                catch (Exception ex)
+//                {
+//                    Logger.LogError(ex, "Error handling message {MessageType}", typeof(TMessage).Name);
+//                    // Политика обработки ошибок: здесь можно добавить повтор или dead-letter
+//                }
+//            }
+//        }
+//        catch (OperationCanceledException)
+//        {
+//            // Ожидаемая отмена при остановке
+//        }
+//        finally
+//        {
+//            Logger.LogDebug("Processor {ProcessorName} stopped processing.", GetType().Name);
+//        }
+//    }
+
+//    protected abstract Task HandleAsync(TMessage message, CancellationToken ct);
+
+//    public virtual async ValueTask DisposeAsync()
+//    {
+//        _channel.Writer.TryComplete();   // Больше не принимаем новые сообщения
+//        await _processingTask;           // Дожидаемся завершения обработки всех оставшихся
+//        _cts.Cancel();                   // Отменяем токен (на случай, если кто-то ещё держит)
+//        _cts.Dispose();
+//    }
+//}
 
 //// ProcessorBase.cs
 //using System.Threading.Channels;
@@ -529,6 +572,7 @@ File: Trading.Core/Trading.Core.csproj
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.11" />
   </ItemGroup>
 
@@ -660,6 +704,7 @@ public class PortfolioProcessor : EventDrivenProcessor<PositionUpdated>
 ================
 File: Trading.Processors/PositionProcessor.cs
 ================
+// 26.08.29
 // PositionProcessor.cs
 using Trading.Core;
 using Trading.Domain;
@@ -685,7 +730,21 @@ public class PositionProcessor : EventDrivenProcessor<Trade>
             (ticker, existing) =>
             {
                 decimal newQty = existing.Quantity + (trade.Side == "Buy" ? trade.Quantity : -trade.Quantity);
-                decimal avgPrice = (existing.AveragePrice * existing.Quantity + trade.Price * trade.Quantity) / (existing.Quantity + trade.Quantity);
+                decimal avgPrice;
+                if (newQty == 0)
+                {
+                    avgPrice = 0; // позиция закрыта, средняя цена не важна
+                }
+                else if (trade.Side == "Buy")
+                {
+                    // Покупка: пересчитываем среднюю
+                    avgPrice = (existing.AveragePrice * existing.Quantity + trade.Price * trade.Quantity) / newQty;
+                }
+                else
+                {
+                    // Продажа: средняя цена не меняется
+                    avgPrice = existing.AveragePrice;
+                }
                 return new PositionUpdated(ticker, newQty, avgPrice);
             });
 
@@ -694,6 +753,42 @@ public class PositionProcessor : EventDrivenProcessor<Trade>
         Logger.LogInformation("Position updated for {Ticker}: {Quantity}", trade.Ticker, updated.Quantity);
     }
 }
+
+// 26.08.26
+// PositionProcessor.cs
+//using Trading.Core;
+//using Trading.Domain;
+//using Trading.Storage;
+//using Microsoft.Extensions.Logging;
+
+//namespace Trading.Processors;
+
+//public class PositionProcessor : EventDrivenProcessor<Trade>
+//{
+//    private readonly InMemoryDatabase _db;
+
+//    public PositionProcessor(IMicroEventBus bus, ILoggerFactory loggerFactory, InMemoryDatabase db)
+//        : base(bus, loggerFactory)
+//    {
+//        _db = db;
+//    }
+
+//    protected override async Task HandleAsync(Trade trade, CancellationToken ct)
+//    {
+//        _db.Positions.AddOrUpdate(trade.Ticker,
+//            ticker => new PositionUpdated(ticker, trade.Side == "Buy" ? trade.Quantity : -trade.Quantity, trade.Price),
+//            (ticker, existing) =>
+//            {
+//                decimal newQty = existing.Quantity + (trade.Side == "Buy" ? trade.Quantity : -trade.Quantity);
+//                decimal avgPrice = (existing.AveragePrice * existing.Quantity + trade.Price * trade.Quantity) / (existing.Quantity + trade.Quantity);
+//                return new PositionUpdated(ticker, newQty, avgPrice);
+//            });
+
+//        var updated = _db.Positions[trade.Ticker];
+//        await Bus.PublishAsync(updated, ct);
+//        Logger.LogInformation("Position updated for {Ticker}: {Quantity}", trade.Ticker, updated.Quantity);
+//    }
+//}
 
 ================
 File: Trading.Processors/QuotesFeederProcessor.cs
@@ -740,7 +835,9 @@ public class QuotesFeederProcessor : ProcessorBase<NewQuotes>
 ================
 File: Trading.Processors/StrategyProcessor.cs
 ================
+// 26.08.29
 // StrategyProcessor.cs
+
 using Trading.Core;
 using Trading.Domain;
 using Trading.Storage;
@@ -755,19 +852,22 @@ public enum StrategyState
     InPosition          // есть открытая позиция (и нет активного ордера)
 }
 
-public class StrategyProcessor : EventDrivenProcessor<NewQuotes>
+// Маркерный интерфейс для событий, обрабатываемых стратегией
+public interface IStrategyEvent { }
+public record NewQuotesStrategyEvent(NewQuotes Quotes) : IStrategyEvent;
+public record OrderFilledStrategyEvent(OrderFilled Filled) : IStrategyEvent;
+public record OrderNotFilledStrategyEvent(OrderNotFilled NotFilled) : IStrategyEvent;
+
+public class StrategyProcessor : EventDrivenProcessor<IStrategyEvent>
 {
     private readonly InMemoryDatabase _db;
     private readonly Dictionary<string, TickerState> _tickerStates = new();
-    private readonly object _stateLock = new();
-
-    // Локальное представление позиций для быстрого доступа (не зависит от PositionProcessor)
-    private readonly Dictionary<string, decimal> _localPositions = new();
+    private readonly Dictionary<string, decimal> _localPositions = new(); // количество по тикеру
 
     private class TickerState
     {
         public StrategyState State { get; set; } = StrategyState.Idle;
-        public string? PendingSide { get; set; } // "Buy" или "Sell", если WaitingForFill
+        public string? PendingSide { get; set; } // "Buy" или "Sell"
     }
 
     public StrategyProcessor(IMicroEventBus bus, ILoggerFactory loggerFactory, InMemoryDatabase db)
@@ -775,121 +875,254 @@ public class StrategyProcessor : EventDrivenProcessor<NewQuotes>
     {
         _db = db;
 
-        // Подписываемся на события исполнения ордеров
-        Bus.Subscribe<OrderFilled>((filled, ct) => OnOrderFilled(filled));
-        Bus.Subscribe<OrderNotFilled>((notFilled, ct) => OnOrderNotFilled(notFilled));
+        // Подписываемся на внешние события, но только для перекладки в свой канал
+        Bus.Subscribe<NewQuotes>((quotes, ct) => EnqueueAsync(new NewQuotesStrategyEvent(quotes), ct));
+        Bus.Subscribe<OrderFilled>((filled, ct) => EnqueueAsync(new OrderFilledStrategyEvent(filled), ct));
+        Bus.Subscribe<OrderNotFilled>((notFilled, ct) => EnqueueAsync(new OrderNotFilledStrategyEvent(notFilled), ct));
     }
 
-    private Task OnOrderFilled(OrderFilled filled)
+    protected override async Task HandleAsync(IStrategyEvent message, CancellationToken ct)
     {
-        lock (_stateLock)
+        switch (message)
         {
-            var ticker = filled.Ticker;
-            if (!_tickerStates.TryGetValue(ticker, out var stateInfo))
-                stateInfo = _tickerStates[ticker] = new TickerState();
-
-            // Если мы ожидали исполнения ордера
-            if (stateInfo.State == StrategyState.WaitingForFill)
-            {
-                if (stateInfo.PendingSide == "Buy")
-                {
-                    // Открываем позицию
-                    _localPositions[ticker] = _localPositions.GetValueOrDefault(ticker) + filled.Quantity;
-                    stateInfo.State = StrategyState.InPosition;
-                }
-                else if (stateInfo.PendingSide == "Sell")
-                {
-                    // Закрываем позицию
-                    _localPositions[ticker] = _localPositions.GetValueOrDefault(ticker) - filled.Quantity;
-                    stateInfo.State = StrategyState.Idle;
-                }
-                stateInfo.PendingSide = null;
-            }
-            // Если состояние не WaitingForFill, игнорируем (например, повторное исполнение или неожиданное)
+            case NewQuotesStrategyEvent newQuotesEvent:
+                await ProcessNewQuotesAsync(newQuotesEvent.Quotes, ct);
+                break;
+            case OrderFilledStrategyEvent filledEvent:
+                ProcessOrderFilled(filledEvent.Filled);
+                break;
+            case OrderNotFilledStrategyEvent notFilledEvent:
+                ProcessOrderNotFilled(notFilledEvent.NotFilled);
+                break;
         }
-        return Task.CompletedTask;
     }
 
-    private Task OnOrderNotFilled(OrderNotFilled notFilled)
-    {
-        lock (_stateLock)
-        {
-            var ticker = notFilled.Ticker;
-            if (_tickerStates.TryGetValue(ticker, out var stateInfo))
-            {
-                if (stateInfo.State == StrategyState.WaitingForFill)
-                {
-                    // Возвращаемся в предыдущее состояние в зависимости от стороны ордера
-                    if (stateInfo.PendingSide == "Buy")
-                    {
-                        stateInfo.State = StrategyState.Idle; // не купили, позиции нет
-                    }
-                    else if (stateInfo.PendingSide == "Sell")
-                    {
-                        stateInfo.State = StrategyState.InPosition; // позиция осталась
-                    }
-                    stateInfo.PendingSide = null;
-                }
-            }
-        }
-        return Task.CompletedTask;
-    }
-
-    protected override async Task HandleAsync(NewQuotes message, CancellationToken ct)
+    private async Task ProcessNewQuotesAsync(NewQuotes message, CancellationToken ct)
     {
         foreach (var quote in message.Quotes)
         {
             string ticker = quote.Ticker;
-            StrategyState currentState;
-            string? pendingSide;
+            if (!_tickerStates.TryGetValue(ticker, out var stateInfo))
+                stateInfo = _tickerStates[ticker] = new TickerState();
 
-            lock (_stateLock)
+            // Если уже есть активный ордер, пропускаем
+            if (stateInfo.State == StrategyState.WaitingForFill)
+                continue;
+
+            if (stateInfo.State == StrategyState.Idle)
             {
-                if (!_tickerStates.TryGetValue(ticker, out var stateInfo))
-                    stateInfo = _tickerStates[ticker] = new TickerState();
-
-                currentState = stateInfo.State;
-                pendingSide = stateInfo.PendingSide;
-
-                // Если уже есть активный ордер, пропускаем
-                if (currentState == StrategyState.WaitingForFill)
-                    continue;
-
-                // Принимаем решение о новом ордере
-                if (currentState == StrategyState.Idle)
-                {
-                    // Нет позиции – покупаем
-                    stateInfo.State = StrategyState.WaitingForFill;
-                    stateInfo.PendingSide = "Buy";
-                }
-                else if (currentState == StrategyState.InPosition)
-                {
-                    // Есть позиция – продаём
-                    stateInfo.State = StrategyState.WaitingForFill;
-                    stateInfo.PendingSide = "Sell";
-                }
+                // Нет позиции – покупаем
+                stateInfo.State = StrategyState.WaitingForFill;
+                stateInfo.PendingSide = "Buy";
+                var buyOrder = new OrderRequested(ticker, 10, quote.Ask, "Buy");
+                await Bus.PublishAsync(buyOrder, ct);
+                Logger.LogInformation("Strategy: Sending BUY order for {Ticker} at {Price}", ticker, quote.Ask);
             }
-
-            // Отправляем ордер (вне блокировки)
-            if (pendingSide == null) // фактически всегда не null после изменения, но для ясности
+            else if (stateInfo.State == StrategyState.InPosition)
             {
-                if (currentState == StrategyState.Idle)
-                {
-                    var buyOrder = new OrderRequested(ticker, 10, quote.Ask, "Buy");
-                    await Bus.PublishAsync(buyOrder, ct);
-                    Logger.LogInformation("Strategy: Sending BUY order for {Ticker} at {Price}", ticker, quote.Ask);
-                }
-                else if (currentState == StrategyState.InPosition)
-                {
-                    decimal quantity = _localPositions.GetValueOrDefault(ticker);
-                    var sellOrder = new OrderRequested(ticker, quantity, quote.Bid, "Sell");
-                    await Bus.PublishAsync(sellOrder, ct);
-                    Logger.LogInformation("Strategy: Sending SELL order for {Ticker} at {Price}", ticker, quote.Bid);
-                }
+                // Есть позиция – продаём всю позицию
+                decimal quantity = _localPositions.GetValueOrDefault(ticker);
+                stateInfo.State = StrategyState.WaitingForFill;
+                stateInfo.PendingSide = "Sell";
+                var sellOrder = new OrderRequested(ticker, quantity, quote.Bid, "Sell");
+                await Bus.PublishAsync(sellOrder, ct);
+                Logger.LogInformation("Strategy: Sending SELL order for {Ticker} at {Price}", ticker, quote.Bid);
+            }
+        }
+    }
+
+    private void ProcessOrderFilled(OrderFilled filled)
+    {
+        string ticker = filled.Ticker;
+        if (!_tickerStates.TryGetValue(ticker, out var stateInfo))
+            stateInfo = _tickerStates[ticker] = new TickerState();
+
+        if (stateInfo.State == StrategyState.WaitingForFill)
+        {
+            if (stateInfo.PendingSide == "Buy")
+            {
+                _localPositions[ticker] = _localPositions.GetValueOrDefault(ticker) + filled.Quantity;
+                stateInfo.State = StrategyState.InPosition;
+            }
+            else if (stateInfo.PendingSide == "Sell")
+            {
+                _localPositions[ticker] = _localPositions.GetValueOrDefault(ticker) - filled.Quantity;
+                stateInfo.State = StrategyState.Idle;
+            }
+            stateInfo.PendingSide = null;
+        }
+        // Если состояние не WaitingForFill, игнорируем
+    }
+
+    private void ProcessOrderNotFilled(OrderNotFilled notFilled)
+    {
+        string ticker = notFilled.Ticker;
+        if (_tickerStates.TryGetValue(ticker, out var stateInfo))
+        {
+            if (stateInfo.State == StrategyState.WaitingForFill)
+            {
+                if (stateInfo.PendingSide == "Buy")
+                    stateInfo.State = StrategyState.Idle;      // не купили
+                else if (stateInfo.PendingSide == "Sell")
+                    stateInfo.State = StrategyState.InPosition; // позиция осталась
+                stateInfo.PendingSide = null;
             }
         }
     }
 }
+
+// 26.08.26
+//StrategyProcessor.cs
+
+//using Trading.Core;
+//using Trading.Domain;
+//using Trading.Storage;
+//using Microsoft.Extensions.Logging;
+
+//namespace Trading.Processors;
+
+//public enum StrategyState
+//{
+//    Idle,               // нет позиции и нет активного ордера
+//    WaitingForFill,     // отправлен ордер, ждём исполнения/отказа
+//    InPosition          // есть открытая позиция (и нет активного ордера)
+//}
+
+//public class StrategyProcessor : EventDrivenProcessor<NewQuotes>
+//{
+//    private readonly InMemoryDatabase _db;
+//    private readonly Dictionary<string, TickerState> _tickerStates = new();
+//    private readonly object _stateLock = new();
+
+//    // Локальное представление позиций для быстрого доступа (не зависит от PositionProcessor)
+//    private readonly Dictionary<string, decimal> _localPositions = new();
+
+//    private class TickerState
+//    {
+//        public StrategyState State { get; set; } = StrategyState.Idle;
+//        public string? PendingSide { get; set; } // "Buy" или "Sell", если WaitingForFill
+//    }
+
+//    public StrategyProcessor(IMicroEventBus bus, ILoggerFactory loggerFactory, InMemoryDatabase db)
+//        : base(bus, loggerFactory)
+//    {
+//        _db = db;
+
+//        // Подписываемся на события исполнения ордеров
+//        Bus.Subscribe<OrderFilled>((filled, ct) => OnOrderFilled(filled));
+//        Bus.Subscribe<OrderNotFilled>((notFilled, ct) => OnOrderNotFilled(notFilled));
+//    }
+
+//    private Task OnOrderFilled(OrderFilled filled)
+//    {
+//        lock (_stateLock)
+//        {
+//            var ticker = filled.Ticker;
+//            if (!_tickerStates.TryGetValue(ticker, out var stateInfo))
+//                stateInfo = _tickerStates[ticker] = new TickerState();
+
+//            // Если мы ожидали исполнения ордера
+//            if (stateInfo.State == StrategyState.WaitingForFill)
+//            {
+//                if (stateInfo.PendingSide == "Buy")
+//                {
+//                    // Открываем позицию
+//                    _localPositions[ticker] = _localPositions.GetValueOrDefault(ticker) + filled.Quantity;
+//                    stateInfo.State = StrategyState.InPosition;
+//                }
+//                else if (stateInfo.PendingSide == "Sell")
+//                {
+//                    // Закрываем позицию
+//                    _localPositions[ticker] = _localPositions.GetValueOrDefault(ticker) - filled.Quantity;
+//                    stateInfo.State = StrategyState.Idle;
+//                }
+//                stateInfo.PendingSide = null;
+//            }
+//            // Если состояние не WaitingForFill, игнорируем (например, повторное исполнение или неожиданное)
+//        }
+//        return Task.CompletedTask;
+//    }
+
+//    private Task OnOrderNotFilled(OrderNotFilled notFilled)
+//    {
+//        lock (_stateLock)
+//        {
+//            var ticker = notFilled.Ticker;
+//            if (_tickerStates.TryGetValue(ticker, out var stateInfo))
+//            {
+//                if (stateInfo.State == StrategyState.WaitingForFill)
+//                {
+//                    // Возвращаемся в предыдущее состояние в зависимости от стороны ордера
+//                    if (stateInfo.PendingSide == "Buy")
+//                    {
+//                        stateInfo.State = StrategyState.Idle; // не купили, позиции нет
+//                    }
+//                    else if (stateInfo.PendingSide == "Sell")
+//                    {
+//                        stateInfo.State = StrategyState.InPosition; // позиция осталась
+//                    }
+//                    stateInfo.PendingSide = null;
+//                }
+//            }
+//        }
+//        return Task.CompletedTask;
+//    }
+
+//    protected override async Task HandleAsync(NewQuotes message, CancellationToken ct)
+//    {
+//        foreach (var quote in message.Quotes)
+//        {
+//            string ticker = quote.Ticker;
+//            StrategyState currentState;
+//            string? pendingSide;
+
+//            lock (_stateLock)
+//            {
+//                if (!_tickerStates.TryGetValue(ticker, out var stateInfo))
+//                    stateInfo = _tickerStates[ticker] = new TickerState();
+
+//                currentState = stateInfo.State;
+//                pendingSide = stateInfo.PendingSide;
+
+//                // Если уже есть активный ордер, пропускаем
+//                if (currentState == StrategyState.WaitingForFill)
+//                    continue;
+
+//                // Принимаем решение о новом ордере
+//                if (currentState == StrategyState.Idle)
+//                {
+//                    // Нет позиции – покупаем
+//                    stateInfo.State = StrategyState.WaitingForFill;
+//                    stateInfo.PendingSide = "Buy";
+//                }
+//                else if (currentState == StrategyState.InPosition)
+//                {
+//                    // Есть позиция – продаём
+//                    stateInfo.State = StrategyState.WaitingForFill;
+//                    stateInfo.PendingSide = "Sell";
+//                }
+//            }
+
+//            // Отправляем ордер (вне блокировки)
+//            if (pendingSide == null) // фактически всегда не null после изменения, но для ясности
+//            {
+//                if (currentState == StrategyState.Idle)
+//                {
+//                    var buyOrder = new OrderRequested(ticker, 10, quote.Ask, "Buy");
+//                    await Bus.PublishAsync(buyOrder, ct);
+//                    Logger.LogInformation("Strategy: Sending BUY order for {Ticker} at {Price}", ticker, quote.Ask);
+//                }
+//                else if (currentState == StrategyState.InPosition)
+//                {
+//                    decimal quantity = _localPositions.GetValueOrDefault(ticker);
+//                    var sellOrder = new OrderRequested(ticker, quantity, quote.Bid, "Sell");
+//                    await Bus.PublishAsync(sellOrder, ct);
+//                    Logger.LogInformation("Strategy: Sending SELL order for {Ticker} at {Price}", ticker, quote.Bid);
+//                }
+//            }
+//        }
+//    }
+//}
 
 //// StrategyProcessor.cs
 //using Trading.Core;
@@ -1612,10 +1845,6 @@ File: TradingPlatform.slnx
     <Project Path="Trading.Tests/Trading.Tests.csproj" />
   </Folder>
 </Solution>
-
-
-
-
 
 ================================================================
 End of Codebase

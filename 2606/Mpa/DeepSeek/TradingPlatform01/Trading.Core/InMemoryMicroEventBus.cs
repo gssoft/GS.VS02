@@ -1,5 +1,6 @@
 ﻿// 26.08.29
 // InMemoryMicroEventBus.cs
+//
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 
@@ -14,16 +15,27 @@ public class InMemoryMicroEventBus : IMicroEventBus
         var eventType = typeof(TEvent);
         var wrappedHandler = new Func<object, CancellationToken, Task>((e, ct) => handler((TEvent)e, ct));
 
-        while (true)
-        {
-            var currentList = _handlers.TryGetValue(eventType, out var list)
-                ? list
-                : ImmutableList<Func<object, CancellationToken, Task>>.Empty;
-            var newList = currentList.Add(wrappedHandler);
-            if (_handlers.TryUpdate(eventType, newList, currentList))
-                break;
-        }
+        _handlers.AddOrUpdate(
+            eventType,
+            _ => ImmutableList<Func<object, CancellationToken, Task>>.Empty.Add(wrappedHandler),
+            (_, existingList) => existingList.Add(wrappedHandler));
     }
+
+    //public void Subscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
+    //{
+    //    var eventType = typeof(TEvent);
+    //    var wrappedHandler = new Func<object, CancellationToken, Task>((e, ct) => handler((TEvent)e, ct));
+
+    //    while (true)
+    //    {
+    //        var currentList = _handlers.TryGetValue(eventType, out var list)
+    //            ? list
+    //            : ImmutableList<Func<object, CancellationToken, Task>>.Empty;
+    //        var newList = currentList.Add(wrappedHandler);
+    //        if (_handlers.TryUpdate(eventType, newList, currentList))
+    //            break;
+    //    }
+    //}
 
     public void Unsubscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
     {
@@ -44,7 +56,7 @@ public class InMemoryMicroEventBus : IMicroEventBus
     }
 }
 
-// 26.08.29
+// 26.08.26
 //// InMemoryMicroEventBus.cs
 //using System.Collections.Concurrent;
 
