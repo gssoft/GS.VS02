@@ -9,12 +9,14 @@ namespace Trading.Processors;
 public class OrderExecutorProcessor : EventDrivenProcessor<OrderRequested>
 {
     private readonly InMemoryDatabase _db;
+    private readonly double _fillProbability;
     private readonly Random _rnd = new();
 
-    public OrderExecutorProcessor(IMicroEventBus bus, ILoggerFactory loggerFactory, InMemoryDatabase db)
+    public OrderExecutorProcessor(IMicroEventBus bus, ILoggerFactory loggerFactory, InMemoryDatabase db, double fillProbability = 0.7)
         : base(bus, loggerFactory)
     {
         _db = db;
+        _fillProbability = fillProbability;
     }
 
     protected override async Task HandleAsync(OrderRequested request, CancellationToken ct)
@@ -24,7 +26,7 @@ public class OrderExecutorProcessor : EventDrivenProcessor<OrderRequested>
         await Bus.PublishAsync(order, ct); // публикуем OrderCreated (не обязательно)
 
         // Имитация исполнения: 70% - filled, 30% - not filled
-        if (_rnd.NextDouble() < 0.7)
+        if (_rnd.NextDouble() < _fillProbability)
         {
             var filled = new OrderFilled(order.OrderId, order.Ticker, order.Quantity, order.Price, order.Side);
             await Bus.PublishAsync(filled, ct);

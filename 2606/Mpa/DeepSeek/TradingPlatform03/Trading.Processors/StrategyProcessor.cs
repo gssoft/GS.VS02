@@ -22,6 +22,8 @@ public record OrderNotFilledStrategyEvent(OrderNotFilled NotFilled) : IStrategyE
 public class StrategyProcessor : ProcessorBase<IStrategyEvent>
 {
     private readonly InMemoryDatabase _db;
+
+    private readonly decimal _lotSize;
     private readonly Dictionary<string, TickerState> _tickerStates = new();
     private readonly Dictionary<string, decimal> _localPositions = new();
 
@@ -31,10 +33,11 @@ public class StrategyProcessor : ProcessorBase<IStrategyEvent>
         public string? PendingSide { get; set; }
     }
 
-    public StrategyProcessor(IMicroEventBus bus, ILoggerFactory loggerFactory, InMemoryDatabase db)
+    public StrategyProcessor(IMicroEventBus bus, ILoggerFactory loggerFactory, InMemoryDatabase db, decimal lotSize = 10m)
         : base(bus, loggerFactory)
     {
         _db = db;
+        _lotSize = lotSize;
 
         Bus.Subscribe<NewQuotes>((quotes, ct) => EnqueueAsync(new NewQuotesStrategyEvent(quotes), ct));
         Bus.Subscribe<OrderFilled>((filled, ct) => EnqueueAsync(new OrderFilledStrategyEvent(filled), ct));
@@ -72,7 +75,7 @@ public class StrategyProcessor : ProcessorBase<IStrategyEvent>
             {
                 stateInfo.State = StrategyState.WaitingForFill;
                 stateInfo.PendingSide = "Buy";
-                var buyOrder = new OrderRequested(ticker, 10, quote.Ask, "Buy");
+                var buyOrder = new OrderRequested(ticker, _lotSize, quote.Ask, "Buy");
                 await Bus.PublishAsync(buyOrder, ct);
                 Logger.LogInformation("Strategy: Sending BUY order for {Ticker} at {Price}", ticker, quote.Ask);
             }
