@@ -1,0 +1,3 @@
+Котировки
+Tickers - .json
+Strategy - Random
