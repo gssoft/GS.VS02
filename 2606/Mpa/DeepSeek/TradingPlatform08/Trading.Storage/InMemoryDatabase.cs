@@ -7,6 +7,8 @@ namespace Trading.Storage;
 
 public class InMemoryDatabase
 {
+    private const int MaxEventLogSize = 42;
+
     public ConcurrentDictionary<Guid, OrderCreated> Orders { get; } = new();
     public ConcurrentDictionary<Guid, Trade> Trades { get; } = new();
     public ConcurrentDictionary<string, PositionUpdated> Positions { get; } = new();
@@ -18,9 +20,15 @@ public class InMemoryDatabase
     public void SaveTrade(Trade trade) => Trades[trade.TradeId] = trade;
     public void UpdatePosition(PositionUpdated position) => Positions[position.Ticker] = position;
 
+    //public void LogEvent(string eventType, object evt)
+    //{
+    //    EventLog.Enqueue(new EventLogEntry { EventType = eventType, Data = evt });
+    //}
+
     public void LogEvent(string eventType, object evt)
     {
         EventLog.Enqueue(new EventLogEntry { EventType = eventType, Data = evt });
+        while (EventLog.Count > MaxEventLogSize && EventLog.TryDequeue(out _)) { }
     }
 }
 
