@@ -1,0 +1,19 @@
+{
+  "eventBus": "InMemory",
+  "storage": "InMemory",
+  "processors": [
+    {
+      "type": "QuotesFeederProcessor",
+      "config": {
+        "tickers": [ "AAPL" ]
+      }
+    },
+    {
+      "type": "StrategyProcessor",
+      "config": {
+        "lotSize": 10
+      }
+    }
+  ]
+}
+

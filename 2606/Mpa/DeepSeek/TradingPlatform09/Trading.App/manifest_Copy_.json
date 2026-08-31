@@ -1,0 +1,33 @@
+{
+  "eventBus": "InMemory",
+  "storage": "InMemory",
+  "processors": [
+    {
+      "type": "QuotesFeederProcessor",
+      "config": {
+        "tickers": [ "AAPL" ]
+      }
+    },
+    {
+      "type": "StrategyProcessor",
+      "config": {
+        "lotSize": 10
+      }
+    },
+    {
+      "type": "OrderExecutorProcessor",
+      "config": {
+        "fillProbability": 0.7
+      }
+    },
+    {
+      "type": "TradeProcessor"
+    },
+    {
+      "type": "PositionProcessor"
+    },
+    {
+      "type": "PortfolioProcessor"
+    }
+  ]
+}
