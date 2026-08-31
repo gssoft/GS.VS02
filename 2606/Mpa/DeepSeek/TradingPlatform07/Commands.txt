@@ -8,3 +8,13 @@ docker run -d --name trading-rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-man
 
 docker rm -f trading-rabbitmq
 docker run -d --name trading-rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+
+Test-NetConnection 127.0.0.1 -Port 5672
+Test-NetConnection 127.0.0.1 -Port 15672
+
+-------------------
+docker rm -f trading-rabbitmq
+docker run -d --name trading-rabbitmq -p 127.0.0.1:5672:5672 -p 127.0.0.1:15672:15672 rabbitmq:3-management
+
+docker rm -f trading-rabbitmq
+docker run -d --name trading-rabbitmq -p 127.0.0.1:5672:5672 -p 127.0.0.1:15672:15672 rabbitmq:3-management

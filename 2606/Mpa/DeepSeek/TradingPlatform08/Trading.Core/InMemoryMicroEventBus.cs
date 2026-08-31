@@ -29,7 +29,7 @@ public class InMemoryMicroEventBus : IMicroEventBus
         if (_handlers.TryGetValue(typeof(TEvent), out var handlers))
         {
             foreach (var handler in handlers)
-                await handler(@event, cancellationToken);
+                await handler(@event!, cancellationToken);
         }
     }
 }

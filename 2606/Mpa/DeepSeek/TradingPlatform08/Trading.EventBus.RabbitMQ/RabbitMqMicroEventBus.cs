@@ -61,10 +61,12 @@ public class RabbitMqMicroEventBus : IMicroEventBus, IDisposable
                     await h(evt, CancellationToken.None);
                 }
             }
-            _channel.BasicAck(ea.DeliveryTag, multiple: false);
+            // 26.08.31
+           // _channel.BasicAck(ea.DeliveryTag, multiple: false);
         };
-
-        _channel.BasicConsume(queue: queueName, autoAck: false, consumer: consumer);
+        // 26.08.31
+        //_channel.BasicConsume(queue: queueName, autoAck: false, consumer: consumer);
+        _channel.BasicConsume(queue: queueName, autoAck: true, consumer: consumer);
     }
 
     public void Unsubscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
