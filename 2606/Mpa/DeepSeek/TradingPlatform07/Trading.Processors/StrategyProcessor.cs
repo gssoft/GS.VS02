@@ -75,7 +75,8 @@ public class StrategyProcessor : ProcessorBase<IStrategyEvent>
             {
                 stateInfo.State = StrategyState.WaitingForFill;
                 stateInfo.PendingSide = "Buy";
-                var buyOrder = new OrderRequested(ticker, _lotSize, quote.Ask, "Buy");
+                // var buyOrder = new OrderRequested(ticker, _lotSize, quote.Ask, "Buy");
+                var buyOrder = new OrderRequested { Ticker = ticker, Quantity = _lotSize, Price = quote.Ask, Side = "Buy" };
                 await Bus.PublishAsync(buyOrder, ct);
                 Logger.LogInformation("Strategy: Sending BUY order for {Ticker} at {Price}", ticker, quote.Ask);
             }
@@ -84,7 +85,8 @@ public class StrategyProcessor : ProcessorBase<IStrategyEvent>
                 decimal quantity = _localPositions.GetValueOrDefault(ticker);
                 stateInfo.State = StrategyState.WaitingForFill;
                 stateInfo.PendingSide = "Sell";
-                var sellOrder = new OrderRequested(ticker, quantity, quote.Bid, "Sell");
+                // var sellOrder = new OrderRequested(ticker, quantity, quote.Bid, "Sell");
+                var sellOrder = new OrderRequested { Ticker = ticker, Quantity = quantity, Price = quote.Bid, Side = "Sell" };
                 await Bus.PublishAsync(sellOrder, ct);
                 Logger.LogInformation("Strategy: Sending SELL order for {Ticker} at {Price}", ticker, quote.Bid);
             }

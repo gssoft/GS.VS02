@@ -19,7 +19,9 @@ public class PortfolioProcessor : EventDrivenProcessor<PositionUpdated>
     protected override async Task HandleAsync(PositionUpdated position, CancellationToken ct)
     {
         // В реальном приложении можно обновлять агрегированный снапшот
-        var snapshot = new PortfolioSnapshot(_db.Positions.ToDictionary(p => p.Key, p => p.Value.Quantity));
+        //var snapshot = new PortfolioSnapshot(_db.Positions.ToDictionary(p => p.Key, p => p.Value.Quantity));
+        var snapshot = // new PortfolioSnapshot(_db.Positions.ToDictionary(p => p.Key, p => p.Value.Quantity));
+            new PortfolioSnapshot { Positions = _db.Positions.ToDictionary(p => p.Key, p => p.Value.Quantity) };
         await Bus.PublishAsync(snapshot, ct);
         Logger.LogInformation("Portfolio snapshot: {Count} positions", snapshot.Positions.Count);
     }

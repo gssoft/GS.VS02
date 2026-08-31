@@ -18,15 +18,26 @@ public class QuotesFeederProcessor : ProcessorBase<NewQuotes>
 
     public async Task GenerateQuotesAsync(CancellationToken ct)
     {
+        //var quotes = _tickers.Select(t =>
+        //{
+        //    decimal basePrice = 100 + (decimal)_rnd.NextDouble() * 50;
+        //    decimal bid = basePrice - 0.1m;
+        //    decimal ask = basePrice + 0.1m;
+        //    return new Quote(t, bid, ask, DateTime.UtcNow);
+        //}).ToList();
+        // await Bus.PublishAsync(new NewQuotes(quotes), ct);
+
         var quotes = _tickers.Select(t =>
         {
             decimal basePrice = 100 + (decimal)_rnd.NextDouble() * 50;
             decimal bid = basePrice - 0.1m;
             decimal ask = basePrice + 0.1m;
-            return new Quote(t, bid, ask, DateTime.UtcNow);
+            // return new Quote(t, bid, ask, DateTime.UtcNow);
+            return new Quote { Ticker = t, Bid = bid, Ask = ask, Timestamp = DateTime.UtcNow };
         }).ToList();
 
-        await Bus.PublishAsync(new NewQuotes(quotes), ct);
+        // await Bus.PublishAsync(new NewQuotes { Quotes = quotes }, ct);
+        await Bus.PublishAsync(new NewQuotes { Quotes = quotes }, ct);
     }
 
     protected override Task HandleAsync(NewQuotes message, CancellationToken ct)

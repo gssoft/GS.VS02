@@ -18,7 +18,8 @@ public class TradeProcessor : EventDrivenProcessor<OrderFilled>
 
     protected override async Task HandleAsync(OrderFilled filled, CancellationToken ct)
     {
-        var trade = new Trade(Guid.NewGuid(), filled.OrderId, filled.Ticker, filled.Quantity, filled.Price, filled.Side, DateTime.UtcNow);
+        var trade = // new Trade(Guid.NewGuid(), filled.OrderId, filled.Ticker, filled.Quantity, filled.Price, filled.Side, DateTime.UtcNow);
+            new Trade { TradeId = Guid.NewGuid(), OrderId = filled.OrderId, Ticker = filled.Ticker, Quantity = filled.Quantity, Price = filled.Price, Side = filled.Side, Timestamp = DateTime.UtcNow };
         _db.SaveTrade(trade);
         await Bus.PublishAsync(trade, ct);
         Logger.LogInformation("Trade created for {Ticker}", filled.Ticker);

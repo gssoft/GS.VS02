@@ -1,0 +1,10 @@
+Очистка RabbitMQ
+Выполните в терминале:
+
+powershell
+docker rm -f trading-rabbitmq
+docker run -d --name trading-rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+Это удалит старые очереди и создаст чистую среду.
+
+docker rm -f trading-rabbitmq
+docker run -d --name trading-rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
