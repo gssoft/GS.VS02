@@ -1,0 +1,1589 @@
+================================================================
+Directory Structure
+================================================================
+Trading.App/appsettings.json
+Trading.App/manifest.json
+Trading.App/ManifestLoader.cs
+Trading.App/ManifestProcessorFactory.cs
+Trading.App/Program.cs
+Trading.App/Properties/launchSettings.json
+Trading.App/Trading.App.csproj
+Trading.App/TradingWorker.cs
+Trading.Core/EventDrivenProcessorBase.cs
+Trading.Core/IMicroEventBus.cs
+Trading.Core/InMemoryMicroEventBus.cs
+Trading.Core/ManifestModels.cs
+Trading.Core/ProcessorBase.cs
+Trading.Core/Trading.Core.csproj
+Trading.Domain/Events.cs
+Trading.Domain/Trading.Domain.csproj
+Trading.Processors/EventLogProcessor.cs
+Trading.Processors/OrderExecutorProcessor.cs
+Trading.Processors/PortfolioProcessor.cs
+Trading.Processors/PositionProcessor.cs
+Trading.Processors/QuotesFeederProcessor.cs
+Trading.Processors/StrategyProcessor.cs
+Trading.Processors/TradeProcessor.cs
+Trading.Processors/Trading.Processors.csproj
+Trading.Storage/InMemoryDatabase.cs
+Trading.Storage/Trading.Storage.csproj
+Trading.Tests/StrategyProcessorRaceTests.cs
+Trading.Tests/Trading.Tests.csproj
+Trading.Tests/TradingCycleIntegrationTests.cs
+TradingPlatform.slnx
+
+================================================================
+Files
+================================================================
+
+================
+File: Trading.App/appsettings.json
+================
+{
+  "Trading": {
+    "Tickers": [ "AAPL", "MSFT", "GOOGL", "AMZN", "SBER" ],
+    "LoopTimeoutInSec": 2,
+    "StopTimeoutInSec": 5,
+    "Strategy": {
+      "LotSize": 10
+    },
+    "OrderExecutor": {
+      "FillProbability": 0.7
+    }
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning"
+    }
+  }
+}
+
+================
+File: Trading.App/manifest.json
+================
+{
+  "eventBus": "InMemory",
+  "storage": "InMemory",
+  "processors": [
+    {
+      "type": "QuotesFeederProcessor",
+      "config": {
+        "tickers": [ "AAPL", "MSFT", "GOOGL", "AMZN", "SBER" ]
+      }
+    },
+    {
+      "type": "StrategyProcessor",
+      "config": {
+        "lotSize": 10
+      }
+    },
+    {
+      "type": "OrderExecutorProcessor",
+      "config": {
+        "fillProbability": 0.7
+      }
+    },
+    {
+      "type": "TradeProcessor"
+    },
+    {
+      "type": "PositionProcessor"
+    },
+    {
+      "type": "PortfolioProcessor"
+    },
+    {
+      "type": "EventLogProcessor"
+    }
+  ]
+}
+
+================
+File: Trading.App/ManifestLoader.cs
+================
+using System.Text.Json;
+using Trading.Core;
+using Trading.Storage;
+using Microsoft.Extensions.Logging;
+
+namespace Trading.App;
+
+public static class ManifestLoader
+{
+    public static TradingManifest Load(string path)
+    {
+        var json = File.ReadAllText(path);
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        return JsonSerializer.Deserialize<TradingManifest>(json, options)
+               ?? throw new InvalidOperationException("Failed to deserialize manifest.");
+    }
+
+    public static List<object> CreateProcessors(
+        TradingManifest manifest,
+        IMicroEventBus bus,
+        ILoggerFactory loggerFactory,
+        InMemoryDatabase db)
+    {
+        var processors = new List<object>();
+        foreach (var proc in manifest.Processors)
+        {
+            var instance = ManifestProcessorFactory.CreateProcessor(proc.Type, bus, loggerFactory, db, proc.Config);
+            processors.Add(instance);
+        }
+        return processors;
+    }
+}
+
+================
+File: Trading.App/ManifestProcessorFactory.cs
+================
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Trading.Core;
+using Trading.Processors;
+using Trading.Storage;
+
+namespace Trading.App;
+
+public static class ManifestProcessorFactory
+{
+    public static object CreateProcessor(
+        string type,
+        IMicroEventBus bus,
+        ILoggerFactory loggerFactory,
+        InMemoryDatabase db,
+        Dictionary<string, object>? config)
+    {
+        return type switch
+        {
+            nameof(QuotesFeederProcessor) => CreateQuotesFeeder(bus, loggerFactory, config),
+            nameof(StrategyProcessor) => CreateStrategy(bus, loggerFactory, db, config),
+            nameof(OrderExecutorProcessor) => CreateOrderExecutor(bus, loggerFactory, db, config),
+            nameof(TradeProcessor) => new TradeProcessor(bus, loggerFactory, db),
+            nameof(PositionProcessor) => new PositionProcessor(bus, loggerFactory, db),
+            nameof(PortfolioProcessor) => new PortfolioProcessor(bus, loggerFactory, db),
+            nameof(EventLogProcessor) => new EventLogProcessor(bus, db, loggerFactory.CreateLogger<EventLogProcessor>()),
+            _ => throw new NotSupportedException($"Processor type '{type}' is not supported.")
+        };
+    }
+
+    private static QuotesFeederProcessor CreateQuotesFeeder(
+        IMicroEventBus bus,
+        ILoggerFactory loggerFactory,
+        Dictionary<string, object>? config)
+    {
+        string[] tickers = config != null && config.TryGetValue("tickers", out var t) && t is JsonElement arr && arr.ValueKind == JsonValueKind.Array
+            ? arr.EnumerateArray().Select(e => e.GetString()!).ToArray()
+            : new[] { "AAPL", "MSFT", "GOOGL" };
+
+        return new QuotesFeederProcessor(bus, loggerFactory, tickers);
+    }
+
+    private static StrategyProcessor CreateStrategy(
+        IMicroEventBus bus,
+        ILoggerFactory loggerFactory,
+        InMemoryDatabase db,
+        Dictionary<string, object>? config)
+    {
+        decimal lotSize = 10m;
+        if (config != null && config.TryGetValue("lotSize", out var l) && l is JsonElement je && je.ValueKind == JsonValueKind.Number)
+        {
+            lotSize = je.GetDecimal();
+        }
+
+        return new StrategyProcessor(bus, loggerFactory, db, lotSize);
+    }
+
+    private static OrderExecutorProcessor CreateOrderExecutor(
+        IMicroEventBus bus,
+        ILoggerFactory loggerFactory,
+        InMemoryDatabase db,
+        Dictionary<string, object>? config)
+    {
+        double fillProbability = 0.7;
+        if (config != null && config.TryGetValue("fillProbability", out var p) && p is JsonElement je && je.ValueKind == JsonValueKind.Number)
+        {
+            fillProbability = je.GetDouble();
+        }
+
+        return new OrderExecutorProcessor(bus, loggerFactory, db, fillProbability);
+    }
+}
+
+================
+File: Trading.App/Program.cs
+================
+//// 26.08.30
+
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+using Trading.App;
+using Trading.Core;
+using Trading.Processors;
+using Trading.Storage;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Настройка логирования
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.SetMinimumLevel(LogLevel.Information);
+
+// Создаём логгер вручную и регистрируем
+using var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
+builder.Services.AddSingleton<ILoggerFactory>(loggerFactory);
+
+// Загружаем манифест
+var manifestPath = builder.Configuration["ManifestPath"] ?? "manifest.json";
+var manifest = ManifestLoader.Load(manifestPath);
+
+// Создаём общие компоненты
+var bus = new InMemoryMicroEventBus();
+var db = new InMemoryDatabase();
+
+// Регистрируем шину и БД
+builder.Services.AddSingleton<IMicroEventBus>(bus);
+builder.Services.AddSingleton<InMemoryDatabase>(db);
+
+// Создаём процессоры из манифеста
+var processors = ManifestLoader.CreateProcessors(manifest, bus, loggerFactory, db);
+
+// Регистрируем процессоры в DI
+foreach (var processor in processors)
+{
+    builder.Services.AddSingleton(processor.GetType(), processor);
+}
+
+// Регистрируем TradingWorker как hosted service
+builder.Services.AddHostedService<TradingWorker>();
+
+var app = builder.Build();
+
+// Принудительно создаём все процессоры, чтобы они подписались на события
+foreach (var processor in processors)
+{
+    // Уже созданы, но можно вызвать GetRequiredService для надёжности
+    app.Services.GetRequiredService(processor.GetType());
+}
+
+// --- Minimal API для отображения ---
+
+//app.MapGet("/", async context =>
+//{
+//    context.Response.ContentType = "text/html; charset=utf-8";
+//    await context.Response.WriteAsync(@"
+//<!DOCTYPE html>
+//<html>
+//<head><title>Trading Monitor</title></head>
+//<body>
+//<h1>Trading Monitor</h1>
+//<div id='events'></div>
+//<script>
+//async function fetchData() {
+//    const resp = await fetch('/events');
+//    const data = await resp.json();
+//    const div = document.getElementById('events');
+//    div.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+//}
+//setInterval(fetchData, 1000);
+//fetchData();
+//</script>
+//</body>
+//</html>");
+//});
+
+app.MapGet("/", async context =>
+{
+    context.Response.ContentType = "text/html; charset=utf-8";
+    await context.Response.WriteAsync(@"
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trading Monitor</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { color: #333; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .event-type { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Trading Monitor</h1>
+    <div id='last-updated'></div>
+    <table id='events-table'>
+        <thead>
+            <tr>
+                <th>Event Type</th>
+                <th>Ticker</th>
+                <th>Quantity</th>
+                <th>Price</th>
+                <th>Side</th>
+                <th>Timestamp</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <script>
+        async function fetchData() {
+            try {
+                const resp = await fetch('/events');
+                const events = await resp.json();
+                const tbody = document.querySelector('#events-table tbody');
+                tbody.innerHTML = '';
+                events.forEach(evt => {
+                    const row = document.createElement('tr');
+                    const eventType = evt.constructor?.name || evt.$type || (evt.tradeId ? 'Trade' : evt.orderId && evt.side ? 'Order' : evt.position ? 'Position' : 'Event');
+                    let ticker = '', quantity = '', price = '', side = '', timestamp = '', details = '';
+                    if (evt.tradeId) {
+                        ticker = evt.ticker || '';
+                        quantity = evt.quantity || '';
+                        price = evt.price || '';
+                        side = evt.side || '';
+                        timestamp = evt.timestamp || '';
+                        details = 'TradeId: ' + evt.tradeId + ', OrderId: ' + evt.orderId;
+                    } else if (evt.orderId && evt.side) {
+                        ticker = evt.ticker || '';
+                        quantity = evt.quantity || '';
+                        price = evt.price || '';
+                        side = evt.side || '';
+                        timestamp = evt.timestamp || '';
+                        details = 'OrderId: ' + evt.orderId;
+                    } else if (evt.ticker && evt.quantity !== undefined) {
+                        ticker = evt.ticker || '';
+                        quantity = evt.quantity || '';
+                        price = evt.averagePrice || '';
+                        timestamp = new Date().toISOString(); // Position events don't have timestamp
+                        details = 'Position updated';
+                    } else if (evt.positions) {
+                        ticker = '';
+                        quantity = '';
+                        price = '';
+                        timestamp = new Date().toISOString();
+                        details = 'Portfolio snapshot: ' + JSON.stringify(evt.positions);
+                    } else {
+                        details = JSON.stringify(evt);
+                    }
+                    row.innerHTML = `
+                        <td class='event-type'>${eventType}</td>
+                        <td>${ticker}</td>
+                        <td>${quantity}</td>
+                        <td>${price}</td>
+                        <td>${side}</td>
+                        <td>${timestamp}</td>
+                        <td>${details}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                document.getElementById('last-updated').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+            } catch (err) {
+                console.error('Error fetching events:', err);
+            }
+        }
+        setInterval(fetchData, 1000);
+        fetchData();
+    </script>
+</body>
+</html>");
+});
+
+app.MapGet("/events", (InMemoryDatabase db) => db.EventLog.ToArray());
+app.MapGet("/positions", (InMemoryDatabase db) => db.Positions.Values);
+app.MapGet("/trades", (InMemoryDatabase db) => db.Trades.Values);
+app.MapGet("/orders", (InMemoryDatabase db) => db.Orders.Values);
+
+// Запуск приложения (это запустит и hosted services)
+await app.RunAsync();
+
+
+//using Microsoft.Extensions.Configuration;
+//using Microsoft.Extensions.DependencyInjection;
+//using Microsoft.Extensions.Hosting;
+//using Microsoft.Extensions.Logging;
+//using Trading.App;
+//using Trading.Core;
+//using Trading.Processors;
+//using Trading.Storage;
+
+//var builder = Host.CreateApplicationBuilder(args);
+
+//builder.Logging.ClearProviders();
+//builder.Logging.AddConsole();
+//builder.Logging.SetMinimumLevel(LogLevel.Information);
+
+//// Создаём логгер вручную (или можно через DI, но проще для загрузчика)
+//using var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
+//builder.Services.AddSingleton<ILoggerFactory>(loggerFactory);
+
+//// Загружаем манифест
+//var manifestPath = builder.Configuration["ManifestPath"] ?? "manifest.json";
+//var manifest = ManifestLoader.Load(manifestPath);
+
+//// Создаём общие компоненты
+//var bus = new InMemoryMicroEventBus();
+//var db = new InMemoryDatabase();
+
+//// Создаём процессоры из манифеста
+//var processors = ManifestLoader.CreateProcessors(manifest, bus, loggerFactory, db);
+
+//// Регистрируем в DI
+//builder.Services.AddSingleton<IMicroEventBus>(bus);
+//builder.Services.AddSingleton<InMemoryDatabase>(db);
+
+//foreach (var processor in processors)
+//{
+//    builder.Services.AddSingleton(processor.GetType(), processor);
+//}
+
+//// Регистрируем TradingWorker
+//builder.Services.AddHostedService<TradingWorker>();
+
+//var host = builder.Build();
+//await host.RunAsync();
+
+
+//using Microsoft.Extensions.Configuration;
+//using Microsoft.Extensions.DependencyInjection;
+//using Microsoft.Extensions.Hosting;
+//using Microsoft.Extensions.Logging;
+//using Trading.App;
+//using Trading.Core;
+//using Trading.Processors;
+//using Trading.Storage;
+
+//var builder = Host.CreateApplicationBuilder(args);
+
+//builder.Logging.ClearProviders();
+//builder.Logging.AddConsole();
+
+//var configuration = builder.Configuration;
+//builder.Logging.SetMinimumLevel(LogLevel.Information);
+
+//builder.Services.AddSingleton<IMicroEventBus, InMemoryMicroEventBus>();
+//builder.Services.AddSingleton<InMemoryDatabase>();
+
+//// QuotesFeederProcessor
+//builder.Services.AddSingleton<QuotesFeederProcessor>(sp =>
+//{
+//    var bus = sp.GetRequiredService<IMicroEventBus>();
+//    var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+//    var tickers = configuration.GetSection("Trading:Tickers").Get<string[]>() ?? new[] { "AAPL", "MSFT", "GOOGL" };
+//    return new QuotesFeederProcessor(bus, loggerFactory, tickers);
+//});
+
+//// StrategyProcessor
+//builder.Services.AddSingleton<StrategyProcessor>(sp =>
+//{
+//    var bus = sp.GetRequiredService<IMicroEventBus>();
+//    var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+//    var db = sp.GetRequiredService<InMemoryDatabase>();
+//    var lotSize = configuration.GetValue<decimal>("Trading:Strategy:LotSize", 10m);
+//    return new StrategyProcessor(bus, loggerFactory, db, lotSize);
+//});
+
+//// OrderExecutorProcessor
+//builder.Services.AddSingleton<OrderExecutorProcessor>(sp =>
+//{
+//    var bus = sp.GetRequiredService<IMicroEventBus>();
+//    var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+//    var db = sp.GetRequiredService<InMemoryDatabase>();
+//    var fillProbability = configuration.GetValue<double>("Trading:OrderExecutor:FillProbability", 0.7);
+//    return new OrderExecutorProcessor(bus, loggerFactory, db, fillProbability);
+//});
+
+//builder.Services.AddSingleton<TradeProcessor>();
+//builder.Services.AddSingleton<PositionProcessor>();
+//builder.Services.AddSingleton<PortfolioProcessor>();
+
+//builder.Services.AddHostedService<TradingWorker>();
+
+//var host = builder.Build();
+
+//// Принудительно создаём все процессоры, чтобы они подписались на события
+//host.Services.GetRequiredService<StrategyProcessor>();
+//host.Services.GetRequiredService<OrderExecutorProcessor>();
+//host.Services.GetRequiredService<TradeProcessor>();
+//host.Services.GetRequiredService<PositionProcessor>();
+//host.Services.GetRequiredService<PortfolioProcessor>();
+
+//await host.RunAsync();
+
+//using Microsoft.Extensions.DependencyInjection;
+//using Microsoft.Extensions.Hosting;
+//using Microsoft.Extensions.Logging;
+//using Trading.App;
+//using Trading.Core;
+//using Trading.Processors;
+//using Trading.Storage;
+
+//var builder = Host.CreateApplicationBuilder(args);
+
+//builder.Logging.ClearProviders();
+//builder.Logging.AddConsole();
+//builder.Logging.SetMinimumLevel(LogLevel.Information);
+
+//builder.Services.AddSingleton<IMicroEventBus, InMemoryMicroEventBus>();
+//builder.Services.AddSingleton<InMemoryDatabase>();
+
+//builder.Services.AddSingleton<QuotesFeederProcessor>(sp =>
+//{
+//    var bus = sp.GetRequiredService<IMicroEventBus>();
+//    var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+//    var tickers = new[] { "AAPL", "MSFT", "GOOGL" };
+//    return new QuotesFeederProcessor(bus, loggerFactory, tickers);
+//});
+
+//builder.Services.AddSingleton<StrategyProcessor>();
+//builder.Services.AddSingleton<OrderExecutorProcessor>();
+//builder.Services.AddSingleton<TradeProcessor>();
+//builder.Services.AddSingleton<PositionProcessor>();
+//builder.Services.AddSingleton<PortfolioProcessor>();
+
+//builder.Services.AddHostedService<TradingWorker>();
+
+//var host = builder.Build();
+
+//// Принудительно создаём все процессоры, чтобы они подписались на события
+//host.Services.GetRequiredService<StrategyProcessor>();
+//host.Services.GetRequiredService<OrderExecutorProcessor>();
+//host.Services.GetRequiredService<TradeProcessor>();
+//host.Services.GetRequiredService<PositionProcessor>();
+//host.Services.GetRequiredService<PortfolioProcessor>();
+
+//await host.RunAsync();
+
+================
+File: Trading.App/Properties/launchSettings.json
+================
+{
+  "profiles": {
+    "Trading.App": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:61188;http://localhost:61189"
+    }
+  }
+}
+
+================
+File: Trading.App/Trading.App.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.Core\Trading.Core.csproj" />
+    <ProjectReference Include="..\Trading.Processors\Trading.Processors.csproj" />
+    <ProjectReference Include="..\Trading.Storage\Trading.Storage.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="manifest.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
+
+================
+File: Trading.App/TradingWorker.cs
+================
+// 26.08.30
+
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Trading.Core;
+using Trading.Processors;
+
+namespace Trading.App;
+
+public class TradingWorker : BackgroundService
+{
+    private readonly IMicroEventBus _bus;
+    private readonly QuotesFeederProcessor _quotesFeeder;
+    private readonly ILogger<TradingWorker> _logger;
+    private readonly int _loopTimeoutInSec;
+    private readonly int _stopTimeoutInSec;
+
+    public TradingWorker(
+        IMicroEventBus bus,
+        QuotesFeederProcessor quotesFeeder,
+        ILogger<TradingWorker> logger,
+        IConfiguration configuration)
+    {
+        _bus = bus;
+        _quotesFeeder = quotesFeeder;
+        _logger = logger;
+        _loopTimeoutInSec = configuration.GetValue<int>("Trading:LoopTimeoutInSec", 2);
+        _stopTimeoutInSec = configuration.GetValue<int>("Trading:StopTimeoutInSec", 5);
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("Trading cycle started.");
+
+        try
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await _quotesFeeder.GenerateQuotesAsync(stoppingToken);
+                    await Task.Delay(TimeSpan.FromSeconds(_loopTimeoutInSec), stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    _logger.LogInformation("Trading cycle stopped by cancellation.");
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unexpected error in trading cycle. Retrying in {StopTimeout} seconds...", _stopTimeoutInSec);
+                    await Task.Delay(TimeSpan.FromSeconds(_stopTimeoutInSec), stoppingToken);
+                }
+            }
+        }
+        finally
+        {
+            _logger.LogInformation("Trading cycle stopped gracefully.");
+        }
+    }
+}
+
+
+//using Microsoft.Extensions.Hosting;
+//using Microsoft.Extensions.Logging;
+//using Trading.Core;
+//using Trading.Processors;
+
+//namespace Trading.App;
+
+//public class TradingWorker : BackgroundService
+//{
+//    private readonly IMicroEventBus _bus;
+//    private readonly QuotesFeederProcessor _quotesFeeder;
+//    private readonly ILogger<TradingWorker> _logger;
+
+//    private readonly int LoopTimeoutInSec = 2;
+//    private readonly int StopTimeoutInSec = 5;
+
+//    public TradingWorker(
+//        IMicroEventBus bus,
+//        QuotesFeederProcessor quotesFeeder,
+//        ILogger<TradingWorker> logger)
+//    {
+//        _bus = bus;
+//        _quotesFeeder = quotesFeeder;
+//        _logger = logger;
+//    }
+
+//    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+//    {
+//        _logger.LogInformation("Trading cycle started.");
+
+//        try
+//        {
+//            while (!stoppingToken.IsCancellationRequested)
+//            {
+//                try
+//                {
+//                    await _quotesFeeder.GenerateQuotesAsync(stoppingToken);
+//                    await Task.Delay(TimeSpan.FromSeconds(LoopTimeoutInSec), stoppingToken);
+//                }
+//                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+//                {
+//                    _logger.LogInformation("Trading cycle stopped by cancellation.");
+//                    break;
+//                }
+//                catch (Exception ex)
+//                {
+//                    _logger.LogError(ex, "Unexpected error in trading cycle. Retrying in 5 seconds...");
+//                    await Task.Delay(TimeSpan.FromSeconds(StopTimeoutInSec), stoppingToken);
+//                }
+//            }
+//        }
+//        finally
+//        {
+//            _logger.LogInformation("Trading cycle stopped gracefully.");
+//        }
+//    }
+//}
+
+================
+File: Trading.Core/EventDrivenProcessorBase.cs
+================
+// EventDrivenProcessorBase.cs
+using Microsoft.Extensions.Logging;
+using Trading.Core;
+
+public abstract class EventDrivenProcessor<TEvent> : ProcessorBase<TEvent>
+{
+    protected EventDrivenProcessor(IMicroEventBus bus, ILoggerFactory loggerFactory, int capacity = 1000)
+        : base(bus, loggerFactory, capacity)
+    {
+        // Подписываемся с правильной сигнатурой: (событие, токен отмены)
+        Bus.Subscribe<TEvent>((evt, ct) => EnqueueAsync(evt, ct));
+    }
+}
+
+================
+File: Trading.Core/IMicroEventBus.cs
+================
+// IMicroEventBus.cs
+namespace Trading.Core;
+
+public interface IMicroEventBus
+{
+    void Subscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler);
+    void Unsubscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler);
+    Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default);
+}
+
+================
+File: Trading.Core/InMemoryMicroEventBus.cs
+================
+using System.Collections.Concurrent;
+using System.Collections.Immutable;
+
+namespace Trading.Core;
+
+public class InMemoryMicroEventBus : IMicroEventBus
+{
+    private readonly ConcurrentDictionary<Type, ImmutableList<Func<object, CancellationToken, Task>>> _handlers = new();
+
+    public void Subscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
+    {
+        var eventType = typeof(TEvent);
+        var wrappedHandler = new Func<object, CancellationToken, Task>((e, ct) => handler((TEvent)e, ct));
+
+        _handlers.AddOrUpdate(
+            eventType,
+            _ => ImmutableList<Func<object, CancellationToken, Task>>.Empty.Add(wrappedHandler),
+            (_, existingList) => existingList.Add(wrappedHandler));
+    }
+
+    public void Unsubscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler)
+    {
+        // В текущей реализации не используется; можно реализовать через замену списка.
+        throw new NotSupportedException("Unsubscribe is not supported in this implementation.");
+    }
+
+    public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
+    {
+        if (_handlers.TryGetValue(typeof(TEvent), out var handlers))
+        {
+            foreach (var handler in handlers)
+                await handler(@event, cancellationToken);
+        }
+    }
+}
+
+================
+File: Trading.Core/ManifestModels.cs
+================
+namespace Trading.Core;
+
+public class TradingManifest
+{
+    public string EventBus { get; set; } = "InMemory";
+    public string Storage { get; set; } = "InMemory";
+    public List<ProcessorManifest> Processors { get; set; } = new();
+}
+
+public class ProcessorManifest
+{
+    public string Type { get; set; } = string.Empty;
+    public Dictionary<string, object>? Config { get; set; }
+}
+
+================
+File: Trading.Core/ProcessorBase.cs
+================
+using System.Threading.Channels;
+using Microsoft.Extensions.Logging;
+
+namespace Trading.Core;
+
+public abstract class ProcessorBase<TMessage> : IAsyncDisposable
+{
+    private readonly Channel<TMessage> _channel;
+    private readonly CancellationTokenSource _cts = new();
+    private readonly Task _processingTask;
+
+    protected readonly IMicroEventBus Bus;
+    protected readonly ILogger Logger;
+
+    protected ProcessorBase(IMicroEventBus bus, ILoggerFactory loggerFactory, int capacity = 1000)
+    {
+        Bus = bus;
+        Logger = loggerFactory.CreateLogger(GetType());
+        _channel = Channel.CreateBounded<TMessage>(new BoundedChannelOptions(capacity)
+        {
+            FullMode = BoundedChannelFullMode.Wait
+        });
+
+        _processingTask = Task.Run(ProcessMessagesAsync);
+    }
+
+    protected async Task EnqueueAsync(TMessage message, CancellationToken ct = default)
+        => await _channel.Writer.WriteAsync(message, ct);
+
+    private async Task ProcessMessagesAsync()
+    {
+        try
+        {
+            await foreach (var message in _channel.Reader.ReadAllAsync(_cts.Token))
+            {
+                try
+                {
+                    await HandleAsync(message, _cts.Token);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "Error handling message {MessageType}", typeof(TMessage).Name);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Ожидаемая отмена при остановке
+        }
+        finally
+        {
+            Logger.LogDebug("Processor {ProcessorName} stopped processing.", GetType().Name);
+        }
+    }
+
+    protected abstract Task HandleAsync(TMessage message, CancellationToken ct);
+
+    public virtual async ValueTask DisposeAsync()
+    {
+        _cts.Cancel();                    // Отменяем токен, чтобы цикл завершился
+        _channel.Writer.TryComplete();    // Больше не принимаем новые сообщения
+        await _processingTask;            // Дожидаемся завершения обработки
+        _cts.Dispose();
+    }
+}
+
+================
+File: Trading.Core/Trading.Core.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.11" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Trading.Domain/Events.cs
+================
+// Events.cs
+namespace Trading.Domain;
+
+public record Quote(string Ticker, decimal Bid, decimal Ask, DateTime Timestamp);
+public record NewQuotes(IReadOnlyList<Quote> Quotes);
+
+public record OrderRequested(string Ticker, decimal Quantity, decimal Price, string Side); // Buy/Sell
+public record OrderCreated(Guid OrderId, string Ticker, decimal Quantity, decimal Price, string Side, DateTime Timestamp);
+public record OrderFilled(Guid OrderId, string Ticker, decimal Quantity, decimal Price, string Side);
+
+public record OrderNotFilled(Guid OrderId, string Ticker, string Reason);
+// public record OrderNotFilled(Guid OrderId, string Reason);
+
+public record Trade(Guid TradeId, Guid OrderId, string Ticker, decimal Quantity, decimal Price, string Side, DateTime Timestamp);
+public record PositionUpdated(string Ticker, decimal Quantity, decimal AveragePrice);
+public record PortfolioSnapshot(IReadOnlyDictionary<string, decimal> Positions);
+
+================
+File: Trading.Domain/Trading.Domain.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
+
+================
+File: Trading.Processors/EventLogProcessor.cs
+================
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Trading.Core;
+using Trading.Domain;
+using Trading.Storage;
+
+namespace Trading.Processors;
+
+public class EventLogProcessor : IHostedService, IDisposable
+{
+    private readonly IMicroEventBus _bus;
+    private readonly InMemoryDatabase _db;
+    private readonly ILogger<EventLogProcessor> _logger;
+
+    public EventLogProcessor(IMicroEventBus bus, InMemoryDatabase db, ILogger<EventLogProcessor> logger)
+    {
+        _bus = bus;
+        _db = db;
+        _logger = logger;
+
+        // Подписки на события
+        _bus.Subscribe<OrderCreated>(OnOrderCreated);
+        _bus.Subscribe<OrderFilled>(OnOrderFilled);
+        _bus.Subscribe<OrderNotFilled>(OnOrderNotFilled);
+        _bus.Subscribe<Trade>(OnTrade);
+        _bus.Subscribe<PositionUpdated>(OnPositionUpdated);
+        _bus.Subscribe<PortfolioSnapshot>(OnPortfolioSnapshot);
+    }
+
+    private Task OnOrderCreated(OrderCreated evt, CancellationToken ct)
+    {
+        _db.LogEvent(evt);
+        return Task.CompletedTask;
+    }
+    private Task OnOrderFilled(OrderFilled evt, CancellationToken ct)
+    {
+        _db.LogEvent(evt);
+        return Task.CompletedTask;
+    }
+    private Task OnOrderNotFilled(OrderNotFilled evt, CancellationToken ct)
+    {
+        _db.LogEvent(evt);
+        return Task.CompletedTask;
+    }
+    private Task OnTrade(Trade evt, CancellationToken ct)
+    {
+        _db.LogEvent(evt);
+        return Task.CompletedTask;
+    }
+    private Task OnPositionUpdated(PositionUpdated evt, CancellationToken ct)
+    {
+        _db.LogEvent(evt);
+        return Task.CompletedTask;
+    }
+    private Task OnPortfolioSnapshot(PortfolioSnapshot evt, CancellationToken ct)
+    {
+        _db.LogEvent(evt);
+        return Task.CompletedTask;
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public void Dispose() { }
+}
+
+================
+File: Trading.Processors/OrderExecutorProcessor.cs
+================
+// OrderExecutorProcessor.cs
+using Trading.Core;
+using Trading.Domain;
+using Trading.Storage;
+using Microsoft.Extensions.Logging;
+
+namespace Trading.Processors;
+
+public class OrderExecutorProcessor : EventDrivenProcessor<OrderRequested>
+{
+    private readonly InMemoryDatabase _db;
+    private readonly double _fillProbability;
+    private readonly Random _rnd = new();
+
+    public OrderExecutorProcessor(IMicroEventBus bus, ILoggerFactory loggerFactory, InMemoryDatabase db, double fillProbability = 0.7)
+        : base(bus, loggerFactory)
+    {
+        _db = db;
+        _fillProbability = fillProbability;
+    }
+
+    protected override async Task HandleAsync(OrderRequested request, CancellationToken ct)
+    {
+        var order = new OrderCreated(Guid.NewGuid(), request.Ticker, request.Quantity, request.Price, request.Side, DateTime.UtcNow);
+        _db.SaveOrder(order);
+        await Bus.PublishAsync(order, ct); // публикуем OrderCreated (не обязательно)
+
+        // Имитация исполнения: 70% - filled, 30% - not filled
+        if (_rnd.NextDouble() < _fillProbability)
+        {
+            var filled = new OrderFilled(order.OrderId, order.Ticker, order.Quantity, order.Price, order.Side);
+            await Bus.PublishAsync(filled, ct);
+            Logger.LogInformation("Order {OrderId} FILLED", order.OrderId);
+        }
+        else
+        {
+            // var notFilled = new OrderNotFilled(order.OrderId, "Random rejection");
+
+            var notFilled = new OrderNotFilled(order.OrderId, order.Ticker, "Random rejection");
+            await Bus.PublishAsync(notFilled, ct);
+            Logger.LogInformation("Order {OrderId} NOT FILLED", order.OrderId);
+        }
+    }
+}
+
+================
+File: Trading.Processors/PortfolioProcessor.cs
+================
+// PortfolioProcessor.cs
+using Trading.Core;
+using Trading.Domain;
+using Trading.Storage;
+using Microsoft.Extensions.Logging;
+
+namespace Trading.Processors;
+
+public class PortfolioProcessor : EventDrivenProcessor<PositionUpdated>
+{
+    private readonly InMemoryDatabase _db;
+
+    public PortfolioProcessor(IMicroEventBus bus, ILoggerFactory loggerFactory, InMemoryDatabase db)
+        : base(bus, loggerFactory)
+    {
+        _db = db;
+    }
+
+    protected override async Task HandleAsync(PositionUpdated position, CancellationToken ct)
+    {
+        // В реальном приложении можно обновлять агрегированный снапшот
+        var snapshot = new PortfolioSnapshot(_db.Positions.ToDictionary(p => p.Key, p => p.Value.Quantity));
+        await Bus.PublishAsync(snapshot, ct);
+        Logger.LogInformation("Portfolio snapshot: {Count} positions", snapshot.Positions.Count);
+    }
+}
+
+================
+File: Trading.Processors/PositionProcessor.cs
+================
+// PositionProcessor.cs
+using Trading.Core;
+using Trading.Domain;
+using Trading.Storage;
+using Microsoft.Extensions.Logging;
+
+namespace Trading.Processors;
+
+public class PositionProcessor : EventDrivenProcessor<Trade>
+{
+    private readonly InMemoryDatabase _db;
+
+    public PositionProcessor(IMicroEventBus bus, ILoggerFactory loggerFactory, InMemoryDatabase db)
+        : base(bus, loggerFactory)
+    {
+        _db = db;
+    }
+
+    protected override async Task HandleAsync(Trade trade, CancellationToken ct)
+    {
+        _db.Positions.AddOrUpdate(trade.Ticker,
+            ticker => new PositionUpdated(ticker, trade.Side == "Buy" ? trade.Quantity : -trade.Quantity, trade.Price),
+            (ticker, existing) =>
+            {
+                decimal newQty = existing.Quantity + (trade.Side == "Buy" ? trade.Quantity : -trade.Quantity);
+                decimal avgPrice = (existing.AveragePrice * existing.Quantity + trade.Price * trade.Quantity) / (existing.Quantity + trade.Quantity);
+                return new PositionUpdated(ticker, newQty, avgPrice);
+            });
+
+        var updated = _db.Positions[trade.Ticker];
+        await Bus.PublishAsync(updated, ct);
+        Logger.LogInformation("Position updated for {Ticker}: {Quantity}", trade.Ticker, updated.Quantity);
+    }
+}
+
+================
+File: Trading.Processors/QuotesFeederProcessor.cs
+================
+// QuotesFeederProcessor.cs
+using Trading.Core;
+using Trading.Domain;
+using Microsoft.Extensions.Logging;
+
+namespace Trading.Processors;
+
+public class QuotesFeederProcessor : ProcessorBase<NewQuotes>
+{
+    private readonly string[] _tickers;
+    private readonly Random _rnd = new();
+
+    public QuotesFeederProcessor(IMicroEventBus bus, ILoggerFactory loggerFactory, string[] tickers)
+        : base(bus, loggerFactory)
+    {
+        _tickers = tickers;
+    }
+
+    public async Task GenerateQuotesAsync(CancellationToken ct)
+    {
+        var quotes = _tickers.Select(t =>
+        {
+            decimal basePrice = 100 + (decimal)_rnd.NextDouble() * 50;
+            decimal bid = basePrice - 0.1m;
+            decimal ask = basePrice + 0.1m;
+            return new Quote(t, bid, ask, DateTime.UtcNow);
+        }).ToList();
+
+        await Bus.PublishAsync(new NewQuotes(quotes), ct);
+    }
+
+    protected override Task HandleAsync(NewQuotes message, CancellationToken ct)
+    {
+        // QuotesFeeder сам не обрабатывает NewQuotes, он их публикует. 
+        // Поэтому можно не переопределять этот метод или использовать отдельный вход.
+        return Task.CompletedTask;
+    }
+}
+
+================
+File: Trading.Processors/StrategyProcessor.cs
+================
+// 26.08.30
+
+using Trading.Core;
+using Trading.Domain;
+using Trading.Storage;
+using Microsoft.Extensions.Logging;
+
+namespace Trading.Processors;
+
+public enum StrategyState
+{
+    Idle,
+    WaitingForFill,
+    InPosition
+}
+
+public interface IStrategyEvent { }
+public record NewQuotesStrategyEvent(NewQuotes Quotes) : IStrategyEvent;
+public record OrderFilledStrategyEvent(OrderFilled Filled) : IStrategyEvent;
+public record OrderNotFilledStrategyEvent(OrderNotFilled NotFilled) : IStrategyEvent;
+
+public class StrategyProcessor : ProcessorBase<IStrategyEvent>
+{
+    private readonly InMemoryDatabase _db;
+
+    private readonly decimal _lotSize;
+    private readonly Dictionary<string, TickerState> _tickerStates = new();
+    private readonly Dictionary<string, decimal> _localPositions = new();
+
+    private class TickerState
+    {
+        public StrategyState State { get; set; } = StrategyState.Idle;
+        public string? PendingSide { get; set; }
+    }
+
+    public StrategyProcessor(IMicroEventBus bus, ILoggerFactory loggerFactory, InMemoryDatabase db, decimal lotSize = 10m)
+        : base(bus, loggerFactory)
+    {
+        _db = db;
+        _lotSize = lotSize;
+
+        Bus.Subscribe<NewQuotes>((quotes, ct) => EnqueueAsync(new NewQuotesStrategyEvent(quotes), ct));
+        Bus.Subscribe<OrderFilled>((filled, ct) => EnqueueAsync(new OrderFilledStrategyEvent(filled), ct));
+        Bus.Subscribe<OrderNotFilled>((notFilled, ct) => EnqueueAsync(new OrderNotFilledStrategyEvent(notFilled), ct));
+    }
+
+    protected override async Task HandleAsync(IStrategyEvent message, CancellationToken ct)
+    {
+        switch (message)
+        {
+            case NewQuotesStrategyEvent newQuotesEvent:
+                await ProcessNewQuotesAsync(newQuotesEvent.Quotes, ct);
+                break;
+            case OrderFilledStrategyEvent filledEvent:
+                ProcessOrderFilled(filledEvent.Filled);
+                break;
+            case OrderNotFilledStrategyEvent notFilledEvent:
+                ProcessOrderNotFilled(notFilledEvent.NotFilled);
+                break;
+        }
+    }
+
+    private async Task ProcessNewQuotesAsync(NewQuotes message, CancellationToken ct)
+    {
+        foreach (var quote in message.Quotes)
+        {
+            string ticker = quote.Ticker;
+            if (!_tickerStates.TryGetValue(ticker, out var stateInfo))
+                stateInfo = _tickerStates[ticker] = new TickerState();
+
+            if (stateInfo.State == StrategyState.WaitingForFill)
+                continue;
+
+            if (stateInfo.State == StrategyState.Idle)
+            {
+                stateInfo.State = StrategyState.WaitingForFill;
+                stateInfo.PendingSide = "Buy";
+                var buyOrder = new OrderRequested(ticker, _lotSize, quote.Ask, "Buy");
+                await Bus.PublishAsync(buyOrder, ct);
+                Logger.LogInformation("Strategy: Sending BUY order for {Ticker} at {Price}", ticker, quote.Ask);
+            }
+            else if (stateInfo.State == StrategyState.InPosition)
+            {
+                decimal quantity = _localPositions.GetValueOrDefault(ticker);
+                stateInfo.State = StrategyState.WaitingForFill;
+                stateInfo.PendingSide = "Sell";
+                var sellOrder = new OrderRequested(ticker, quantity, quote.Bid, "Sell");
+                await Bus.PublishAsync(sellOrder, ct);
+                Logger.LogInformation("Strategy: Sending SELL order for {Ticker} at {Price}", ticker, quote.Bid);
+            }
+        }
+    }
+
+    private void ProcessOrderFilled(OrderFilled filled)
+    {
+        string ticker = filled.Ticker;
+        if (!_tickerStates.TryGetValue(ticker, out var stateInfo))
+            stateInfo = _tickerStates[ticker] = new TickerState();
+
+        if (stateInfo.State == StrategyState.WaitingForFill)
+        {
+            if (stateInfo.PendingSide == "Buy")
+            {
+                _localPositions[ticker] = _localPositions.GetValueOrDefault(ticker) + filled.Quantity;
+                stateInfo.State = StrategyState.InPosition;
+            }
+            else if (stateInfo.PendingSide == "Sell")
+            {
+                _localPositions[ticker] = _localPositions.GetValueOrDefault(ticker) - filled.Quantity;
+                stateInfo.State = StrategyState.Idle;
+            }
+            stateInfo.PendingSide = null;
+        }
+    }
+
+    private void ProcessOrderNotFilled(OrderNotFilled notFilled)
+    {
+        string ticker = notFilled.Ticker;
+        if (_tickerStates.TryGetValue(ticker, out var stateInfo))
+        {
+            if (stateInfo.State == StrategyState.WaitingForFill)
+            {
+                if (stateInfo.PendingSide == "Buy")
+                    stateInfo.State = StrategyState.Idle;
+                else if (stateInfo.PendingSide == "Sell")
+                    stateInfo.State = StrategyState.InPosition;
+                stateInfo.PendingSide = null;
+            }
+        }
+    }
+}
+
+================
+File: Trading.Processors/TradeProcessor.cs
+================
+// TradeProcessor.cs
+using Trading.Core;
+using Trading.Domain;
+using Trading.Storage;
+using Microsoft.Extensions.Logging;
+
+namespace Trading.Processors;
+
+public class TradeProcessor : EventDrivenProcessor<OrderFilled>
+{
+    private readonly InMemoryDatabase _db;
+
+    public TradeProcessor(IMicroEventBus bus, ILoggerFactory loggerFactory, InMemoryDatabase db)
+        : base(bus, loggerFactory)
+    {
+        _db = db;
+    }
+
+    protected override async Task HandleAsync(OrderFilled filled, CancellationToken ct)
+    {
+        var trade = new Trade(Guid.NewGuid(), filled.OrderId, filled.Ticker, filled.Quantity, filled.Price, filled.Side, DateTime.UtcNow);
+        _db.SaveTrade(trade);
+        await Bus.PublishAsync(trade, ct);
+        Logger.LogInformation("Trade created for {Ticker}", filled.Ticker);
+    }
+}
+
+================
+File: Trading.Processors/Trading.Processors.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.Core\Trading.Core.csproj" />
+    <ProjectReference Include="..\Trading.Domain\Trading.Domain.csproj" />
+    <ProjectReference Include="..\Trading.Storage\Trading.Storage.csproj" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Trading.Storage/InMemoryDatabase.cs
+================
+// InMemoryDatabase.cs
+using System.Collections.Concurrent;
+using Trading.Domain;
+
+namespace Trading.Storage;
+
+public class InMemoryDatabase
+{
+    public ConcurrentDictionary<Guid, OrderCreated> Orders { get; } = new();
+    public ConcurrentDictionary<Guid, Trade> Trades { get; } = new();
+    public ConcurrentDictionary<string, PositionUpdated> Positions { get; } = new();
+
+    // Новая коллекция для хранения последних событий (для UI)
+    public ConcurrentQueue<object> EventLog { get; } = new();
+
+    public void SaveOrder(OrderCreated order) => Orders[order.OrderId] = order;
+    public void SaveTrade(Trade trade) => Trades[trade.TradeId] = trade;
+    public void UpdatePosition(PositionUpdated position) => Positions[position.Ticker] = position;
+
+    // Метод для логирования событий
+    public void LogEvent(object evt) => EventLog.Enqueue(evt);
+}
+
+
+//using System.Collections.Concurrent;
+//using System.Diagnostics;
+//using Trading.Domain;
+
+//namespace Trading.Storage;
+
+//public class InMemoryDatabase
+//{
+//    public ConcurrentDictionary<Guid, OrderCreated> Orders { get; } = new();
+//    public ConcurrentDictionary<Guid, Trade> Trades { get; } = new();
+//    public ConcurrentDictionary<string, PositionUpdated> Positions { get; } = new();
+
+//    public void SaveOrder(OrderCreated order) => Orders[order.OrderId] = order;
+//    public void SaveTrade(Trade trade) => Trades[trade.TradeId] = trade;
+//    public void UpdatePosition(PositionUpdated position) => Positions[position.Ticker] = position;
+//}
+
+================
+File: Trading.Storage/Trading.Storage.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.Domain\Trading.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Trading.Tests/StrategyProcessorRaceTests.cs
+================
+// 26.08.30
+
+using System.Diagnostics;
+using Trading.Core;
+using Trading.Domain;
+using Trading.Processors;
+using Trading.Storage;
+using Microsoft.Extensions.Logging.Abstractions;
+using Xunit;
+
+namespace Trading.Tests;
+
+public class StrategyProcessorRaceTests
+{
+    [Fact]
+    public async Task Strategy_Should_Not_Send_New_Order_Until_Previous_Is_Resolved()
+    {
+        // Arrange
+        var bus = new InMemoryMicroEventBus();
+        var db = new InMemoryDatabase();
+        var loggerFactory = NullLoggerFactory.Instance;
+
+        var strategy = new StrategyProcessor(bus, loggerFactory, db);
+
+        var sentOrders = new List<OrderRequested>();
+        var lockObj = new object();
+        bus.Subscribe<OrderRequested>((order, ct) =>
+        {
+            lock (lockObj) sentOrders.Add(order);
+            return Task.CompletedTask;
+        });
+
+        var quote = new Quote("AAPL", 100m, 101m, DateTime.UtcNow);
+        var newQuotes = new NewQuotes(new[] { quote });
+
+        await bus.PublishAsync(newQuotes);
+        await WaitForOrderCountAsync(sentOrders, expectedCount: 1, timeout: TimeSpan.FromSeconds(2));
+        Assert.Single(sentOrders);
+
+        await bus.PublishAsync(newQuotes);
+        await Task.Delay(200);
+        Assert.Single(sentOrders);
+
+        var filled = new OrderFilled(Guid.NewGuid(), "AAPL", 10m, 101m, "Buy");
+        await bus.PublishAsync(filled);
+        await Task.Delay(100);
+
+        await bus.PublishAsync(newQuotes);
+        await WaitForOrderCountAsync(sentOrders, expectedCount: 2, timeout: TimeSpan.FromSeconds(2));
+        Assert.Equal(2, sentOrders.Count);
+    }
+
+    private static async Task WaitForOrderCountAsync(List<OrderRequested> orders, int expectedCount, TimeSpan timeout)
+    {
+        var sw = Stopwatch.StartNew();
+        while (sw.Elapsed < timeout)
+        {
+            lock (orders)
+            {
+                if (orders.Count >= expectedCount)
+                    return;
+            }
+            await Task.Delay(50);
+        }
+        throw new TimeoutException($"Expected {expectedCount} orders but got {orders.Count} within {timeout}");
+    }
+}
+
+================
+File: Trading.Tests/Trading.Tests.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.11" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.App\Trading.App.csproj" />
+    <ProjectReference Include="..\Trading.Core\Trading.Core.csproj" />
+    <ProjectReference Include="..\Trading.Domain\Trading.Domain.csproj" />
+    <ProjectReference Include="..\Trading.Processors\Trading.Processors.csproj" />
+    <ProjectReference Include="..\Trading.Storage\Trading.Storage.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Trading.Tests/TradingCycleIntegrationTests.cs
+================
+// TradingCycleIntegrationTests.cs
+using Trading.Core;
+using Trading.Domain;
+using Trading.Processors;
+using Trading.Storage;
+using Microsoft.Extensions.Logging;
+using Xunit;
+
+namespace Trading.Tests;
+
+public class TradingCycleIntegrationTests
+{
+    [Fact]
+    public async Task FullCycle_Should_Produce_Trades_And_NonNegative_Positions()
+    {
+        // Arrange
+        var bus = new InMemoryMicroEventBus();
+        var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
+        var db = new InMemoryDatabase();
+        var tickers = new[] { "AAPL", "MSFT", "GOOGL" };
+
+        // Регистрируем процессоры (как в Program.cs, но вручную)
+        var quotesFeeder = new QuotesFeederProcessor(bus, loggerFactory, tickers);
+        var strategy = new StrategyProcessor(bus, loggerFactory, db);
+        var executor = new OrderExecutorProcessor(bus, loggerFactory, db);
+        var tradeProcessor = new TradeProcessor(bus, loggerFactory, db);
+        var positionProcessor = new PositionProcessor(bus, loggerFactory, db);
+        var portfolioProcessor = new PortfolioProcessor(bus, loggerFactory, db);
+
+        // Act
+        await quotesFeeder.GenerateQuotesAsync(CancellationToken.None);
+        await Task.Delay(1000); // даём время на полный цикл
+
+        // Assert
+        // 1. Все позиции неотрицательны
+        foreach (var pos in db.Positions.Values)
+        {
+            Assert.True(pos.Quantity >= 0, $"Position for {pos.Ticker} is negative: {pos.Quantity}");
+        }
+
+        // 2. Количество сделок равно количеству исполненных ордеров
+        int filledOrdersCount = db.Orders.Values.Count(o => db.Trades.Values.Any(t => t.OrderId == o.OrderId));
+        int tradesCount = db.Trades.Count;
+        Assert.Equal(filledOrdersCount, tradesCount);
+    }
+}
+
+================
+File: TradingPlatform.slnx
+================
+<Solution>
+  <Folder Name="/Src/">
+    <Project Path="Trading.App/Trading.App.csproj" />
+    <Project Path="Trading.Core/Trading.Core.csproj" />
+    <Project Path="Trading.Domain/Trading.Domain.csproj" />
+    <Project Path="Trading.Processors/Trading.Processors.csproj" />
+    <Project Path="Trading.Storage/Trading.Storage.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Trading.Tests/Trading.Tests.csproj" />
+  </Folder>
+</Solution>
+
+================================================================
+End of Codebase
+================================================================
