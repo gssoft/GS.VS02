@@ -18,7 +18,7 @@ public class RabbitMqMicroEventBus : IMicroEventBus, IDisposable
         PropertyNameCaseInsensitive = true
     };
 
-    public RabbitMqMicroEventBus(string hostName = "localhost", int port = 5672, string username = "guest", string password = "guest")
+    public RabbitMqMicroEventBus(string hostName = "localhost", int port = 15672, string username = "guest", string password = "guest")
     {
         var factory = new ConnectionFactory
         {

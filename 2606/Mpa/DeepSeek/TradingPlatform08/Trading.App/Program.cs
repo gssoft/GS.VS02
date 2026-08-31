@@ -1,17 +1,16 @@
-﻿//// 26.08.30
+﻿////// 26.08.31
+///
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-
-using Trading.EventBus.RabbitMQ;
-
 using Trading.App;
 using Trading.Core;
 using Trading.Processors;
 using Trading.Storage;
+using Trading.EventBus.RabbitMQ;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,19 +27,18 @@ builder.Services.AddSingleton<ILoggerFactory>(loggerFactory);
 var manifestPath = builder.Configuration["ManifestPath"] ?? "manifest.json";
 var manifest = ManifestLoader.Load(manifestPath);
 
+// Выбираем шину событий
 IMicroEventBus bus = builder.Configuration["EventBus:Type"] switch
 {
     "RabbitMQ" => new RabbitMqMicroEventBus(
-        builder.Configuration["EventBus:RabbitMQ:HostName"] ?? "localhost",
-        builder.Configuration.GetValue<int>("EventBus:RabbitMQ:Port", 5672),
+        builder.Configuration["EventBus:RabbitMQ:HostName"] ?? "127.0.0.1",
+        builder.Configuration.GetValue<int>("EventBus:RabbitMQ:Port", 15672),
         builder.Configuration["EventBus:RabbitMQ:Username"] ?? "guest",
         builder.Configuration["EventBus:RabbitMQ:Password"] ?? "guest"),
     _ => new InMemoryMicroEventBus()
 };
 
-
-// Создаём общие компоненты
-// var bus = new InMemoryMicroEventBus();   
+// Создаём хранилище
 var db = new InMemoryDatabase();
 
 // Регистрируем шину и БД
@@ -64,35 +62,10 @@ var app = builder.Build();
 // Принудительно создаём все процессоры, чтобы они подписались на события
 foreach (var processor in processors)
 {
-    // Уже созданы, но можно вызвать GetRequiredService для надёжности
     app.Services.GetRequiredService(processor.GetType());
 }
 
 // --- Minimal API для отображения ---
-
-//app.MapGet("/", async context =>
-//{
-//    context.Response.ContentType = "text/html; charset=utf-8";
-//    await context.Response.WriteAsync(@"
-//<!DOCTYPE html>
-//<html>
-//<head><title>Trading Monitor</title></head>
-//<body>
-//<h1>Trading Monitor</h1>
-//<div id='events'></div>
-//<script>
-//async function fetchData() {
-//    const resp = await fetch('/events');
-//    const data = await resp.json();
-//    const div = document.getElementById('events');
-//    div.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-//}
-//setInterval(fetchData, 1000);
-//fetchData();
-//</script>
-//</body>
-//</html>");
-//});
 
 app.MapGet("/", async context =>
 {
@@ -138,39 +111,41 @@ app.MapGet("/", async context =>
                 const events = await resp.json();
                 const tbody = document.querySelector('#events-table tbody');
                 tbody.innerHTML = '';
-                events.forEach(evt => {
-                    const row = document.createElement('tr');
-                    const eventType = evt.constructor?.name || evt.$type || (evt.tradeId ? 'Trade' : evt.orderId && evt.side ? 'Order' : evt.position ? 'Position' : 'Event');
-                    let ticker = '', quantity = '', price = '', side = '', timestamp = '', details = '';
-                    if (evt.tradeId) {
-                        ticker = evt.ticker || '';
-                        quantity = evt.quantity || '';
-                        price = evt.price || '';
-                        side = evt.side || '';
-                        timestamp = evt.timestamp || '';
-                        details = 'TradeId: ' + evt.tradeId + ', OrderId: ' + evt.orderId;
-                    } else if (evt.orderId && evt.side) {
-                        ticker = evt.ticker || '';
-                        quantity = evt.quantity || '';
-                        price = evt.price || '';
-                        side = evt.side || '';
-                        timestamp = evt.timestamp || '';
-                        details = 'OrderId: ' + evt.orderId;
-                    } else if (evt.ticker && evt.quantity !== undefined) {
-                        ticker = evt.ticker || '';
-                        quantity = evt.quantity || '';
-                        price = evt.averagePrice || '';
-                        timestamp = new Date().toISOString(); // Position events don't have timestamp
-                        details = 'Position updated';
-                    } else if (evt.positions) {
-                        ticker = '';
-                        quantity = '';
-                        price = '';
-                        timestamp = new Date().toISOString();
-                        details = 'Portfolio snapshot: ' + JSON.stringify(evt.positions);
-                    } else {
-                        details = JSON.stringify(evt);
+                events.forEach(entry => {
+                    const evt = entry.data;
+                    const eventType = entry.eventType;
+                    let ticker = evt.ticker || '';
+                    let quantity = evt.quantity !== undefined ? evt.quantity : '';
+                    let price = evt.price !== undefined ? evt.price : '';
+                    let side = evt.side || '';
+                    let timestamp = evt.timestamp || new Date().toISOString();
+                    let details = '';
+
+                    switch(eventType) {
+                        case 'OrderCreated':
+                        case 'OrderFilled':
+                            details = 'OrderId: ' + (evt.orderId || '');
+                            break;
+                        case 'OrderNotFilled':
+                            details = 'Reason: ' + (evt.reason || '');
+                            break;
+                        case 'Trade':
+                            details = 'TradeId: ' + (evt.tradeId || '') + ', OrderId: ' + (evt.orderId || '');
+                            break;
+                        case 'PositionUpdated':
+                            details = 'AveragePrice: ' + (evt.averagePrice || '');
+                            break;
+                        case 'PortfolioSnapshot':
+                            ticker = '';
+                            quantity = '';
+                            price = '';
+                            details = JSON.stringify(evt.positions);
+                            break;
+                        default:
+                            details = JSON.stringify(evt);
                     }
+
+                    const row = document.createElement('tr');
                     row.innerHTML = `
                         <td class='event-type'>${eventType}</td>
                         <td>${ticker}</td>
@@ -199,162 +174,5 @@ app.MapGet("/positions", (InMemoryDatabase db) => db.Positions.Values);
 app.MapGet("/trades", (InMemoryDatabase db) => db.Trades.Values);
 app.MapGet("/orders", (InMemoryDatabase db) => db.Orders.Values);
 
-// Запуск приложения (это запустит и hosted services)
+// Запуск приложения
 await app.RunAsync();
-
-
-//using Microsoft.Extensions.Configuration;
-//using Microsoft.Extensions.DependencyInjection;
-//using Microsoft.Extensions.Hosting;
-//using Microsoft.Extensions.Logging;
-//using Trading.App;
-//using Trading.Core;
-//using Trading.Processors;
-//using Trading.Storage;
-
-//var builder = Host.CreateApplicationBuilder(args);
-
-//builder.Logging.ClearProviders();
-//builder.Logging.AddConsole();
-//builder.Logging.SetMinimumLevel(LogLevel.Information);
-
-//// Создаём логгер вручную (или можно через DI, но проще для загрузчика)
-//using var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
-//builder.Services.AddSingleton<ILoggerFactory>(loggerFactory);
-
-//// Загружаем манифест
-//var manifestPath = builder.Configuration["ManifestPath"] ?? "manifest.json";
-//var manifest = ManifestLoader.Load(manifestPath);
-
-//// Создаём общие компоненты
-//var bus = new InMemoryMicroEventBus();
-//var db = new InMemoryDatabase();
-
-//// Создаём процессоры из манифеста
-//var processors = ManifestLoader.CreateProcessors(manifest, bus, loggerFactory, db);
-
-//// Регистрируем в DI
-//builder.Services.AddSingleton<IMicroEventBus>(bus);
-//builder.Services.AddSingleton<InMemoryDatabase>(db);
-
-//foreach (var processor in processors)
-//{
-//    builder.Services.AddSingleton(processor.GetType(), processor);
-//}
-
-//// Регистрируем TradingWorker
-//builder.Services.AddHostedService<TradingWorker>();
-
-//var host = builder.Build();
-//await host.RunAsync();
-
-
-//using Microsoft.Extensions.Configuration;
-//using Microsoft.Extensions.DependencyInjection;
-//using Microsoft.Extensions.Hosting;
-//using Microsoft.Extensions.Logging;
-//using Trading.App;
-//using Trading.Core;
-//using Trading.Processors;
-//using Trading.Storage;
-
-//var builder = Host.CreateApplicationBuilder(args);
-
-//builder.Logging.ClearProviders();
-//builder.Logging.AddConsole();
-
-//var configuration = builder.Configuration;
-//builder.Logging.SetMinimumLevel(LogLevel.Information);
-
-//builder.Services.AddSingleton<IMicroEventBus, InMemoryMicroEventBus>();
-//builder.Services.AddSingleton<InMemoryDatabase>();
-
-//// QuotesFeederProcessor
-//builder.Services.AddSingleton<QuotesFeederProcessor>(sp =>
-//{
-//    var bus = sp.GetRequiredService<IMicroEventBus>();
-//    var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-//    var tickers = configuration.GetSection("Trading:Tickers").Get<string[]>() ?? new[] { "AAPL", "MSFT", "GOOGL" };
-//    return new QuotesFeederProcessor(bus, loggerFactory, tickers);
-//});
-
-//// StrategyProcessor
-//builder.Services.AddSingleton<StrategyProcessor>(sp =>
-//{
-//    var bus = sp.GetRequiredService<IMicroEventBus>();
-//    var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-//    var db = sp.GetRequiredService<InMemoryDatabase>();
-//    var lotSize = configuration.GetValue<decimal>("Trading:Strategy:LotSize", 10m);
-//    return new StrategyProcessor(bus, loggerFactory, db, lotSize);
-//});
-
-//// OrderExecutorProcessor
-//builder.Services.AddSingleton<OrderExecutorProcessor>(sp =>
-//{
-//    var bus = sp.GetRequiredService<IMicroEventBus>();
-//    var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-//    var db = sp.GetRequiredService<InMemoryDatabase>();
-//    var fillProbability = configuration.GetValue<double>("Trading:OrderExecutor:FillProbability", 0.7);
-//    return new OrderExecutorProcessor(bus, loggerFactory, db, fillProbability);
-//});
-
-//builder.Services.AddSingleton<TradeProcessor>();
-//builder.Services.AddSingleton<PositionProcessor>();
-//builder.Services.AddSingleton<PortfolioProcessor>();
-
-//builder.Services.AddHostedService<TradingWorker>();
-
-//var host = builder.Build();
-
-//// Принудительно создаём все процессоры, чтобы они подписались на события
-//host.Services.GetRequiredService<StrategyProcessor>();
-//host.Services.GetRequiredService<OrderExecutorProcessor>();
-//host.Services.GetRequiredService<TradeProcessor>();
-//host.Services.GetRequiredService<PositionProcessor>();
-//host.Services.GetRequiredService<PortfolioProcessor>();
-
-//await host.RunAsync();
-
-//using Microsoft.Extensions.DependencyInjection;
-//using Microsoft.Extensions.Hosting;
-//using Microsoft.Extensions.Logging;
-//using Trading.App;
-//using Trading.Core;
-//using Trading.Processors;
-//using Trading.Storage;
-
-//var builder = Host.CreateApplicationBuilder(args);
-
-//builder.Logging.ClearProviders();
-//builder.Logging.AddConsole();
-//builder.Logging.SetMinimumLevel(LogLevel.Information);
-
-//builder.Services.AddSingleton<IMicroEventBus, InMemoryMicroEventBus>();
-//builder.Services.AddSingleton<InMemoryDatabase>();
-
-//builder.Services.AddSingleton<QuotesFeederProcessor>(sp =>
-//{
-//    var bus = sp.GetRequiredService<IMicroEventBus>();
-//    var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-//    var tickers = new[] { "AAPL", "MSFT", "GOOGL" };
-//    return new QuotesFeederProcessor(bus, loggerFactory, tickers);
-//});
-
-//builder.Services.AddSingleton<StrategyProcessor>();
-//builder.Services.AddSingleton<OrderExecutorProcessor>();
-//builder.Services.AddSingleton<TradeProcessor>();
-//builder.Services.AddSingleton<PositionProcessor>();
-//builder.Services.AddSingleton<PortfolioProcessor>();
-
-//builder.Services.AddHostedService<TradingWorker>();
-
-//var host = builder.Build();
-
-//// Принудительно создаём все процессоры, чтобы они подписались на события
-//host.Services.GetRequiredService<StrategyProcessor>();
-//host.Services.GetRequiredService<OrderExecutorProcessor>();
-//host.Services.GetRequiredService<TradeProcessor>();
-//host.Services.GetRequiredService<PositionProcessor>();
-//host.Services.GetRequiredService<PortfolioProcessor>();
-
-//await host.RunAsync();
