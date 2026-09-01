@@ -10,7 +10,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Trading.App\Trading.App.csproj" />
     <ProjectReference Include="..\Trading.Dashboard\Trading.Dashboard.csproj" />
+	<PackageReference Include="Aspire.Hosting.RabbitMQ" Version="13.5.3" />
   </ItemGroup>
 
 </Project>
