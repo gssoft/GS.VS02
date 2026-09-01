@@ -1,0 +1,6 @@
+{
+  "name": "Microprocessor Topology Visualizer",
+  "description": "Visualizes Actor/Microprocessor architecture patterns from a JSON manifest.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,34 @@
+{
+  "processors": [
+    {
+      "name": "QuotesFeederProcessor",
+      "subscribesTo": [],
+      "publishes": ["NewQuotes"]
+    },
+    {
+      "name": "StrategyProcessor",
+      "subscribesTo": ["NewQuotes", "OrderFilled", "OrderNotFilled"],
+      "publishes": ["OrderRequested"]
+    },
+    {
+      "name": "OrderExecutorProcessor",
+      "subscribesTo": ["OrderRequested"],
+      "publishes": ["OrderCreated", "OrderFilled", "OrderNotFilled"]
+    },
+    {
+      "name": "TradeProcessor",
+      "subscribesTo": ["OrderFilled"],
+      "publishes": ["Trade"]
+    },
+    {
+      "name": "PositionProcessor",
+      "subscribesTo": ["Trade"],
+      "publishes": ["PositionUpdated"]
+    },
+    {
+      "name": "PortfolioProcessor",
+      "subscribesTo": ["PositionUpdated"],
+      "publishes": ["PortfolioSnapshot"]
+    }
+  ]
+}
