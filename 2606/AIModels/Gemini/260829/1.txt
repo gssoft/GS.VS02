@@ -1,0 +1,17 @@
+Отличный план! Вы всё правильно поняли. Возьмите вчерашнюю версию (ту, что работала), затем замените файлы на сегодняшние исправленные версии:
+
+Trading.Core/InMemoryMicroEventBus.cs — полностью замените на версию с ImmutableList и исправленным Subscribe (как вы показали). Убедитесь, что в начале файла есть using System.Collections.Immutable;.
+
+Trading.Core/ProcessorBase.cs — оставьте вчерашний (без IHostedService), если он работал, либо возьмите сегодняшний, если хотите чистую остановку.
+
+StrategyProcessor.cs — возьмите сегодняшнюю версию с IStrategyEvent (она уже включает исправления для однопоточной обработки). Это устранит гонки без lock.
+
+Program.cs — используйте вчерашний вариант, но добавьте настройку логирования:
+
+csharp
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.SetMinimumLevel(LogLevel.Information);
+И обязательно принудительно создайте все процессоры до host.RunAsync(), как вчера.
+
+TradingWorker.cs — оставьте вчерашний, но замените LogError на LogInformation в блоке отмены.

@@ -21,17 +21,19 @@ public class EventMonitorService : IAsyncDisposable
         SubscribeToEvents();
     }
 
+   
+
     private void SubscribeToEvents()
     {
-        _bus.Subscribe<OrderCreated>(e => AddEvent(nameof(OrderCreated), e));
-        _bus.Subscribe<OrderFilled>(e => AddEvent(nameof(OrderFilled), e));
-        _bus.Subscribe<OrderNotFilled>(e => AddEvent(nameof(OrderNotFilled), e));
-        _bus.Subscribe<Trade>(e => AddEvent(nameof(Trade), e));
-        _bus.Subscribe<PositionUpdated>(e => AddEvent(nameof(PositionUpdated), e));
-        _bus.Subscribe<PortfolioSnapshot>(e => AddEvent(nameof(PortfolioSnapshot), e));
+        _bus.Subscribe<OrderCreated>((e, ct) => AddEvent(nameof(OrderCreated), e));
+        _bus.Subscribe<OrderFilled>((e, ct) => AddEvent(nameof(OrderFilled), e));
+        _bus.Subscribe<OrderNotFilled>((e, ct) => AddEvent(nameof(OrderNotFilled), e));
+        _bus.Subscribe<Trade>((e, ct) => AddEvent(nameof(Trade), e));
+        _bus.Subscribe<PositionUpdated>((e, ct) => AddEvent(nameof(PositionUpdated), e));
+        _bus.Subscribe<PortfolioSnapshot>((e, ct) => AddEvent(nameof(PortfolioSnapshot), e));
     }
 
-    private Task AddEvent<T>(string type, T evt)
+    private Task AddEvent<T>(string type, T evt) where T : class
     {
         _events.Enqueue(new EventRecord { EventType = type, Data = evt });
         while (_events.Count > MaxEvents && _events.TryDequeue(out _)) { }
