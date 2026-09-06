@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.SignalR.Client
 @using Trading.Domain
+@inject NavigationManager Navigation
 @implements IAsyncDisposable
 
 <h3>Сделки</h3>
@@ -57,3 +58,63 @@
             await hubConnection.DisposeAsync();
     }
 }
+
+@* @page "/trades"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@using Trading.Domain
+@implements IAsyncDisposable
+
+<h3>Сделки</h3>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>TradeId</th>
+            <th>Тикер</th>
+            <th>Side</th>
+            <th>Цена</th>
+            <th>Кол-во</th>
+            <th>Время</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var trade in trades.OrderByDescending(t => t.Timestamp))
+        {
+            <tr>
+                <td>@trade.TradeId</td>
+                <td>@trade.Ticker</td>
+                <td>@trade.Side</td>
+                <td>@trade.Price</td>
+                <td>@trade.Quantity</td>
+                <td>@trade.Timestamp.ToLocalTime().ToString("HH:mm:ss")</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private HubConnection? hubConnection;
+    private List<Trade> trades = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/trading"))
+            .Build();
+
+        hubConnection.On<Trade>("TradeExecuted", (trade) =>
+        {
+            trades.Add(trade);
+            if (trades.Count > 100) trades.RemoveAt(0);
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+            await hubConnection.DisposeAsync();
+    }
+} *@

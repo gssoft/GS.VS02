@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.SignalR.Client
 @using Trading.Domain
+@inject NavigationManager Navigation
 @implements IAsyncDisposable
 
 <h3>Котировки</h3>
@@ -55,3 +56,62 @@
             await hubConnection.DisposeAsync();
     }
 }
+
+@* @page "/quotes"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@using Trading.Domain
+@implements IAsyncDisposable
+
+<h3>Котировки</h3>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Тикер</th>
+            <th>Bid</th>
+            <th>Ask</th>
+            <th>Время</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var quote in quotes.Values.OrderBy(q => q.Ticker))
+        {
+            <tr>
+                <td>@quote.Ticker</td>
+                <td>@quote.Bid</td>
+                <td>@quote.Ask</td>
+                <td>@quote.Timestamp.ToLocalTime().ToString("HH:mm:ss")</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private HubConnection? hubConnection;
+    private Dictionary<string, Quote> quotes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/trading"))
+            .Build();
+
+        hubConnection.On<NewQuotes>("QuotesUpdated", (newQuotes) =>
+        {
+            foreach (var q in newQuotes.Quotes)
+            {
+                quotes[q.Ticker] = q;
+            }
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+            await hubConnection.DisposeAsync();
+    }
+}
+ *@

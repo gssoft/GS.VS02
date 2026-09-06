@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.SignalR.Client
 @using Trading.Domain
+@inject NavigationManager Navigation
 @implements IAsyncDisposable
 
 <h3>Ордера</h3>
@@ -77,3 +78,83 @@
             await hubConnection.DisposeAsync();
     }
 }
+
+@* @page "/orders"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@using Trading.Domain
+@implements IAsyncDisposable
+
+<h3>Ордера</h3>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>OrderId</th>
+            <th>Тикер</th>
+            <th>Side</th>
+            <th>Цена</th>
+            <th>Кол-во</th>
+            <th>Статус</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var order in orders.Values.OrderByDescending(o => o.Timestamp))
+        {
+            <tr>
+                <td>@order.OrderId</td>
+                <td>@order.Ticker</td>
+                <td>@order.Side</td>
+                <td>@order.Price</td>
+                <td>@order.Quantity</td>
+                <td>@GetStatus(order.OrderId)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private HubConnection? hubConnection;
+    private Dictionary<Guid, OrderCreated> orders = new();
+    private HashSet<Guid> filledOrders = new();
+    private HashSet<Guid> notFilledOrders = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/trading"))
+            .Build();
+
+        hubConnection.On<OrderCreated>("OrderCreated", (order) =>
+        {
+            orders[order.OrderId] = order;
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<OrderFilled>("OrderFilled", (filled) =>
+        {
+            filledOrders.Add(filled.OrderId);
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<OrderNotFilled>("OrderNotFilled", (notFilled) =>
+        {
+            notFilledOrders.Add(notFilled.OrderId);
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    private string GetStatus(Guid orderId)
+    {
+        if (filledOrders.Contains(orderId)) return "Filled";
+        if (notFilledOrders.Contains(orderId)) return "Rejected";
+        return "Pending";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+            await hubConnection.DisposeAsync();
+    }
+} *@
