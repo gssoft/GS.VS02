@@ -1,0 +1,410 @@
+PowerShell 7.6.5
+PS C:\Users\Administrator> cd d:
+PS D:\> cd d:\Projects\VS02\2606\mpa
+PS D:\Projects\VS02\2606\Mpa> dir
+
+    Directory: D:\Projects\VS02\2606\Mpa
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d----          2026-09-01    09:14                DeepSeek
+d----          2026-08-25    10:43                Doc
+d----          2026-08-25    10:56                Giga
+-a---          2026-06-02    20:31           2423 EventHub.txt
+-a---          2026-08-19    05:15         185334 Micro_Process_Architecture _012.docx
+-a---          2026-08-19    05:16         185796 Micro_Process_Architecture_014.docx
+-a---          2026-05-24    02:31         225412 MPA_260523_Copy_02.txt
+-a---          2026-05-23    23:18         239764 MPA_260523.txt
+-a---          2026-05-24    17:42           6208 Mpa_260524_03.txt
+-a---          2026-08-19    23:37             89 Reffs.txt
+-a---          2026-08-19    05:15         185334 Микропроцессорная Архитектура _012.docx
+-a---          2026-08-19    05:16         185796 Микропроцессорная Архитектура_014.docx
+-a---          2026-08-19    05:10         169496 Начнем дисскусию Микропроцессорная Архитектура Отличный вопрос.docx
+
+PS D:\Projects\VS02\2606\Mpa> cd deepseek
+PS D:\Projects\VS02\2606\Mpa\DeepSeek> dir
+
+    Directory: D:\Projects\VS02\2606\Mpa\DeepSeek
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d----          2026-08-31    03:09                TradingEventBus
+d----          2026-08-29    20:43                TradingPlatform
+d----          2026-08-29    19:56                TradingPlatform01
+d----          2026-08-30    06:38                TradingPlatform02
+d----          2026-08-30    21:27                TradingPlatform03
+d----          2026-08-31    01:06                TradingPlatform04
+d----          2026-08-31    02:28                TradingPlatform05
+d----          2026-08-31    17:47                TradingPlatform07
+d----          2026-08-31    21:12                TradingPlatform08
+d----          2026-08-31    21:18                TradingPlatform09
+d----          2026-09-01    05:51                TradingPlatform10
+d----          2026-09-01    09:07                TradingPlatform11
+d----          2026-09-01    09:14                TradingPlatform13
+
+PS D:\Projects\VS02\2606\Mpa\DeepSeek> cd tradingPlatform13
+PS D:\Projects\VS02\2606\Mpa\DeepSeek\TradingPlatform13> dir
+
+    Directory: D:\Projects\VS02\2606\Mpa\DeepSeek\TradingPlatform13
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d----          2026-09-01    09:14                Trading.App
+d----          2026-09-01    09:14                Trading.Core
+d----          2026-09-02    18:40                Trading.Dashboard
+d----          2026-09-01    09:14                Trading.Domain
+d----          2026-09-01    09:14                Trading.EventBus.RabbitMQ
+d----          2026-09-01    09:14                Trading.Processors
+d----          2026-09-01    09:14                Trading.Storage
+d----          2026-09-01    09:14                Trading.Tests
+d----          2026-09-01    09:53                TradingPlatform.AppHost
+d----          2026-09-01    09:14                TradingPlatform.ServiceDefaults
+-a---          2026-09-01    08:13             97 aspire.config.json
+-a---          2026-08-31    16:22            414 Commands.txt
+-a---          2026-09-01    09:07            109 repomix_fool_str_260901_.txt
+-a---          2026-09-01    08:20            875 TradingPlatform.slnx
+-a---          2026-08-31    17:47          64800 TradingPlatform071.txt
+-a---          2026-08-31    21:13          61550 TradingPlatform08.txt
+-a---          2026-09-01    05:51          65265 TradingPlatform10.txt
+-a---          2026-09-01    09:04          76571 TradingPlatform11.txt
+
+PS D:\Projects\VS02\2606\Mpa\DeepSeek\TradingPlatform13> repomix --style plain --ignore "wwwroot/, **/*.css, **/*.txt, **/*.map, **/*.js" --output TradingPlatform13.txt
+
+📦 Repomix v1.15.0
+
+No custom config found at repomix.config.ts, repomix.config.mts, repomix.config.cts, repomix.config.js, repomix.config.mjs, repomix.config.cjs, repomix.config.json5, repomix.config.jsonc, repomix.config.json or global config at C:\Users\Administrator\AppData\Local\Repomix\repomix.config.ts, C:\Users\Administrator\AppData\Local\Repomix\repomix.config.mts, C:\Users\Administrator\AppData\Local\Repomix\repomix.config.cts, C:\Users\Administrator\AppData\Local\Repomix\repomix.config.js, C:\Users\Administrator\AppData\Local\Repomix\repomix.config.mjs, C:\Users\Administrator\AppData\Local\Repomix\repomix.config.cjs, C:\Users\Administrator\AppData\Local\Repomix\repomix.config.json5, C:\Users\Administrator\AppData\Local\Repomix\repomix.config.jsonc, C:\Users\Administrator\AppData\Local\Repomix\repomix.config.json.
+You can add a config file for additional settings. Please check https://github.com/yamadashy/repomix for more information.
+✔ Packing completed successfully!
+
+📈 Top 5 Files by Token Count:
+──────────────────────────────
+1.  Trading.App/Program.cs (1,351 tokens, 6,638 chars, 7.5%)
+2.  Trading.Processors/StrategyProcessor.cs (1,085 tokens, 5,334 chars, 6%)
+3.  TradingPlatform.ServiceDefaults/Extensions.cs (884 tokens, 5,111 chars, 4.9%)
+4.  Trading.Dashboard/Components/Pages/Home.razor (813 tokens, 3,642 chars, 4.5%)
+5.  Trading.EventBus.RabbitMQ/RabbitMqMicroEventBus.cs (657 tokens, 3,124 chars, 3.7%)
+
+🔎 Security Check:
+──────────────────
+✔ No suspicious files detected.
+
+
+📊 Pack Summary:
+────────────────
+  Total Files: 58 files
+ Total Tokens: 17,960 tokens
+  Total Chars: 84,068 chars
+       Output: TradingPlatform13.txt
+     Security: ✔ No suspicious files detected
+
+🎉 All Done!
+Your repository has been successfully packed.
+
+💡 Repomix is now available in your browser! Try it at https://repomix.com
+PS D:\Projects\VS02\2606\Mpa\DeepSeek\TradingPlatform13>
+--------------------------------------------
+PowerShell 7.6.5
+PS C:\Users\Administrator> cd d:
+PS D:\> cd vs02
+Set-Location: Cannot find path 'D:\vs02' because it does not exist.
+PS D:\> cd projects\vs02\2606\MPA
+PS D:\Projects\VS02\2606\Mpa> dir
+
+    Directory: D:\Projects\VS02\2606\Mpa
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d----          2026-09-05    22:57                DeepSeek
+d----          2026-08-25    10:43                Doc
+d----          2026-08-25    10:56                Giga
+-a---          2026-06-02    20:31           2423 EventHub.txt
+-a---          2026-08-19    05:15         185334 Micro_Process_Architecture _012.docx
+-a---          2026-08-19    05:16         185796 Micro_Process_Architecture_014.docx
+-a---          2026-05-24    02:31         225412 MPA_260523_Copy_02.txt
+-a---          2026-05-23    23:18         239764 MPA_260523.txt
+-a---          2026-05-24    17:42           6208 Mpa_260524_03.txt
+-a---          2026-08-19    23:37             89 Reffs.txt
+-a---          2026-08-19    05:15         185334 Микропроцессорная Архитектура _012.docx
+-a---          2026-08-19    05:16         185796 Микропроцессорная Архитектура_014.docx
+-a---          2026-08-19    05:10         169496 Начнем дисскусию Микропроцессорная Архитектура Отличный вопрос.docx
+
+PS D:\Projects\VS02\2606\Mpa> cd deepseek
+PS D:\Projects\VS02\2606\Mpa\DeepSeek> dir
+
+    Directory: D:\Projects\VS02\2606\Mpa\DeepSeek
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d----          2026-08-31    03:09                TradingEventBus
+d----          2026-08-29    20:43                TradingPlatform
+d----          2026-08-29    19:56                TradingPlatform01
+d----          2026-08-30    06:38                TradingPlatform02
+d----          2026-08-30    21:27                TradingPlatform03
+d----          2026-08-31    01:06                TradingPlatform04
+d----          2026-08-31    02:28                TradingPlatform05
+d----          2026-08-31    17:47                TradingPlatform07
+d----          2026-08-31    21:12                TradingPlatform08
+d----          2026-08-31    21:18                TradingPlatform09
+d----          2026-09-01    05:51                TradingPlatform10
+d----          2026-09-01    09:07                TradingPlatform11
+d----          2026-09-05    22:32                TradingPlatform13
+d----          2026-09-05    23:01                TradingPlatform14
+
+PS D:\Projects\VS02\2606\Mpa\DeepSeek> cd tradingPlatform14
+PS D:\Projects\VS02\2606\Mpa\DeepSeek\TradingPlatform14> dir
+
+    Directory: D:\Projects\VS02\2606\Mpa\DeepSeek\TradingPlatform14
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d----          2026-09-05    23:13                Trading.App
+d----          2026-09-05    23:01                Trading.Core
+d----          2026-09-05    23:18                Trading.Dashboard
+d----          2026-09-05    23:01                Trading.Domain
+d----          2026-09-05    23:01                Trading.EventBus.RabbitMQ
+d----          2026-09-05    23:01                Trading.Processors
+d----          2026-09-05    23:01                Trading.Storage
+d----          2026-09-05    23:01                Trading.Tests
+d----          2026-09-05    23:22                TradingPlatform.AppHost
+d----          2026-09-05    23:01                TradingPlatform.ServiceDefaults
+-a---          2026-09-01    08:13             97 aspire.config.json
+-a---          2026-08-31    16:22            414 Commands.txt
+-a---          2026-09-01    09:07            109 repomix_fool_str_260901_.txt
+-a---          2026-09-01    08:20            875 TradingPlatform.slnx
+-a---          2026-08-31    17:47          64800 TradingPlatform071.txt
+-a---          2026-08-31    21:13          61550 TradingPlatform08.txt
+-a---          2026-09-01    05:51          65265 TradingPlatform10.txt
+-a---          2026-09-01    09:04          76571 TradingPlatform11.txt
+-a---          2026-09-05    22:40          83259 TradingPlatform13.txt
+
+PS D:\Projects\VS02\2606\Mpa\DeepSeek\TradingPlatform14> cd TradingPlatform.Apphost
+PS D:\Projects\VS02\2606\Mpa\DeepSeek\TradingPlatform14\TradingPlatform.AppHost> dir
+
+    Directory: D:\Projects\VS02\2606\Mpa\DeepSeek\TradingPlatform14\TradingPlatform.AppHost
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d----          2026-09-05    23:01                bin
+d----          2026-09-05    23:09                obj
+d----          2026-09-05    23:01                Properties
+-a---          2026-09-05    23:22           1016 AppHost.cs
+-a---          2026-09-01    08:13            127 appsettings.Development.json
+-a---          2026-09-01    08:13            167 appsettings.json
+-a---          2026-09-01    09:53            641 TradingPlatform.AppHost.csproj
+
+PS D:\Projects\VS02\2606\Mpa\DeepSeek\TradingPlatform14\TradingPlatform.AppHost> dotnet run
+Using launch settings from D:\Projects\VS02\2606\Mpa\DeepSeek\TradingPlatform14\TradingPlatform.AppHost\Properties\launchSettings.json...
+Building...
+
+     AppHost:  TradingPlatform.AppHost.csproj
+
+   Dashboard:  https://localhost:17112/login?t=67414709f02ea4af5631789d20d564c8
+
+        Logs:  C:\Users\Administrator\.aspire\logs\cli_20260905T203311_0ba18dda.log
+
+               Press CTRL+C to stop the AppHost and exit.
+
+🛑 Stopping Aspire.
+PS D:\Projects\VS02\2606\Mpa\DeepSeek\TradingPlatform14\TradingPlatform.AppHost> dotnet run
+Using launch settings from D:\Projects\VS02\2606\Mpa\DeepSeek\TradingPlatform14\TradingPlatform.AppHost\Properties\launchSettings.json...
+Building...
+
+     AppHost:  TradingPlatform.AppHost.csproj
+
+   Dashboard:  https://localhost:17112/login?t=a5a2298d8fb5cde36e6581303916e780
+
+        Logs:  C:\Users\Administrator\.aspire\logs\cli_20260905T211156_72b05dd9.log
+
+               Press CTRL+C to stop the AppHost and exit.
+-------------------------
+Windows PowerShell
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+Install the latest PowerShell for new features and improvements! https://aka.ms/PSWindows
+
+PS C:\Users\Administrator> docker run -d --name trading-rabbitmq -p 127.0.0.1:5672:5672 -p 127.0.0.1:15672:15672 rabbitmq:3-management
+
+What's next:
+    Debug this container error with Gordon → docker ai "help me fix this container error"
+docker: Error response from daemon: Conflict. The container name "/trading-rabbitmq" is already in use by container "f448103b040493705c7b871c29e8946505c68e29385613c8cc6614a19a33f4d1". You have to remove (or rename) that container to be able to reuse that name.
+
+Run 'docker run --help' for more information
+PS C:\Users\Administrator> Test-NetConnection 127.0.0.1 -Port 5672
+WARNING: TCP connect to (127.0.0.1 : 5672) failed
+
+
+ComputerName           : 127.0.0.1
+RemoteAddress          : 127.0.0.1
+RemotePort             : 5672
+InterfaceAlias         : Loopback Pseudo-Interface 1
+SourceAddress          : 127.0.0.1
+PingSucceeded          : True
+PingReplyDetails (RTT) : 0 ms
+TcpTestSucceeded       : False
+
+
+
+PS C:\Users\Administrator> docker run -d --name trading-rabbitmq -p 127.0.0.1:5672:5672 -p 127.0.0.1:15672:15672 rabbitmq:3-management
+
+What's next:
+    Debug this container error with Gordon → docker ai "help me fix this container error"
+docker: Error response from daemon: Conflict. The container name "/trading-rabbitmq" is already in use by container "f448103b040493705c7b871c29e8946505c68e29385613c8cc6614a19a33f4d1". You have to remove (or rename) that container to be able to reuse that name.
+
+Run 'docker run --help' for more information
+PS C:\Users\Administrator> docker ps
+CONTAINER ID   IMAGE     COMMAND                  CREATED       STATUS          PORTS                                         NAMES
+822f0257238f   redis:6   "docker-entrypoint.s…"   5 weeks ago   Up 17 minutes   0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp   dapr_redis
+PS C:\Users\Administrator> docker ps --filter "ancestor=rabbitmq:3-management"
+CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+PS C:\Users\Administrator> docker run -d --name trading-rabbitmq -p 127.0.0.1:5672:5672 -p 127.0.0.1:15672:15672 rabbitmq:3-management
+
+What's next:
+    Debug this container error with Gordon → docker ai "help me fix this container error"
+docker: Error response from daemon: Conflict. The container name "/trading-rabbitmq" is already in use by container "f448103b040493705c7b871c29e8946505c68e29385613c8cc6614a19a33f4d1". You have to remove (or rename) that container to be able to reuse that name.
+
+Run 'docker run --help' for more information
+PS C:\Users\Administrator> docker stopdocker stop $(docker ps -aq)
+docker: unknown command: docker stopdocker
+
+Run 'docker --help' for more information
+PS C:\Users\Administrator> docker stop $(docker ps -aq)
+f448103b0404
+822f0257238f
+6652627e0098
+50c06df13c99
+8c3b7ba60c5c
+6e27fe438acb
+f7b625977260
+03f747e90c49
+d1e8a255f285
+0acf297fd715
+8eae6df28294
+PS C:\Users\Administrator> docker rm $(docker ps -aq)
+f448103b0404
+822f0257238f
+6652627e0098
+50c06df13c99
+8c3b7ba60c5c
+6e27fe438acb
+f7b625977260
+03f747e90c49
+d1e8a255f285
+0acf297fd715
+8eae6df28294
+PS C:\Users\Administrator> docker volume prune -f
+Deleted Volumes:
+7067aeebe48a85e3af72f7a2082fae33aececd09d4c6180ae719ca161ce3b398
+97a2350a58fb08ff4553c045a6402916db5bfbc854be7bbb709955df4080205e
+fe1eb4fd2e20136c63c8c3639940d025f4254bc2af9f1127d22697ad8ae9aafd
+10ee43c2a14424891475d2abd4516c927c7aabc458f24eec2951f516c5713e4e
+5932f636435cdc5cd66d152d3c86d73606a726a4fce1ce3b047316d047073326
+7813d3443b214e8f0f8b8c481581a2af109eef99e2a7027c5f6bd03a6bb4173a
+b27c43562f4c2f27a2338c508fb03f54fddc2e041b38c7129f99ecc68ae85ede
+b3558d3f4cfd9fe03c73a6a94c3c4cd6384f518724ddf09fcc85932090dfbcc8
+1230bfe18944123da77be48eaccd1b5988c0ce2f4beb6c944c6c06b9cb926a24
+56c9fdb97e3d644abe5ada2ed51d21f442b66f725913c5f77287643c883abeed
+678cb9fb47c7bcd55e27f76407ae576f8aa3bd367e7df51f5c2fed9eb396a8cd
+87b467ca4d94a0227c491a94e8a5a261d7da2766c277545928153386fc5d8f37
+a68cb3cc7eb568e4c92efd69e80caf598251468054ad05b6a27f83899374c018
+f10df5355159b705294d7f96ac2cb8cf50646c9534000e2f39199d917f995594
+81ba106ff94c695d1768e691183c7d77e0d0d3266c7a6d576bd8df6ec3f1fc3d
+882b12dfab258a8610dae2c1a8472fa6411d33f53a0d9504131fadc54cebf852
+99a5ead221b2bf6f692c7c6082baeeb41957658ea0d65da6ea37fa1d07495b12
+d37a8ac1e5b4c4bd0ec282dcc416f6fcf616c093b6e88bd4e9bc421309b8c5bd
+db27cb637434967e70ee88327ba6bd846d4a4f543bea52d652643803d46c1300
+
+Total reclaimed space: 1.4MB
+PS C:\Users\Administrator> docker rmi $(docker images -q rabbitmq)
+Untagged: rabbitmq:4.3
+Deleted: sha256:f3aa266b9f3ee3d06c6658804aa3b8e4474bfc18880dcc20f469995a728c298b
+Untagged: rabbitmq:4.2
+Deleted: sha256:0f0eeaba114a94a9e4aae6a5bde40de85e0ab3b9ae7fe715a25cac19c4253643
+Untagged: rabbitmq:4.2-management
+Deleted: sha256:ae4a4628f132397d1290c9be38bec1eb4befd262cc9b4cee51d5706cce6c4314
+Untagged: rabbitmq:3-management
+Deleted: sha256:e582c0bc7766f3342496d8485efb5a1df782b5ce3886ad017e2eaae442311f69
+PS C:\Users\Administrator> docker run -d --name trading-rabbitmq -p 5672:5672 -p 15672:15672 -e RABBITMQ_DEFAULT_USER=guest -e RABBITMQ_DEFAULT_PASSWORD=guest rabbitmq:3-management
+Unable to find image 'rabbitmq:3-management' locally
+3-management: Pulling from library/rabbitmq
+7084ac8f4ab6: Pull complete
+d686b50ce172: Pull complete
+f4e7f62f4b80: Pull complete
+5e1c03b67a78: Pull complete
+14e6209d5fa8: Pull complete
+20043066d3d5: Pull complete
+efa05c660812: Pull complete
+3fadc669ef11: Pull complete
+beb0d870d438: Pull complete
+d63c4408fdb7: Pull complete
+7ec4c696b8bb: Download complete
+16ef6b12768c: Download complete
+Digest: sha256:e582c0bc7766f3342496d8485efb5a1df782b5ce3886ad017e2eaae442311f69
+Status: Downloaded newer image for rabbitmq:3-management
+0bf8c17ce011c3d4f84d6be3daf20c8baa25192f58143e7b0f968d444b95d198
+PS C:\Users\Administrator> dotnet --version
+10.0.400
+PS C:\Users\Administrator> dotnet workload list
+
+Workload version: 10.0.400-manifests.b0ae88bd
+
+Installed Workload Id      Manifest Version         Installation Source
+-----------------------------------------------------------------------
+android                    36.1.69/10.0.100         VS 18.9.12120.119
+ios                        26.5.10301/10.0.100      VS 18.9.12120.119
+maccatalyst                26.5.10301/10.0.100      VS 18.9.12120.119
+maui-windows               10.0.20/10.0.100         VS 18.9.12120.119
+
+Use `dotnet workload search` to find additional workloads to install.
+
+PS C:\Users\Administrator> aspire --version
+13.4.6+87fe259e4fc244c599019a7b1304c85a1488f248
+PS C:\Users\Administrator> dotnet clean
+MSBUILD : error MSB1003: Specify a project or solution file. The current working directory does not contain a project or solution file.
+PS C:\Users\Administrator>
+------------------------------------
+
+PS D:\projects\vs02\2606\mpa\deepseek\tradingplatform14> dir
+
+
+    Directory: D:\projects\vs02\2606\mpa\deepseek\tradingplatform14
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d-----        2026-09-05     23:13                Trading.App
+d-----        2026-09-05     23:01                Trading.Core
+d-----        2026-09-05     23:18                Trading.Dashboard
+d-----        2026-09-05     23:01                Trading.Domain
+d-----        2026-09-05     23:01                Trading.EventBus.RabbitMQ
+d-----        2026-09-05     23:01                Trading.Processors
+d-----        2026-09-05     23:01                Trading.Storage
+d-----        2026-09-05     23:01                Trading.Tests
+d-----        2026-09-05     23:22                TradingPlatform.AppHost
+d-----        2026-09-05     23:01                TradingPlatform.ServiceDefaults
+-a----        2026-09-01     08:13             97 aspire.config.json
+-a----        2026-08-31     16:22            414 Commands.txt
+-a----        2026-09-06     03:36          19710 PowerShellScript.txt
+-a----        2026-09-01     09:07            109 repomix_fool_str_260901_.txt
+-a----        2026-09-01     08:20            875 TradingPlatform.slnx
+-a----        2026-08-31     17:47          64800 TradingPlatform071.txt
+-a----        2026-08-31     21:13          61550 TradingPlatform08.txt
+-a----        2026-09-01     05:51          65265 TradingPlatform10.txt
+-a----        2026-09-01     09:04          76571 TradingPlatform11.txt
+-a----        2026-09-05     22:40          83259 TradingPlatform13.txt
+
+----------------
+PS D:\projects\vs02\2606\mpa\deepseek\tradingplatform14> cd TradingPlatform.Apphost
+PS D:\projects\vs02\2606\mpa\deepseek\tradingplatform14\TradingPlatform.Apphost> dotnet run
+Using launch settings from D:\projects\vs02\2606\mpa\deepseek\tradingplatform14\TradingPlatform.Apphost\Properties\launchSettings.json...
+Building...
+
+     AppHost:  TradingPlatform.AppHost.csproj
+
+   Dashboard:  https://localhost:17112/login?t=8be62f7a50b56bf55c86ba299e3134b2
+
+        Logs:  C:\Users\Administrator\.aspire\logs\cli_20260906T010902_97a85b08.log
+
+               Press CTRL+C to stop the AppHost and exit.
+----------
+
+

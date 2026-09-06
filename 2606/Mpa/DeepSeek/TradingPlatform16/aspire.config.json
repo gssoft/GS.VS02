@@ -1,0 +1,5 @@
+{
+  "appHost": {
+    "path": "TradingPlatform.AppHost/TradingPlatform.AppHost.csproj"
+  }
+}

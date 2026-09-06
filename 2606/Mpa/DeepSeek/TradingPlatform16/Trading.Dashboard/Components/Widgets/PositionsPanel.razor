@@ -1,0 +1,107 @@
+﻿@page "/positions"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@using Trading.Domain
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<h3>Позиции</h3>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Тикер</th>
+            <th>Количество</th>
+            <th>Средняя цена</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var pos in positions.Values)
+        {
+            <tr>
+                <td>@pos.Ticker</td>
+                <td>@pos.Quantity</td>
+                <td>@pos.AveragePrice</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private HubConnection? hubConnection;
+    private Dictionary<string, PositionUpdated> positions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/trading"))
+            .Build();
+
+        hubConnection.On<PositionUpdated>("PositionUpdated", (pos) =>
+        {
+            positions[pos.Ticker] = pos;
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+            await hubConnection.DisposeAsync();
+    }
+}
+
+@* @page "/positions"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@using Trading.Domain
+@implements IAsyncDisposable
+
+<h3>Позиции</h3>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Тикер</th>
+            <th>Количество</th>
+            <th>Средняя цена</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var pos in positions.Values)
+        {
+            <tr>
+                <td>@pos.Ticker</td>
+                <td>@pos.Quantity</td>
+                <td>@pos.AveragePrice</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private HubConnection? hubConnection;
+    private Dictionary<string, PositionUpdated> positions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/trading"))
+            .Build();
+
+        hubConnection.On<PositionUpdated>("PositionUpdated", (pos) =>
+        {
+            positions[pos.Ticker] = pos;
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+            await hubConnection.DisposeAsync();
+    }
+}
+ *@
