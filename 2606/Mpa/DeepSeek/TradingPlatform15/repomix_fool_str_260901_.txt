@@ -1,0 +1,1 @@
+repomix --style plain --ignore "wwwroot/,**/*.css,**/*.txt,**/*.map,**/*.js" --output TradingPlatform11.txt

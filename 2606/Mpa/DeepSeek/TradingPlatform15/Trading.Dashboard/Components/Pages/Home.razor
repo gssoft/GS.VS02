@@ -1,0 +1,126 @@
+﻿@page "/"
+@using Trading.Dashboard.Services
+@using Trading.Domain
+@inject EventMonitorService EventMonitor
+@implements IDisposable
+
+<PageTitle>Trading Events</PageTitle>
+
+<h1>Trading Events</h1>
+
+<div>
+    <button class="btn btn-primary" @onclick="Refresh">Refresh</button>
+    <span>@lastUpdate</span>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Time</th>
+            <th>Event</th>
+            <th>Ticker</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>Side</th>
+            <th>Details</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var evt in events)
+        {
+            <tr>
+                <td>@GetTimestamp(evt.Data)</td>
+                <td>@evt.EventType</td>
+                <td>@GetTicker(evt.Data)</td>
+                <td>@GetQuantity(evt.Data)</td>
+                <td>@GetPrice(evt.Data)</td>
+                <td>@GetSide(evt.Data)</td>
+                <td>@GetDetails(evt.Data)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<EventRecord> events = new();
+    private string lastUpdate = "";
+    private Timer? timer;
+
+    protected override void OnInitialized()
+    {
+        Refresh();
+        timer = new Timer(_ => InvokeAsync(Refresh), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    private void Refresh()
+    {
+        events = EventMonitor.GetRecentEvents().ToList();
+        lastUpdate = DateTime.Now.ToString("HH:mm:ss");
+    }
+
+    private string GetTimestamp(object data) =>
+        data switch
+        {
+            OrderCreated o => o.Timestamp.ToString("HH:mm:ss"),
+            OrderFilled f => DateTime.Now.ToString("HH:mm:ss"),
+            Trade t => t.Timestamp.ToString("HH:mm:ss"),
+            _ => ""
+        };
+
+    private string GetTicker(object data) =>
+        data switch
+        {
+            OrderCreated o => o.Ticker,
+            OrderFilled f => f.Ticker,
+            OrderNotFilled n => n.Ticker,
+            Trade t => t.Ticker,
+            PositionUpdated p => p.Ticker,
+            _ => ""
+        };
+
+    private string GetQuantity(object data) =>
+        data switch
+        {
+            OrderCreated o => o.Quantity.ToString(),
+            OrderFilled f => f.Quantity.ToString(),
+            Trade t => t.Quantity.ToString(),
+            PositionUpdated p => p.Quantity.ToString(),
+            _ => ""
+        };
+
+    private string GetPrice(object data) =>
+        data switch
+        {
+            OrderCreated o => o.Price.ToString(),
+            OrderFilled f => f.Price.ToString(),
+            Trade t => t.Price.ToString(),
+            PositionUpdated p => p.AveragePrice.ToString(),
+            _ => ""
+        };
+
+    private string GetSide(object data) =>
+        data switch
+        {
+            OrderCreated o => o.Side,
+            OrderFilled f => f.Side,
+            Trade t => t.Side,
+            _ => ""
+        };
+
+    private string GetDetails(object data) =>
+        data switch
+        {
+            OrderCreated o => $"OrderId: {o.OrderId}",
+            OrderFilled f => $"OrderId: {f.OrderId}",
+            OrderNotFilled n => $"Reason: {n.Reason}",
+            Trade t => $"TradeId: {t.TradeId}, OrderId: {t.OrderId}",
+            PositionUpdated p => $"AvgPrice: {p.AveragePrice}",
+            PortfolioSnapshot ps => $"Positions: {string.Join(", ", ps.Positions.Select(kv => $"{kv.Key}:{kv.Value}"))}",
+            _ => ""
+        };
+
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+}

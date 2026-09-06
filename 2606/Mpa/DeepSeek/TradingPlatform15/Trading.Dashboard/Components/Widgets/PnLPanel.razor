@@ -1,0 +1,57 @@
+﻿@page "/pnl"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@using Trading.Domain
+@implements IAsyncDisposable
+
+<h3>Портфель (PnL)</h3>
+@if (snapshot != null)
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Тикер</th>
+                <th>Количество</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var kvp in snapshot.Positions)
+            {
+                <tr>
+                    <td>@kvp.Key</td>
+                    <td>@kvp.Value</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <p>Нет данных</p>
+}
+
+@code {
+    private HubConnection? hubConnection;
+    private PortfolioSnapshot? snapshot;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/trading"))
+            .Build();
+
+        hubConnection.On<PortfolioSnapshot>("PnLUpdated", (pnl) =>
+        {
+            snapshot = pnl;
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+            await hubConnection.DisposeAsync();
+    }
+}
