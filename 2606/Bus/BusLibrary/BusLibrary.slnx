@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Text/">
+    <File Path="Notes.txt" />
+  </Folder>
+  <Project Path="../BusLibrary02.Core/BusLibrary02.Core.csproj" />
+  <Project Path="BusLibrary.Test02/BusLibrary.Test02.csproj" Id="cf8fd577-c983-4ccc-b323-f07c520569b5" />
+  <Project Path="BusLibrary.Tests/BusLibrary.Tests.csproj" Id="9d5939ee-0a3b-4e97-848d-fd0eeaa2a60b" />
+  <Project Path="BusLibrary03/BusLibrary03.csproj" />
+</Solution>

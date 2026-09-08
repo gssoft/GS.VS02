@@ -1,0 +1,4 @@
+Из BusLibrary02.Core -> BusLibrary03
+Handlers над Subscribers имеют Приоритет
+Сначала исполняются всегда Handlers, затем Subscribers.
+

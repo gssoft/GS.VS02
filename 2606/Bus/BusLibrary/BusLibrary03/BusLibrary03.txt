@@ -1,0 +1,1166 @@
+BusLibrary03
+================================================================
+Directory Structure
+================================================================
+Abstractions.cs
+Attributes.cs
+BusLibrary03.csproj
+CompositeKeyRouter.cs
+DynamicKeyRouter.cs
+DynamicSubscriptions.cs
+EventHandlerRegistry.cs
+EventHub.cs
+Extensions.cs
+Interfaces.cs
+Keys.cs
+MessageKeyAttribute.cs
+RoutingMode.cs
+StaticKeyRouter.cs
+StaticMessageExtensions.cs
+SubscriptionExtensions.cs
+
+================================================================
+Files
+================================================================
+
+================
+File: Abstractions.cs
+================
+// Abstractions.cs
+
+namespace BusLibrary;
+
+public abstract record MessageBase(string Key, string? SenderKey = null) : IMessage
+{
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+}
+
+================
+File: Attributes.cs
+================
+// Attributes.cs
+
+using Microsoft.Extensions.DependencyInjection;
+
+namespace BusLibrary;
+
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
+public sealed class HandlesAttribute : Attribute
+{
+    public string Key { get; }
+    public HandlesAttribute(string key) => Key = key;
+}
+
+public sealed class AttributeKeyRouter : IKeyRouter
+{
+    private readonly IEventHandlerRegistry _registry;
+    public AttributeKeyRouter(IEventHandlerRegistry registry) => _registry = registry;
+    public IEnumerable<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>> Resolve(IServiceProvider serviceProvider, string key)
+    {
+        var handlerMap = _registry.GetHandlerMap();
+        if (!handlerMap.TryGetValue(key, out var handlerTypes))
+            return Enumerable.Empty<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>();
+        var invokers = new List<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>();
+        foreach (var handlerType in handlerTypes)
+        {
+            invokers.Add((sp, msg, ct) =>
+            {
+                var handler = sp.GetRequiredService(handlerType);
+                var handleMethod = handlerType.GetMethod("Handle");
+                if (handleMethod == null)
+                    throw new InvalidOperationException($"Handler {handlerType.Name} does not have Handle method");
+                return (ValueTask)handleMethod.Invoke(handler, new object[] { msg, ct });
+            });
+        }
+        return invokers;
+    }
+}
+
+================
+File: BusLibrary03.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: CompositeKeyRouter.cs
+================
+// CompositeKeyRouter.cs (исправленная версия)
+
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using System.Linq;
+
+namespace BusLibrary;
+
+/// <summary>
+/// Композитный роутер, объединяющий атрибутные и динамические подписки
+/// </summary>
+public sealed class CompositeKeyRouter : IKeyRouter
+{
+    private readonly IEventHandlerRegistry _registry;
+
+    // Updates 26.05.22
+    private readonly IDynamicSubscriptionManager _subscriptionManager;
+    private readonly ILogger<CompositeKeyRouter>? _logger;
+
+    public CompositeKeyRouter(
+        IEventHandlerRegistry registry,
+        // Updates 26.05.22
+        IDynamicSubscriptionManager subscriptionManager,
+        ILogger<CompositeKeyRouter>? logger = null)
+    {
+        _registry = registry;
+        _subscriptionManager = subscriptionManager;
+        _logger = logger;
+    }
+
+    public IEnumerable<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>
+        Resolve(IServiceProvider serviceProvider, string key)
+    {
+        var handlers = new List<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>();
+
+        // 1. Статические обработчики из атрибутов
+        var staticHandlers = GetStaticHandlers(serviceProvider, key);
+        handlers.AddRange(staticHandlers);
+
+        _logger?.LogDebug("Found {Count} static handlers for key '{Key}'",
+            staticHandlers.Count(), key);
+
+        // 2. Динамические обработчики
+        var dynamicHandlers = _subscriptionManager.GetHandlers(key);
+        handlers.AddRange(dynamicHandlers);
+
+        _logger?.LogDebug("Found {Count} dynamic handlers for key '{Key}'",
+            dynamicHandlers.Count(), key);
+
+        return handlers;
+    }
+
+    private IEnumerable<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>
+        GetStaticHandlers(IServiceProvider serviceProvider, string key)
+    {
+        var handlerMap = _registry.GetHandlerMap();
+        if (!handlerMap.TryGetValue(key, out var handlerTypes))
+            return Enumerable.Empty<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>();
+
+        var invokers = new List<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>();
+        foreach (var handlerType in handlerTypes)
+        {
+            invokers.Add((sp, msg, ct) =>
+            {
+                var handler = sp.GetRequiredService(handlerType);
+                var handleMethod = handlerType.GetMethod("Handle");
+                if (handleMethod == null)
+                    throw new InvalidOperationException($"Handler {handlerType.Name} does not have Handle method");
+
+                return (ValueTask)handleMethod.Invoke(handler, new object[] { msg, ct });
+            });
+        }
+        return invokers;
+    }
+}
+
+================
+File: DynamicKeyRouter.cs
+================
+// Updates 26.05.22
+
+using BusLibrary;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace BusLibrary;
+
+//public sealed class DynamicKeyRouter : IKeyRouter
+//{
+//    private readonly DynamicSubscriptionManager _manager;
+//    public DynamicKeyRouter(DynamicSubscriptionManager manager) => _manager = manager;
+
+//    public IEnumerable<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>
+//    Resolve(IServiceProvider serviceProvider, string key)
+//    {
+//        // Статические обработчики игнорируются, только динамические
+//        return _manager.GetHandlers(key);
+//    }
+//}
+// Updates 26.05.22
+public sealed class DynamicKeyRouter: IKeyRouter
+{
+    // Updates 26.05.22
+    private readonly IDynamicSubscriptionManager _manager;
+
+    public DynamicKeyRouter(IDynamicSubscriptionManager manager) => _manager = manager;
+
+    public IEnumerable<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>
+    Resolve(IServiceProvider serviceProvider, string key)
+    {
+        return _manager.GetHandlers(key);
+    }
+}
+
+================
+File: DynamicSubscriptions.cs
+================
+// Updates 26.05.22
+// DynamicSubscriptions.cs (исправленная версия)
+
+using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
+using System.Linq;
+using System.Reflection;
+
+namespace BusLibrary;
+
+/// <summary>
+/// Интерфейс для динамической подписки на события
+/// </summary>
+public interface IDynamicSubscriptionManager
+{
+    /// <summary>
+    /// Подписаться на событие по ключу
+    /// </summary>
+    IDisposable Subscribe<TMessage>(string key, Func<TMessage, CancellationToken, ValueTask> handler)
+        where TMessage : IMessage;
+
+    /// <summary>
+    /// Подписаться на событие по типу сообщения (используя атрибут)
+    /// </summary>
+    IDisposable Subscribe<TMessage>(Func<TMessage, CancellationToken, ValueTask> handler)
+        where TMessage : IMessage;
+
+    /// <summary>
+    /// Отписаться от события по ключу
+    /// </summary>
+    void Unsubscribe(string key);
+
+    /// <summary>
+    /// Отписаться от события по типу сообщения
+    /// </summary>
+    void Unsubscribe<TMessage>() where TMessage : IMessage;
+
+    IEnumerable<string> GetSubscribedKeys();
+
+    // Updates 26.05.22
+    IEnumerable<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>> GetHandlers(string key);
+}
+
+/// <summary>
+/// Менеджер динамических подписок
+/// </summary>
+public sealed class DynamicSubscriptionManager : IDynamicSubscriptionManager, IDisposable
+{
+    private readonly ConcurrentDictionary<string, List<SubscriptionEntry>> _subscriptions = new();
+    private readonly ConcurrentDictionary<Type, string> _typeToKeyMap = new();
+    private readonly ConcurrentDictionary<Type, string> _typeToStaticKeyMap = new();
+    private readonly ILogger<DynamicSubscriptionManager>? _logger;
+    private bool _disposed;
+
+    private class SubscriptionEntry
+    {
+        public Type MessageType { get; }
+        public Delegate HandlerDelegate { get; }
+        public Guid Id { get; }
+
+        public SubscriptionEntry(Type messageType, Delegate handlerDelegate, Guid id)
+        {
+            MessageType = messageType;
+            HandlerDelegate = handlerDelegate;
+            Id = id;
+        }
+    }
+
+    public DynamicSubscriptionManager(ILogger<DynamicSubscriptionManager>? logger = null)
+    {
+        _logger = logger;
+
+        // Инициализируем статические ключи для стандартных типов сообщений
+        InitializeStaticKeys();
+    }
+
+    private void InitializeStaticKeys()
+    {
+        // Пример добавления статических ключей для известных типов
+        // Можно добавить здесь или использовать конфигурацию
+    }
+
+    /// <summary>
+    /// Подписаться на событие по ключу
+    /// </summary>
+    public IDisposable Subscribe<TMessage>(string key, Func<TMessage, CancellationToken, ValueTask> handler)
+        where TMessage : IMessage
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ArgumentException("Key cannot be null or empty", nameof(key));
+        if (handler is null)
+            throw new ArgumentNullException(nameof(handler));
+
+        var entry = new SubscriptionEntry(
+            typeof(TMessage),
+            handler,
+            Guid.NewGuid()
+        );
+
+        var subscriptions = _subscriptions.GetOrAdd(key, _ => new List<SubscriptionEntry>());
+
+        lock (subscriptions)
+        {
+            subscriptions.Add(entry);
+        }
+
+        _logger?.LogDebug("Subscribed to key '{Key}' with handler ID {HandlerId}", key, entry.Id);
+
+        // Сохраняем связь типа с ключом для возможности отписки по типу
+        _typeToKeyMap.AddOrUpdate(typeof(TMessage), key, (_, existing) => existing);
+
+        return new SubscriptionToken(this, key, entry.Id);
+    }
+
+    /// <summary>
+    /// Подписаться на событие по типу сообщения
+    /// </summary>
+    public IDisposable Subscribe<TMessage>(Func<TMessage, CancellationToken, ValueTask> handler)
+        where TMessage : IMessage
+    {
+        // Попробуем получить ключ из статического словаря
+        if (!_typeToStaticKeyMap.TryGetValue(typeof(TMessage), out var key))
+        {
+            // Если ключ не найден, попробуем получить его из атрибута
+            var attr = typeof(TMessage).GetCustomAttributes(false)
+                .OfType<MessageKeyAttribute>()
+                .FirstOrDefault();
+
+            if (attr != null)
+            {
+                key = attr.Key;
+                _typeToStaticKeyMap.TryAdd(typeof(TMessage), key);
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"Cannot subscribe to {typeof(TMessage).Name} without a key. " +
+                    $"Either use Subscribe(key, handler) or add [MessageKey] attribute to the message type.");
+            }
+        }
+
+        return Subscribe(key, handler);
+    }
+
+    /// <summary>
+    /// Зарегистрировать статический ключ для типа сообщения
+    /// </summary>
+    public void RegisterStaticKey<TMessage>(string key) where TMessage : IMessage
+    {
+        _typeToStaticKeyMap[typeof(TMessage)] = key;
+    }
+
+    
+    
+
+    /// <summary>
+    /// Отписаться от события по ключу
+    /// </summary>
+    public void Unsubscribe(string key)
+    {
+        if (_subscriptions.TryRemove(key, out var subscriptions))
+        {
+            _logger?.LogDebug("Unsubscribed from key '{Key}', removed {Count} handlers",
+                key, subscriptions.Count);
+        }
+    }
+
+    /// <summary>
+    /// Отписаться от события по типу сообщения
+    /// </summary>
+    public void Unsubscribe<TMessage>() where TMessage : IMessage
+    {
+        if (_typeToKeyMap.TryGetValue(typeof(TMessage), out var key))
+        {
+            Unsubscribe(key);
+            _typeToKeyMap.TryRemove(typeof(TMessage), out _);
+        }
+    }
+
+    /// <summary>
+    /// Внутренний метод для отписки по ID обработчика
+    /// </summary>
+    private bool Unsubscribe(string key, Guid handlerId)
+    {
+        if (_subscriptions.TryGetValue(key, out var subscriptions))
+        {
+            lock (subscriptions)
+            {
+                var removed = subscriptions.RemoveAll(x => x.Id == handlerId);
+                if (removed > 0)
+                {
+                    // Если обработчиков не осталось, удаляем ключ
+                    if (subscriptions.Count == 0)
+                    {
+                        _subscriptions.TryRemove(key, out _);
+                    }
+
+                    _logger?.LogDebug("Unsubscribed handler {HandlerId} from key '{Key}'",
+                        handlerId, key);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Получить все обработчики для указанного ключа
+    /// </summary>
+    public IEnumerable<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>
+        GetHandlers(string key)
+    {
+        if (!_subscriptions.TryGetValue(key, out var subscriptions))
+            return Enumerable.Empty<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>();
+
+        var handlers = new List<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>();
+
+        lock (subscriptions)
+        {
+            foreach (var entry in subscriptions)
+            {
+                // Создаем обертку, которая правильно приводит типы
+                handlers.Add(CreateHandlerWrapper(entry));
+            }
+        }
+
+        return handlers;
+    }
+
+    private Func<IServiceProvider, IMessage, CancellationToken, ValueTask>
+        CreateHandlerWrapper(SubscriptionEntry entry)
+    {
+        return (sp, msg, ct) =>
+        {
+            // Проверяем тип сообщения
+            if (!entry.MessageType.IsInstanceOfType(msg))
+            {
+                throw new InvalidCastException(
+                    $"Cannot cast message of type {msg.GetType()} to {entry.MessageType}");
+            }
+
+            // Получаем метод DynamicInvoke у делегата
+            var result = entry.HandlerDelegate.DynamicInvoke(msg, ct);
+
+            // Возвращаем ValueTask
+            if (result is ValueTask valueTask)
+            {
+                return valueTask;
+            }
+            else if (result is Task task)
+            {
+                return new ValueTask(task);
+            }
+            else
+            {
+                return ValueTask.CompletedTask;
+            }
+        };
+    }
+
+    /// <summary>
+    /// Получить все зарегистрированные ключи
+    /// </summary>
+    public IEnumerable<string> GetSubscribedKeys() => _subscriptions.Keys;
+
+    /// <summary>
+    /// Получить количество подписок для ключа
+    /// </summary>
+    public int GetSubscriptionCount(string key)
+    {
+        return _subscriptions.TryGetValue(key, out var subscriptions)
+            ? subscriptions.Count
+            : 0;
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _subscriptions.Clear();
+            _typeToKeyMap.Clear();
+            _typeToStaticKeyMap.Clear();
+            _disposed = true;
+            _logger?.LogInformation("DynamicSubscriptionManager disposed");
+        }
+    }
+
+    /// <summary>
+    /// Токен подписки для отписки через Dispose
+    /// </summary>
+    private sealed class SubscriptionToken : IDisposable
+    {
+        private readonly DynamicSubscriptionManager _manager;
+        private readonly string _key;
+        private readonly Guid _handlerId;
+        private bool _disposed;
+
+        public SubscriptionToken(DynamicSubscriptionManager manager, string key, Guid handlerId)
+        {
+            _manager = manager;
+            _key = key;
+            _handlerId = handlerId;
+        }
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                _manager.Unsubscribe(_key, _handlerId);
+                _disposed = true;
+            }
+        }
+    }
+}
+
+================
+File: EventHandlerRegistry.cs
+================
+// EventHandlerRegistry.cs
+
+namespace BusLibrary;
+
+using Microsoft.Extensions.DependencyInjection;
+using System.Reflection;
+
+public sealed class EventHandlerRegistry : IEventHandlerRegistry
+{
+    private readonly Dictionary<string, List<Type>> _handlerMap;
+    private readonly List<Type> _handlerTypes;
+
+    public EventHandlerRegistry(IEnumerable<Assembly> assemblies)
+    {
+        _handlerMap = new Dictionary<string, List<Type>>(StringComparer.OrdinalIgnoreCase);
+        _handlerTypes = new List<Type>();
+
+        DiscoverHandlers(assemblies);
+    }
+
+    private void DiscoverHandlers(IEnumerable<Assembly> assemblies)
+    {
+        foreach (var assembly in assemblies)
+        {
+            try
+            {
+                var types = assembly.GetTypes()
+                    .Where(t => !t.IsAbstract && !t.IsInterface)
+                    .Where(t => t.GetCustomAttributes<HandlesAttribute>().Any())
+                    .Where(t => t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IMessageHandler<>)));
+
+                foreach (var type in types)
+                {
+                    _handlerTypes.Add(type);
+                    var attributes = type.GetCustomAttributes<HandlesAttribute>();
+
+                    foreach (var attr in attributes)
+                    {
+                        if (!_handlerMap.TryGetValue(attr.Key, out var list))
+                        {
+                            list = new List<Type>();
+                            _handlerMap[attr.Key] = list;
+                        }
+
+                        if (!list.Contains(type))
+                            list.Add(type);
+                    }
+                }
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                Console.WriteLine($"Ошибка загрузки типов из сборки {assembly}: {ex.Message}");
+            }
+        }
+    }
+
+    public void RegisterHandlers(IServiceCollection services)
+    {
+        foreach (var handlerType in _handlerTypes)
+            services.AddSingleton(handlerType);
+    }
+
+    public IEnumerable<Type> GetHandlerTypes() => _handlerTypes;
+
+    public System.Collections.Generic.IDictionary<string, List<Type>> GetHandlerMap() =>
+        _handlerMap.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToList());
+}
+
+================
+File: EventHub.cs
+================
+// EventHub.cs
+
+using Microsoft.Extensions.Logging;
+using System.Threading.Channels;
+
+namespace BusLibrary;
+
+// EventHub.cs ( 25.12.14 исправленный InProcessEventHub)
+public sealed class InProcessEventHub : IEventHub, IAsyncDisposable
+{
+    private readonly IServiceProvider _serviceProvider;
+    private readonly IKeyRouter _router;
+    private readonly IKeyCatalog? _catalog;
+    private readonly Channel<IMessage> _channel;
+    private readonly CancellationTokenSource _cts = new();
+    private readonly Task _pump;
+    private readonly ILogger<InProcessEventHub>? _logger;
+    private bool _disposed;
+    private readonly int dispose_timeout_in_seconds = 5;
+
+    public InProcessEventHub(IServiceProvider serviceProvider, IKeyRouter router, IKeyCatalog? catalog = null, 
+        int capacity = 8192, ILogger<InProcessEventHub>? logger = null)
+    {
+        _serviceProvider = serviceProvider;
+        _router = router;
+        _catalog = catalog;
+        _logger = logger;
+        _channel = Channel.CreateBounded<IMessage>(
+            new BoundedChannelOptions(capacity) { SingleReader = true, SingleWriter = false, FullMode = BoundedChannelFullMode.Wait });
+        _logger?.LogInformation("EventHub pump task starting...");
+        _pump = Task.Run(RunAsync);
+        _logger?.LogInformation("EventHub pump task started.");
+    }
+
+    public async ValueTask PublishAsync(IMessage message, CancellationToken ct = default)
+    {
+        try
+        {
+            _logger?.LogDebug($"Publishing message with key '{message.Key}'.");
+            await _channel.Writer.WriteAsync(message, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogDebug("PublishAsync cancelled for message with key '{Key}'.", message.Key);
+            // Не пробрасываем исключение дальше - это нормально при остановке
+        }
+        catch (ChannelClosedException)
+        {
+            _logger?.LogDebug("Channel closed, cannot publish message with key '{Key}'.", message.Key);
+            // Канал закрыт, EventHub останавливается
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error publishing message with key '{Key}'.", message.Key);
+            // Для других исключений можно пробросить дальше или обработать по-другому
+            throw;
+        }
+    }
+
+    public async ValueTask PublishAsync(long keyId, IMessage message, CancellationToken ct = default)
+    {
+        try
+        {
+            if (_catalog is null) throw new InvalidOperationException("IKeyCatalog is not configured.");
+            if (!_catalog.TryGetString(keyId, out var key)) throw new KeyNotFoundException($"KeyId {keyId} not found in catalog.");
+            if (!string.Equals(message.Key, key, StringComparison.OrdinalIgnoreCase)) message = new RoutedWrapper(message, key);
+            await PublishAsync(message, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogDebug("PublishAsync by keyId cancelled for keyId '{KeyId}'.", keyId);
+            // Не пробрасываем исключение дальше
+        }
+        catch (Exception ex) when (ex is not (OperationCanceledException or ChannelClosedException))
+        {
+            _logger?.LogError(ex, "Error publishing message by keyId '{KeyId}'.", keyId);
+            throw;
+        }
+    }
+
+    private async Task RunAsync()
+    {
+        _logger?.LogDebug("EventHub RunAsync loop started.");
+        try
+        {
+            while (await _channel.Reader.WaitToReadAsync(_cts.Token).ConfigureAwait(false))
+            {
+                _logger?.LogDebug("EventHub RunAsync: Channel has messages to read.");
+                while (_channel.Reader.TryRead(out var message))
+                {
+                    _logger?.LogDebug($"EventHub RunAsync: Processing message with key '{message.Key}'.");
+                    var handlers = _router.Resolve(_serviceProvider, message.Key);
+                    _logger?.LogDebug($"EventHub RunAsync: Found {handlers.Count()} handlers for key '{message.Key}'.");
+
+                    foreach (var h in handlers)
+                    {
+                        try
+                        {
+                            await h(_serviceProvider, message, _cts.Token).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Не логируем TaskCanceledException как ошибку
+                            if (ex is not (OperationCanceledException or TaskCanceledException))
+                            {
+                                _logger?.LogError(ex, "Error in message handler for key '{MessageKey}'.", message.Key);
+                            }
+                            else
+                            {
+                                _logger?.LogDebug("Handler cancelled for key '{MessageKey}'.", message.Key);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogDebug("EventHub RunAsync loop cancelled.");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "EventHub RunAsync loop error.");
+        }
+    }
+
+    private sealed record RoutedWrapper(IMessage Inner, string NewKey) : IMessage
+    {
+        public string Key => NewKey;
+        public string? SenderKey => Inner.SenderKey;
+        public DateTimeOffset CreatedAt => Inner.CreatedAt;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        try
+        {
+            _logger?.LogInformation("EventHub disposing, starting graceful shutdown...");
+
+            // 1. Прекращаем принимать новые сообщения
+            _channel.Writer.TryComplete();
+
+            // 2. Даем время на обработку оставшихся сообщений
+            var gracefulShutdownTimeout = TimeSpan.FromSeconds(3);
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            // Ждем, пока канал не опустеет или не истечет время
+            while (!_channel.Reader.Completion.IsCompleted &&
+                   stopwatch.Elapsed < gracefulShutdownTimeout)
+            {
+                await Task.Delay(100).ConfigureAwait(false);
+            }
+
+            _logger?.LogInformation("EventHub: Graceful shutdown completed, remaining messages: {Count}",
+                _channel.Reader.Count);
+
+            // 3. Отменяем токен
+            _cts.Cancel();
+        }
+        catch (ObjectDisposedException) { return; }
+
+        try
+        {
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(dispose_timeout_in_seconds));
+            var completedTask = await Task.WhenAny(_pump, timeoutTask).ConfigureAwait(false);
+            if (completedTask != _pump)
+            {
+                _logger?.LogWarning("EventHub disposal: Pump did not finish in time, forcing cancellation.");
+                _cts.Cancel();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error during EventHub disposal.");
+        }
+        finally
+        {
+            _cts.Dispose();
+        }
+
+        _logger?.LogInformation("EventHub disposed.");
+    }
+}
+
+================
+File: Extensions.cs
+================
+// Extensions.cs (обновленная версия)
+
+using BusLibrary;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System.Reflection;
+
+namespace BusLibrary;
+// Updates 26.05.22
+public static class EventHubServiceCollectionExtensions
+{
+    public static IServiceCollection AddEventHub(this IServiceCollection services,
+        Action<EventHubOptions>? configure = null)
+    {
+        var opts = new EventHubOptions();
+        configure?.Invoke(opts);
+
+        // Собираем все сборки, в которых искать обработчики
+        var assemblies = new List<Assembly>();
+
+        // Добавляем сборки из опций
+        if (opts.Assemblies?.Any() == true)
+        {
+            assemblies.AddRange(opts.Assemblies);
+        }
+
+        // Если сборки не указаны, добавляем сборку вызывающего кода
+        if (!assemblies.Any())
+        {
+            assemblies.Add(Assembly.GetCallingAssembly());
+        }
+
+        // Создаем реестр обработчиков
+        var registry = new EventHandlerRegistry(assemblies);
+
+        // Регистрируем реестр в DI
+        services.AddSingleton<IEventHandlerRegistry>(registry);
+
+        // Регистрируем обработчики в DI
+        registry.RegisterHandlers(services);
+
+        // Регистрируем менеджер динамических подписок
+        services.AddSingleton<DynamicSubscriptionManager>();
+        services.AddSingleton<IDynamicSubscriptionManager>(sp =>
+            sp.GetRequiredService<DynamicSubscriptionManager>());
+
+        // Регистрируем композитный роутер
+        // services.AddSingleton<IKeyRouter, CompositeKeyRouter>();    // !!!!!!!!!!!!!!
+        // Updates 26.05.22
+        switch (opts.RoutingMode)
+        {
+            case RoutingMode.Static:
+                services.AddSingleton<IKeyRouter, StaticKeyRouter>();
+                break;
+            case RoutingMode.Dynamic:
+                services.AddSingleton<IKeyRouter, DynamicKeyRouter>();
+                break;
+            // Updates 26.05.22
+            case RoutingMode.Both:
+            default:
+                services.AddSingleton<IKeyRouter, CompositeKeyRouter>();
+                break;
+        }
+
+        if (opts.Catalog is not null)
+        {
+            services.AddSingleton<IKeyCatalog>(opts.Catalog);
+        }
+
+        // Регистрируем EventHub
+        services.AddSingleton<IEventHub>(serviceProvider =>
+        {
+            var router = serviceProvider.GetRequiredService<IKeyRouter>();
+            var catalog = serviceProvider.GetService<IKeyCatalog>();
+            var logger = serviceProvider.GetService<ILogger<InProcessEventHub>>();
+
+            return new InProcessEventHub(serviceProvider, router, catalog,
+                opts.ChannelCapacity, logger);
+        });
+
+        return services;
+    }
+
+    public sealed class EventHubOptions
+    {
+        public int ChannelCapacity { get; set; } = 8192;
+        public IKeyCatalog? Catalog { get; set; }
+        public IReadOnlyCollection<Assembly>? Assemblies { get; set; }
+
+        // Updates 26.05.22
+        public RoutingMode RoutingMode { get; set; } = RoutingMode.Both;
+
+    }
+
+    // Updates 26.05.22
+    public static IServiceCollection AddStaticEventHub(this IServiceCollection services,
+    Action<EventHubOptions>? configure = null)
+    {
+        return services.AddEventHub(opts =>
+        {
+            opts.RoutingMode = RoutingMode.Static;
+            configure?.Invoke(opts);
+        });
+    }
+
+    // Updates 26.05.22
+    public static IServiceCollection AddDynamicEventHub(this IServiceCollection services,
+        Action<EventHubOptions>? configure = null)
+    {
+        return services.AddEventHub(opts =>
+        {
+            opts.RoutingMode = RoutingMode.Dynamic;
+            configure?.Invoke(opts);
+        });
+    }
+}
+
+================
+File: Interfaces.cs
+================
+// Interfaces.cs
+
+namespace BusLibrary;
+
+public interface IMessage
+{
+    string Key { get; }
+    string? SenderKey { get; }
+    DateTimeOffset CreatedAt { get; }
+}
+
+public interface IKeyCatalog
+{
+    bool TryGetString(long keyId, out string key);
+    bool TryGetId(string key, out long keyId);
+}
+
+public interface IMessageHandler<in TMessage> where TMessage : IMessage
+{
+    ValueTask Handle(TMessage message, CancellationToken ct);
+}
+
+public interface IEventHub
+{
+    ValueTask PublishAsync(IMessage message, CancellationToken ct = default);
+    ValueTask PublishAsync(long keyId, IMessage message, CancellationToken ct = default);
+}
+
+public interface IKeyRouter
+{
+    IEnumerable<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>
+        Resolve(IServiceProvider serviceProvider, string key);
+}
+
+public interface IEventHubModule
+{
+    IEnumerable<System.Reflection.Assembly> GetHandlerAssemblies();
+    IEnumerable<System.Reflection.Assembly> GetEventAssemblies();
+    IEnumerable<KeyValuePair<string, string>>? GetStaticKeys() => null;
+}
+
+public interface IEventHandlerRegistry
+{
+    void RegisterHandlers(Microsoft.Extensions.DependencyInjection.IServiceCollection services);
+    IEnumerable<Type> GetHandlerTypes();
+    System.Collections.Generic.IDictionary<string, List<Type>> GetHandlerMap();
+}
+
+================
+File: Keys.cs
+================
+// Keys.cs
+
+namespace BusLibrary;
+
+public static class Keys
+{
+    public static string Of(string service, string handler, string? version = null) => 
+        version is null ? $"{service}:{handler}" : $"{service}:{handler}:{version}";
+    public static class A { public const string Ping = "a:ping:v1"; public const string Notify = "a:notify"; }
+    public static class B { public const string Pong = "b:pong:v1"; public const string Audit = "b:audit"; }
+   // public static class C { public const string Job = "c:job"; }
+}
+
+================
+File: MessageKeyAttribute.cs
+================
+// MessageKeyAttribute.cs
+
+using System;
+
+namespace BusLibrary
+{
+    /// <summary>
+    /// Атрибут для указания ключа сообщения
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false, AllowMultiple = false)]
+    public sealed class MessageKeyAttribute : Attribute
+    {
+        public string Key { get; }
+
+        public MessageKeyAttribute(string key)
+        {
+            Key = key ?? throw new ArgumentNullException(nameof(key));
+        }
+    }
+}
+
+================
+File: RoutingMode.cs
+================
+namespace BusLibrary;
+
+// Updates 26.05.22
+public enum RoutingMode
+{
+    Static,
+    Dynamic,
+    Both
+}
+
+================
+File: StaticKeyRouter.cs
+================
+// Updates 26.05.22
+
+using BusLibrary;
+
+using Microsoft.Extensions.DependencyInjection;
+
+namespace BusLibrary;
+
+public sealed class StaticKeyRouter : IKeyRouter
+{
+    private readonly IEventHandlerRegistry _registry;
+
+    public StaticKeyRouter(IEventHandlerRegistry registry) => _registry = registry;
+
+    public IEnumerable<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>
+        Resolve(IServiceProvider serviceProvider, string key)
+    {
+        var handlerMap = _registry.GetHandlerMap();
+        if (!handlerMap.TryGetValue(key, out var handlerTypes))
+            return Enumerable.Empty<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>();
+
+        var invokers = new List<Func<IServiceProvider, IMessage, CancellationToken, ValueTask>>();
+        foreach (var handlerType in handlerTypes)
+        {
+            invokers.Add((sp, msg, ct) =>
+            {
+                var handler = sp.GetRequiredService(handlerType);
+                var handleMethod = handlerType.GetMethod("Handle");
+                if (handleMethod == null)
+                    throw new InvalidOperationException($"Handler {handlerType.Name} does not have Handle method");
+                return (ValueTask)handleMethod.Invoke(handler, new object[] { msg, ct });
+            });
+        }
+        return invokers;
+    }
+}
+
+================
+File: StaticMessageExtensions.cs
+================
+// StaticMessageExtensions.cs
+
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace BusLibrary;
+/// <summary>
+/// Интерфейс для сообщений со статическим ключом
+/// </summary>
+public interface IStaticKeyMessage
+{
+    /// <summary>
+    /// Статический ключ сообщения (без создания экземпляра)
+    /// </summary>
+    static abstract string StaticKey { get; }
+}
+
+================
+File: SubscriptionExtensions.cs
+================
+// SubscriptionExtensions.cs (исправленные)
+
+namespace BusLibrary;
+
+public static class SubscriptionExtensions
+{
+    /// <summary>
+    /// Подписаться на событие по ключу (синхронный обработчик)
+    /// </summary>
+    public static IDisposable Subscribe<TMessage>(
+        this IDynamicSubscriptionManager manager,
+        string key,
+        Action<TMessage> handler)
+        where TMessage : IMessage
+    {
+        return manager.Subscribe<TMessage>(key, (msg, ct) =>
+        {
+            handler(msg);
+            return ValueTask.CompletedTask;
+        });
+    }
+
+    /// <summary>
+    /// Подписаться на событие по типу сообщения (синхронный обработчик)
+    /// </summary>
+    public static IDisposable Subscribe<TMessage>(
+        this IDynamicSubscriptionManager manager,
+        Action<TMessage> handler)
+        where TMessage : IMessage
+    {
+        return manager.Subscribe<TMessage>((msg, ct) =>
+        {
+            handler(msg);
+            return ValueTask.CompletedTask;
+        });
+    }
+
+    /// <summary>
+    /// Подписаться на событие по ключу (асинхронный обработчик без CancellationToken)
+    /// </summary>
+    public static IDisposable Subscribe<TMessage>(
+        this IDynamicSubscriptionManager manager,
+        string key,
+        Func<TMessage, ValueTask> handler)
+        where TMessage : IMessage
+    {
+        return manager.Subscribe<TMessage>(key, async (msg, ct) =>
+        {
+            await handler(msg);
+        });
+    }
+
+    /// <summary>
+    /// Подписаться на событие по типу сообщения (асинхронный обработчик без CancellationToken)
+    /// </summary>
+    public static IDisposable Subscribe<TMessage>(
+        this IDynamicSubscriptionManager manager,
+        Func<TMessage, ValueTask> handler)
+        where TMessage : IMessage
+    {
+        return manager.Subscribe<TMessage>(async (msg, ct) =>
+        {
+            await handler(msg);
+        });
+    }
+
+    /// <summary>
+    /// Зарегистрировать статический ключ для типа сообщения
+    /// </summary>
+    public static void RegisterStaticKey<TMessage>(
+        this IDynamicSubscriptionManager manager,
+        string key) where TMessage : IMessage
+    {
+        if (manager is DynamicSubscriptionManager dsm)
+        {
+            dsm.RegisterStaticKey<TMessage>(key);
+        }
+        else
+        {
+            throw new InvalidOperationException("Manager does not support static key registration");
+        }
+    }
+}
+================================================================
+End of Codebase
+================================================================
