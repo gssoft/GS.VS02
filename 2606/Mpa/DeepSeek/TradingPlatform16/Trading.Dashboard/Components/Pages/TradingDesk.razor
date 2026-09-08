@@ -1,5 +1,41 @@
 ﻿@page "/trading-desk"
 @rendermode InteractiveServer
+@using Trading.Dashboard.Components.Widgets
+
+<h3>Торговый терминал</h3>
+
+<div class="dashboard-grid">
+    <div class="panel"><QuotesPanel /></div>
+    <div class="panel"><OrdersPanel /></div>
+    <div class="panel"><TradesPanel /></div>
+    <div class="panel"><PositionsPanel /></div>
+    <div class="panel"><PnLPanel /></div>
+</div>
+
+<style>
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto auto;
+        gap: 10px;
+        padding: 10px;
+    }
+
+    .panel {
+        border: 1px solid #ccc;
+        padding: 10px;
+        border-radius: 5px;
+    }
+    @@media (min-width: 1200px) {
+        .dashboard-grid {
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: auto auto;
+        }
+    }
+</style>
+
+@* @page "/trading-desk"
+@rendermode InteractiveServer
 
 <h3>Торговый терминал</h3>
 
@@ -30,4 +66,4 @@
             grid-template-rows: auto auto;
         }
     }
-</style>
+</style> *@
