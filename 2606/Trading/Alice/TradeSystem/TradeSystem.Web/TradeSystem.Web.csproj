@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TradeSystem.ServiceDefaults\TradeSystem.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\TradeSystem.Domain\TradeSystem.Domain.csproj" />
+    <ProjectReference Include="..\TradeSystem.Contracts\TradeSystem.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>
