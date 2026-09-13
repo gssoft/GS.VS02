@@ -1,0 +1,230 @@
+﻿@page "/dashboard"
+@using TradeSystem.Contracts
+@using TradeSystem.Web.Services
+
+@inject ApiClientService Api
+@inject SignalRClientService SignalR
+
+<div class="dashboard">
+    <ConnectionStatus />
+
+    <h1>📊 Trading Dashboard</h1>
+
+    @if (_loading)
+    {
+        <p>Загрузка данных...</p>
+    }
+    else
+    {
+        <!-- Сводка по портфелю -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <h5>Total P&L</h5>
+                        <h2 class="@PnLClass(@_totalPnL)">
+                            @_totalPnL.ToString("N2") ₽
+                        </h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <h5>Active Bindings</h5>
+                        <h2>@_activeBindings</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <h5>Open Positions</h5>
+                        <h2>@_openPositions</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <h5>Trades Today</h5>
+                        <h2>@_trades.Count</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Таблица позиций -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4>Positions by Binding</h4>
+            </div>
+            <div class="card-body">
+                @if (_positions.Any())
+                {
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Strategy</th>
+                                <th class="text-end">Net Pos</th>
+                                <th class="text-end">Avg Price</th>
+                                <th class="text-end">Realized P&L</th>
+                                <th class="text-end">Unrealized P&L</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var pos in _positions)
+                            {
+                                <tr>
+                                    <td><strong>@pos.Symbol</strong></td>
+                                    <td>@pos.StrategyName</td>
+                                    <td class="text-end">@pos.NetPosition</td>
+                                    <td class="text-end">@pos.AvgEntryPrice.ToString("N4")</td>
+                                    <td class="text-end @PnLClass(pos.RealizedPnL)">
+                                        @pos.RealizedPnL.ToString("N2")
+                                    </td>
+                                    <td class="text-end @PnLClass(pos.UnrealizedPnL)">
+                                        @pos.UnrealizedPnL.ToString("N2")
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted">Нет активных позиций</p>
+                }
+            </div>
+        </div>
+
+        <!-- Лента сделок -->
+        <div class="card">
+            <div class="card-header">
+                <h4>Recent Trades</h4>
+            </div>
+            <div class="card-body">
+                @if (_trades.Any())
+                {
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Symbol</th>
+                                <th>Side</th>
+                                <th class="text-end">Qty</th>
+                                <th class="text-end">Price</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in _trades.Take(20))
+                            {
+                                <tr>
+                                    <td>@t.ExecutedAt.ToString("HH:mm:ss")</td>
+                                    <td>@t.Symbol</td>
+                                    <td class="@(t.Side == "Buy" ? "text-success" : "text-danger")">
+                                        @t.Side
+                                    </td>
+                                    <td class="text-end">@t.Quantity</td>
+                                    <td class="text-end">@t.Price.ToString("N4")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted">Сделок пока нет</p>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private decimal _totalPnL;
+    private int _activeBindings;
+    private int _openPositions;
+    private List<PositionSnapshot> _positions = new();
+    private List<TradeDto> _trades = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Подписка на real-time события
+        SignalR.OnPositionUpdated += HandlePositionUpdate;
+        SignalR.OnTradeExecuted += HandleTrade;
+        SignalR.OnPortfolioSnapshot += HandlePortfolioSnapshot;
+
+        await LoadInitialData();
+        _loading = false;
+    }
+
+    private async Task LoadInitialData()
+    {
+        try
+        {
+            var portfolios = await Api.GetPortfoliosAsync();
+            if (portfolios.Any())
+            {
+                var portfolioId = portfolios.First().Id;
+                var snapshot = await Api.GetPortfolioSnapshotAsync(portfolioId);
+                if (snapshot is not null)
+                {
+                    _positions = snapshot.Positions;
+                    _totalPnL = snapshot.TotalRealizedPnL + snapshot.TotalUnrealizedPnL;
+                    _activeBindings = snapshot.Positions.Count;
+                    _openPositions = snapshot.Positions.Count(p => p.NetPosition != 0);
+                }
+
+                _trades = await Api.GetTradesAsync(portfolioId);
+                await SignalR.SubscribePortfolioAsync(portfolioId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Load error: {ex.Message}");
+        }
+    }
+
+    private void HandlePositionUpdate(PositionSnapshot pos)
+    {
+        var index = _positions.FindIndex(p => p.BindingId == pos.BindingId);
+        if (index >= 0)
+        {
+            _positions[index] = pos;
+        }
+        else
+        {
+            _positions.Add(pos);
+        }
+        RecalcTotals();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleTrade(TradeDto trade)
+    {
+        _trades.Insert(0, trade);
+        if (_trades.Count > 100)
+            _trades.RemoveAt(_trades.Count - 1);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandlePortfolioSnapshot(PortfolioSnapshot snapshot)
+    {
+        _positions = snapshot.Positions;
+        RecalcTotals();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void RecalcTotals()
+    {
+        _totalPnL = _positions.Sum(p => p.RealizedPnL + p.UnrealizedPnL);
+        _openPositions = _positions.Count(p => p.NetPosition != 0);
+    }
+
+    private string PnLClass(decimal value) =>
+        value > 0 ? "text-success" : value < 0 ? "text-danger" : "text-muted";
+}
+

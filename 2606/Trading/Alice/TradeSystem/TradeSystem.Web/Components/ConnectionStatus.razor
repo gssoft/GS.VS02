@@ -1,0 +1,39 @@
+﻿@using TradeSystem.Web.Services
+
+@inject SignalRClientService SignalR
+@implements IDisposable
+
+<div class="connection-status">
+    @if (SignalR.IsConnected)
+    {
+        <span class="badge bg-success">● Connected</span>
+    }
+    else
+    {
+        <span class="badge bg-danger">● Disconnected</span>
+    }
+</div>
+
+@code {
+    private bool _connected;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SignalR.OnConnectionChanged += UpdateState;
+        _connected = SignalR.IsConnected;
+
+        if (!SignalR.IsConnected)
+            await SignalR.ConnectAsync();
+    }
+
+    private void UpdateState(bool connected)
+    {
+        _connected = connected;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        SignalR.OnConnectionChanged -= UpdateState;
+    }
+}
