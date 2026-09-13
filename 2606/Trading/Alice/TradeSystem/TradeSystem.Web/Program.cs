@@ -1,5 +1,6 @@
 using TradeSystem.Web;
 using TradeSystem.Web.Components;
+using TradeSystem.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,17 @@ builder.Services.AddHttpClient<WeatherApiClient>(client =>
         // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
         client.BaseAddress = new("https+http://apiservice");
     });
+
+builder.Services.AddSingleton<SignalRClientService>();
+builder.Services.AddScoped<ApiClientService>();
+
+// Настройка HttpClient для API
+builder.Services.AddHttpClient<ApiClientService>(client =>
+{
+    client.BaseAddress = new Uri("https://localhost:7527");
+});
+
+
 
 var app = builder.Build();
 
