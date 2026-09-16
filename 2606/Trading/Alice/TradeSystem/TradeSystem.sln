@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.10.12201.205 stable
+VisualStudioVersion = 18.10.12201.205
 MinimumVisualStudioVersion = 17.8.0.0
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeSystem.AppHost", "TradeSystem.AppHost\TradeSystem.AppHost.csproj", "{B109CD9A-C0E3-454D-9B0E-16D3FE826A23}"
 EndProject

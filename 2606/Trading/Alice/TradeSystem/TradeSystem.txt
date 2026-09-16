@@ -1,0 +1,1795 @@
+================================================================
+Directory Structure
+================================================================
+aspire.config.json
+TradeSystem.ApiService/appsettings.Development.json
+TradeSystem.ApiService/appsettings.json
+TradeSystem.ApiService/Program.cs
+TradeSystem.ApiService/Properties/launchSettings.json
+TradeSystem.ApiService/TradeSystem.ApiService.csproj
+TradeSystem.ApiService/TradeSystem.ApiService.csproj.user
+TradeSystem.ApiService/TradeSystem.ApiService.http
+TradeSystem.AppHost/AppHost.cs
+TradeSystem.AppHost/appsettings.Development.json
+TradeSystem.AppHost/appsettings.json
+TradeSystem.AppHost/Properties/launchSettings.json
+TradeSystem.AppHost/TradeSystem.AppHost.csproj
+TradeSystem.Contracts/Dtos.cs
+TradeSystem.Contracts/TradeSystem.Contracts.csproj
+TradeSystem.Domain/Entities.cs
+TradeSystem.Domain/TradeSystem.Domain.csproj
+TradeSystem.ServiceDefaults/Extensions.cs
+TradeSystem.ServiceDefaults/TradeSystem.ServiceDefaults.csproj
+TradeSystem.SignalRHub/appsettings.Development.json
+TradeSystem.SignalRHub/appsettings.json
+TradeSystem.SignalRHub/Program.cs
+TradeSystem.SignalRHub/Properties/launchSettings.json
+TradeSystem.SignalRHub/TradeSystem.SignalRHub.csproj
+TradeSystem.SignalRHub/TradeSystem.SignalRHub.csproj.user
+TradeSystem.sln
+TradeSystem.Web/appsettings.Development.json
+TradeSystem.Web/appsettings.json
+TradeSystem.Web/Components/_Imports.razor
+TradeSystem.Web/Components/App.razor
+TradeSystem.Web/Components/ConnectionStatus.razor
+TradeSystem.Web/Components/Layout/MainLayout.razor
+TradeSystem.Web/Components/Layout/NavMenu.razor
+TradeSystem.Web/Components/Pages/Counter.razor
+TradeSystem.Web/Components/Pages/Dashboard.razor
+TradeSystem.Web/Components/Pages/Error.razor
+TradeSystem.Web/Components/Pages/Home.razor
+TradeSystem.Web/Components/Pages/Weather.razor
+TradeSystem.Web/Components/Routes.razor
+TradeSystem.Web/Program.cs
+TradeSystem.Web/Properties/launchSettings.json
+TradeSystem.Web/Services/ApiClientService.cs
+TradeSystem.Web/Services/SignalRClientService.cs
+TradeSystem.Web/TradeSystem.Web.csproj
+TradeSystem.Web/TradeSystem.Web.csproj.user
+TradeSystem.Web/WeatherApiClient.cs
+TradeSystem.Web/wwwroot/favicon.png
+
+================================================================
+Files
+================================================================
+
+================
+File: aspire.config.json
+================
+{
+  "appHost": {
+    "path": "TradeSystem.AppHost/TradeSystem.AppHost.csproj"
+  }
+}
+
+================
+File: TradeSystem.ApiService/appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: TradeSystem.ApiService/appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: TradeSystem.ApiService/Program.cs
+================
+using TradeSystem.Contracts;
+using TradeSystem.Domain;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add service defaults & Aspire client integrations.
+builder.AddServiceDefaults();
+
+// Add services to the container.
+builder.Services.AddProblemDetails();
+
+// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Services.AddOpenApi();
+
+var app = builder.Build();
+//----------------
+// --- Mock data ---
+var portfolios = new List<Portfolio>
+{
+    new() { Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            Name = "Default Portfolio", IsActive = true }
+};
+
+var tickers = new List<Ticker>
+{
+    new() { Id = Guid.NewGuid(), Symbol = "SBER", Board = "TQBR", LotSize = 10 },
+    new() { Id = Guid.NewGuid(), Symbol = "GAZP", Board = "TQBR", LotSize = 10 },
+    new() { Id = Guid.NewGuid(), Symbol = "SRZ5", Board = "RFUD", LotSize = 1 }
+};
+
+var strategies = new List<TradeStrategy>
+{
+    new() { Id = Guid.NewGuid(), Name = "MeanReversion", StrategyType = "MeanReversion" },
+    new() { Id = Guid.NewGuid(), Name = "Momentum", StrategyType = "Momentum" }
+};
+
+var tickerSber = tickers[0];
+var strategyMr = strategies[0];
+
+var bindings = new List<TickerStrategyBinding>
+{
+    new()
+    {
+        Id = Guid.NewGuid(),
+        PortfolioId = portfolios[0].Id,
+        TickerId = tickerSber.Id,
+        StrategyId = strategyMr.Id,
+        IsActive = true,
+        CapitalAllocation = 100000,
+        MaxPosition = 1000,
+        NetPosition = 500,
+        AvgEntryPrice = 250.50m,
+        RealizedPnL = 1200.00m,
+        UnrealizedPnL = 350.00m,
+        Ticker = tickerSber,
+        Strategy = strategyMr,
+        Portfolio = portfolios[0]
+    }
+};
+
+// --- Endpoints ---
+
+app.MapGet("/api/portfolios", () => portfolios);
+app.MapGet("/api/portfolios/{id:guid}", (Guid id) =>
+    portfolios.FirstOrDefault(p => p.Id == id));
+
+app.MapGet("/api/tickers", () => tickers);
+app.MapGet("/api/strategies", () => strategies);
+
+app.MapGet("/api/bindings", (Guid? portfolioId) =>
+{
+    if (portfolioId.HasValue)
+        return bindings.Where(b => b.PortfolioId == portfolioId.Value).ToList();
+    return bindings;
+});
+
+app.MapGet("/api/portfolios/{id:guid}/snapshot", (Guid id) =>
+{
+    var posSnapshots = bindings
+        .Where(b => b.PortfolioId == id && b.IsActive)
+        .Select(b => new PositionSnapshot(
+            b.Id,
+            b.Ticker?.Symbol ?? "",
+            b.Strategy?.Name ?? "",
+            b.NetPosition,
+            b.AvgEntryPrice,
+            b.RealizedPnL,
+            b.UnrealizedPnL
+        )).ToList();
+
+    return new PortfolioSnapshot(
+        id,
+        portfolios.FirstOrDefault(p => p.Id == id)?.Name ?? "",
+        posSnapshots.Sum(p => p.RealizedPnL),
+        posSnapshots.Sum(p => p.UnrealizedPnL),
+        posSnapshots
+    );
+});
+
+app.MapGet("/api/trades", (Guid? portfolioId) =>
+{
+    return new List<TradeDto>
+    {
+        new(Guid.NewGuid(), Guid.NewGuid(), "SBER", "Buy", 100, 250.10m, DateTime.UtcNow.AddMinutes(-30)),
+        new(Guid.NewGuid(), Guid.NewGuid(), "SBER", "Buy", 400, 250.40m, DateTime.UtcNow.AddMinutes(-20)),
+        new(Guid.NewGuid(), Guid.NewGuid(), "SBER", "Sell", 100, 251.20m, DateTime.UtcNow.AddMinutes(-5))
+    };
+});
+
+
+// -------------
+// Configure the HTTP request pipeline.
+app.UseExceptionHandler();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
+
+app.MapGet("/", () => "API service is running. Navigate to /weatherforecast to see sample data.");
+
+app.MapGet("/weatherforecast", () =>
+{
+    var forecast = Enumerable.Range(1, 5).Select(index =>
+        new WeatherForecast
+        (
+            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+            Random.Shared.Next(-20, 55),
+            summaries[Random.Shared.Next(summaries.Length)]
+        ))
+        .ToArray();
+    return forecast;
+})
+.WithName("GetWeatherForecast");
+
+app.MapDefaultEndpoints();
+
+app.Run();
+
+record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+{
+    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+}
+
+================
+File: TradeSystem.ApiService/Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5572",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://localhost:7527;http://localhost:5572",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: TradeSystem.ApiService/TradeSystem.ApiService.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TradeSystem.ServiceDefaults\TradeSystem.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\TradeSystem.Domain\TradeSystem.Domain.csproj" />
+    <ProjectReference Include="..\TradeSystem.Contracts\TradeSystem.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: TradeSystem.ApiService/TradeSystem.ApiService.csproj.user
+================
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ActiveDebugProfile>https</ActiveDebugProfile>
+  </PropertyGroup>
+</Project>
+
+================
+File: TradeSystem.ApiService/TradeSystem.ApiService.http
+================
+@ApiService_HostAddress = http://localhost:5572
+
+GET {{ApiService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+================
+File: TradeSystem.AppHost/AppHost.cs
+================
+// TradeSystem.AppHost/Program.cs
+
+using Microsoft.AspNetCore.SignalR;
+
+var builder = DistributedApplication.CreateBuilder(args);
+
+// Существующие сервисы
+var apiService = builder.AddProject<Projects.TradeSystem_ApiService>("apiservice");
+
+// SignalR Hub
+var signalrHub = builder.AddProject<Projects.TradeSystem_SignalRHub>("signalrhub")
+    .WithReference(apiService);
+
+// WebClient
+builder.AddProject<Projects.TradeSystem_Web>("webfrontend")
+    .WithReference(apiService)
+    .WithReference(signalrHub);
+
+builder.Build().Run();
+
+================
+File: TradeSystem.AppHost/appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: TradeSystem.AppHost/appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Aspire.Hosting.Dcp": "Warning"
+    }
+  }
+}
+
+================
+File: TradeSystem.AppHost/Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:17254;http://localhost:15278",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21099",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22064"
+      }
+    },
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:15278",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19286",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20085"
+      }
+    }
+  }
+}
+
+================
+File: TradeSystem.AppHost/TradeSystem.AppHost.csproj
+================
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>8ccd6cfe-1531-4458-84eb-d57db129899c</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TradeSystem.ApiService\TradeSystem.ApiService.csproj" />
+    <ProjectReference Include="..\TradeSystem.SignalRHub\TradeSystem.SignalRHub.csproj" />
+    <ProjectReference Include="..\TradeSystem.Web\TradeSystem.Web.csproj" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: TradeSystem.Contracts/Dtos.cs
+================
+// TradeSystem.Contracts/Dtos.cs
+namespace TradeSystem.Contracts;
+
+public record StrategyRegistrationRequest(
+    Guid PortfolioId,
+    Guid TickerId,
+    string StrategyType,
+    Dictionary<string, object> Parameters,
+    decimal CapitalAllocation,
+    int MaxPosition
+);
+
+public record StrategyRegisteredEvent(
+    Guid BindingId,
+    Guid PortfolioId,
+    Guid TickerId,
+    Guid StrategyId,
+    DateTime RegisteredAt
+);
+
+public record TickerQuote(
+    string Symbol,
+    decimal Bid,
+    decimal Ask,
+    decimal Last,
+    DateTime Timestamp
+);
+
+public record SignalDto(
+    Guid BindingId,
+    string Symbol,
+    string Side,       // Buy, Sell
+    int Quantity,
+    decimal? Price,    // null = market order
+    DateTime Timestamp
+);
+
+public record OrderDto(
+    Guid Id,
+    Guid BindingId,
+    string Symbol,
+    string Side,
+    int Quantity,
+    decimal? Price,
+    string Status,    // Pending, Filled, Rejected, Cancelled
+    DateTime CreatedAt
+);
+
+public record TradeDto(
+    Guid Id,
+    Guid OrderId,
+    string Symbol,
+    string Side,
+    int Quantity,
+    decimal Price,
+    DateTime ExecutedAt
+);
+
+public record PositionSnapshot(
+    Guid BindingId,
+    string Symbol,
+    string StrategyName,
+    int NetPosition,
+    decimal AvgEntryPrice,
+    decimal RealizedPnL,
+    decimal UnrealizedPnL
+);
+
+public record PortfolioSnapshot(
+    Guid PortfolioId,
+    string PortfolioName,
+    decimal TotalRealizedPnL,
+    decimal TotalUnrealizedPnL,
+    List<PositionSnapshot> Positions
+);
+
+================
+File: TradeSystem.Contracts/TradeSystem.Contracts.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
+
+================
+File: TradeSystem.Domain/Entities.cs
+================
+// TradeSystem.Domain/Entities.cs
+namespace TradeSystem.Domain;
+
+public class Portfolio
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class Ticker
+{
+    public Guid Id { get; set; }
+    public string Symbol { get; set; } = string.Empty;     // SBER, GAZP, SRZ5
+    public string SecId { get; set; } = string.Empty;      // биржевый идентификатор
+    public string InstrumentType { get; set; } = string.Empty;  // Equity, Future
+    public string Board { get; set; } = string.Empty;      // TQBR, RFUD
+    public decimal LotSize { get; set; } = 1;
+}
+
+public class TradeStrategy
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string StrategyType { get; set; } = string.Empty;  // MeanReversion, Momentum
+    public string Description { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class TickerStrategyBinding
+{
+    public Guid Id { get; set; }
+    public Guid PortfolioId { get; set; }
+    public Guid TickerId { get; set; }
+    public Guid StrategyId { get; set; }
+
+    // Параметры связки
+    public decimal CapitalAllocation { get; set; }
+    public int MaxPosition { get; set; }
+    public bool IsActive { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    // Текущее состояние
+    public int NetPosition { get; set; }
+    public decimal AvgEntryPrice { get; set; }
+    public decimal RealizedPnL { get; set; }
+    public decimal UnrealizedPnL { get; set; }
+
+    // Навигация
+    public Portfolio? Portfolio { get; set; }
+    public Ticker? Ticker { get; set; }
+    public TradeStrategy? Strategy { get; set; }
+}
+
+public class Position
+{
+    public Guid PortfolioId { get; set; }
+    public Guid TickerId { get; set; }
+    public int NetQty { get; set; }
+    public decimal AvgPrice { get; set; }
+}
+
+public class StrategyPnL
+{
+    public Guid BindingId { get; set; }
+    public decimal RealizedPnL { get; set; }
+    public decimal UnrealizedPnL { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+================
+File: TradeSystem.Domain/TradeSystem.Domain.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
+
+================
+File: TradeSystem.ServiceDefaults/Extensions.cs
+================
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ServiceDiscovery;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+
+namespace Microsoft.Extensions.Hosting;
+
+// Adds common Aspire services: service discovery, resilience, health checks, and OpenTelemetry.
+// This project should be referenced by each service project in your solution.
+// To learn more about using this project, see https://aka.ms/aspire/service-defaults
+public static class Extensions
+{
+    private const string HealthEndpointPath = "/health";
+    private const string AlivenessEndpointPath = "/alive";
+
+    public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.ConfigureOpenTelemetry();
+
+        builder.AddDefaultHealthChecks();
+
+        builder.Services.AddServiceDiscovery();
+
+        builder.Services.ConfigureHttpClientDefaults(http =>
+        {
+            // Turn on resilience by default
+            http.AddStandardResilienceHandler();
+
+            // Turn on service discovery by default
+            http.AddServiceDiscovery();
+        });
+
+        // Uncomment the following to restrict the allowed schemes for service discovery.
+        // builder.Services.Configure<ServiceDiscoveryOptions>(options =>
+        // {
+        //     options.AllowedSchemes = ["https"];
+        // });
+
+        return builder;
+    }
+
+    public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.Logging.AddOpenTelemetry(logging =>
+        {
+            logging.IncludeFormattedMessage = true;
+            logging.IncludeScopes = true;
+        });
+
+        builder.Services.AddOpenTelemetry()
+            .WithMetrics(metrics =>
+            {
+                metrics.AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation()
+                    .AddRuntimeInstrumentation();
+            })
+            .WithTracing(tracing =>
+            {
+                tracing.AddSource(builder.Environment.ApplicationName)
+                    .AddAspNetCoreInstrumentation(tracing =>
+                        // Exclude health check requests from tracing
+                        tracing.Filter = context =>
+                            !context.Request.Path.StartsWithSegments(HealthEndpointPath)
+                            && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
+                    )
+                    // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
+                    //.AddGrpcClientInstrumentation()
+                    .AddHttpClientInstrumentation();
+            });
+
+        builder.AddOpenTelemetryExporters();
+
+        return builder;
+    }
+
+    private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+
+        if (useOtlpExporter)
+        {
+            builder.Services.AddOpenTelemetry().UseOtlpExporter();
+        }
+
+        // Uncomment the following lines to enable the Azure Monitor exporter (requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
+        //if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+        //{
+        //    builder.Services.AddOpenTelemetry()
+        //       .UseAzureMonitor();
+        //}
+
+        return builder;
+    }
+
+    public static TBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.Services.AddHealthChecks()
+            // Add a default liveness check to ensure app is responsive
+            .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
+
+        return builder;
+    }
+
+    public static WebApplication MapDefaultEndpoints(this WebApplication app)
+    {
+        // Adding health checks endpoints to applications in non-development environments has security implications.
+        // See https://aka.ms/aspire/healthchecks for details before enabling these endpoints in non-development environments.
+        if (app.Environment.IsDevelopment())
+        {
+            // All health checks must pass for app to be considered ready to accept traffic after starting
+            app.MapHealthChecks(HealthEndpointPath);
+
+            // Only health checks tagged with the "live" tag must pass for app to be considered alive
+            app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
+            {
+                Predicate = r => r.Tags.Contains("live")
+            });
+        }
+
+        return app;
+    }
+}
+
+================
+File: TradeSystem.ServiceDefaults/TradeSystem.ServiceDefaults.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAspireSharedProject>true</IsAspireSharedProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.6.0" />
+    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" Version="10.6.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: TradeSystem.SignalRHub/appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: TradeSystem.SignalRHub/appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: TradeSystem.SignalRHub/Program.cs
+================
+// TradeSystem.SignalRHub/Program.cs
+using Microsoft.AspNetCore.SignalR;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddSignalR();
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("https://localhost:5001", "http://localhost:5000")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
+var app = builder.Build();
+
+app.UseCors();
+app.MapHub<TradeHub>("/tradehub");
+
+app.Run();
+
+public class TradeHub : Hub
+{
+    // Клиент подключается → получает snapshot, затем push-обновления
+    public override async Task OnConnectedAsync()
+    {
+        await Clients.Caller.SendAsync("Connected", new
+        {
+            ConnectionId = Context.ConnectionId,
+            ConnectedAt = DateTime.UtcNow
+        });
+        await base.OnConnectedAsync();
+    }
+
+    // Подписка на конкретный портфель
+    public Task SubscribePortfolio(Guid portfolioId)
+    {
+        return Groups.AddToGroupAsync(Context.ConnectionId, $"portfolio-{portfolioId}");
+    }
+
+    // Отписка от портфеля
+    public Task UnsubscribePortfolio(Guid portfolioId)
+    {
+        return Groups.RemoveFromGroupAsync(Context.ConnectionId, $"portfolio-{portfolioId}");
+    }
+}
+
+================
+File: TradeSystem.SignalRHub/Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5082",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:7182;http://localhost:5082",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: TradeSystem.SignalRHub/TradeSystem.SignalRHub.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\TradeSystem.Contracts\TradeSystem.Contracts.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!--<ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.2.13" />
+  </ItemGroup>-->
+
+</Project>
+
+================
+File: TradeSystem.SignalRHub/TradeSystem.SignalRHub.csproj.user
+================
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ActiveDebugProfile>https</ActiveDebugProfile>
+  </PropertyGroup>
+</Project>
+
+================
+File: TradeSystem.sln
+================
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.10.12201.205 stable
+MinimumVisualStudioVersion = 17.8.0.0
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeSystem.AppHost", "TradeSystem.AppHost\TradeSystem.AppHost.csproj", "{B109CD9A-C0E3-454D-9B0E-16D3FE826A23}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeSystem.ServiceDefaults", "TradeSystem.ServiceDefaults\TradeSystem.ServiceDefaults.csproj", "{5D60054C-EF21-4A2D-A8CF-087100E45BD6}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeSystem.ApiService", "TradeSystem.ApiService\TradeSystem.ApiService.csproj", "{793C7C4D-590D-4937-9E56-BC9459E26A3D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeSystem.Web", "TradeSystem.Web\TradeSystem.Web.csproj", "{4D223E3D-16FA-4AAA-90BA-18E5A70309F1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeSystem.Domain", "TradeSystem.Domain\TradeSystem.Domain.csproj", "{122D3A5B-11EA-48DC-C461-C50CB0C195BA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeSystem.Contracts", "TradeSystem.Contracts\TradeSystem.Contracts.csproj", "{870BF8DF-6E3F-6DD9-B297-3EAAEA004EF8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeSystem.SignalRHub", "TradeSystem.SignalRHub\TradeSystem.SignalRHub.csproj", "{60295320-28F0-9079-91E6-F07C3A963FD4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B109CD9A-C0E3-454D-9B0E-16D3FE826A23}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B109CD9A-C0E3-454D-9B0E-16D3FE826A23}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B109CD9A-C0E3-454D-9B0E-16D3FE826A23}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B109CD9A-C0E3-454D-9B0E-16D3FE826A23}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D60054C-EF21-4A2D-A8CF-087100E45BD6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D60054C-EF21-4A2D-A8CF-087100E45BD6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D60054C-EF21-4A2D-A8CF-087100E45BD6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D60054C-EF21-4A2D-A8CF-087100E45BD6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{793C7C4D-590D-4937-9E56-BC9459E26A3D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{793C7C4D-590D-4937-9E56-BC9459E26A3D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{793C7C4D-590D-4937-9E56-BC9459E26A3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{793C7C4D-590D-4937-9E56-BC9459E26A3D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4D223E3D-16FA-4AAA-90BA-18E5A70309F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4D223E3D-16FA-4AAA-90BA-18E5A70309F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4D223E3D-16FA-4AAA-90BA-18E5A70309F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4D223E3D-16FA-4AAA-90BA-18E5A70309F1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{122D3A5B-11EA-48DC-C461-C50CB0C195BA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{122D3A5B-11EA-48DC-C461-C50CB0C195BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{122D3A5B-11EA-48DC-C461-C50CB0C195BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{122D3A5B-11EA-48DC-C461-C50CB0C195BA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{870BF8DF-6E3F-6DD9-B297-3EAAEA004EF8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{870BF8DF-6E3F-6DD9-B297-3EAAEA004EF8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{870BF8DF-6E3F-6DD9-B297-3EAAEA004EF8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{870BF8DF-6E3F-6DD9-B297-3EAAEA004EF8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{60295320-28F0-9079-91E6-F07C3A963FD4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{60295320-28F0-9079-91E6-F07C3A963FD4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{60295320-28F0-9079-91E6-F07C3A963FD4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{60295320-28F0-9079-91E6-F07C3A963FD4}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FB44C7DB-8A35-46B2-883A-C47858A91054}
+	EndGlobalSection
+EndGlobal
+
+================
+File: TradeSystem.Web/appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: TradeSystem.Web/appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: TradeSystem.Web/Components/_Imports.razor
+================
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.AspNetCore.OutputCaching
+@using Microsoft.JSInterop
+@using TradeSystem.Web
+@using TradeSystem.Web.Components
+
+================
+File: TradeSystem.Web/Components/App.razor
+================
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["TradeSystem.Web.styles.css"]" />
+    <ImportMap />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet />
+</head>
+
+<body>
+    <Routes />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>
+
+================
+File: TradeSystem.Web/Components/ConnectionStatus.razor
+================
+@using TradeSystem.Web.Services
+
+@inject SignalRClientService SignalR
+@implements IDisposable
+
+<div class="connection-status">
+    @if (SignalR.IsConnected)
+    {
+        <span class="badge bg-success">● Connected</span>
+    }
+    else
+    {
+        <span class="badge bg-danger">● Disconnected</span>
+    }
+</div>
+
+@code {
+    private bool _connected;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SignalR.OnConnectionChanged += UpdateState;
+        _connected = SignalR.IsConnected;
+
+        if (!SignalR.IsConnected)
+            await SignalR.ConnectAsync();
+    }
+
+    private void UpdateState(bool connected)
+    {
+        _connected = connected;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        SignalR.OnConnectionChanged -= UpdateState;
+    }
+}
+
+================
+File: TradeSystem.Web/Components/Layout/MainLayout.razor
+================
+@inherits LayoutComponentBase
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+================
+File: TradeSystem.Web/Components/Layout/NavMenu.razor
+================
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">TradeSystem</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="counter">
+                <span class="bi bi-plus-square-fill" aria-hidden="true"></span> Counter
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="weather">
+                <span class="bi bi-list-nested" aria-hidden="true"></span> Weather
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="dashboard">
+                <span class="bi bi-speedometer2 nav-link-icon"></span>
+                Dashboard
+            </NavLink>
+        </div>
+
+
+    </nav>
+</div>
+
+================
+File: TradeSystem.Web/Components/Pages/Counter.razor
+================
+@page "/counter"
+@rendermode InteractiveServer
+
+<PageTitle>Counter</PageTitle>
+
+<h1>Counter</h1>
+
+<p role="status">Current count: @currentCount</p>
+
+<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+
+@code {
+    private int currentCount = 0;
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+}
+
+================
+File: TradeSystem.Web/Components/Pages/Dashboard.razor
+================
+@page "/dashboard"
+@using TradeSystem.Contracts
+@using TradeSystem.Web.Services
+
+@inject ApiClientService Api
+@inject SignalRClientService SignalR
+
+<div class="dashboard">
+    <ConnectionStatus />
+
+    <h1>📊 Trading Dashboard</h1>
+
+    @if (_loading)
+    {
+        <p>Загрузка данных...</p>
+    }
+    else
+    {
+        <!-- Сводка по портфелю -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <h5>Total P&L</h5>
+                        <h2 class="@PnLClass(@_totalPnL)">
+                            @_totalPnL.ToString("N2") ₽
+                        </h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <h5>Active Bindings</h5>
+                        <h2>@_activeBindings</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <h5>Open Positions</h5>
+                        <h2>@_openPositions</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <h5>Trades Today</h5>
+                        <h2>@_trades.Count</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Таблица позиций -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4>Positions by Binding</h4>
+            </div>
+            <div class="card-body">
+                @if (_positions.Any())
+                {
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Strategy</th>
+                                <th class="text-end">Net Pos</th>
+                                <th class="text-end">Avg Price</th>
+                                <th class="text-end">Realized P&L</th>
+                                <th class="text-end">Unrealized P&L</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var pos in _positions)
+                            {
+                                <tr>
+                                    <td><strong>@pos.Symbol</strong></td>
+                                    <td>@pos.StrategyName</td>
+                                    <td class="text-end">@pos.NetPosition</td>
+                                    <td class="text-end">@pos.AvgEntryPrice.ToString("N4")</td>
+                                    <td class="text-end @PnLClass(pos.RealizedPnL)">
+                                        @pos.RealizedPnL.ToString("N2")
+                                    </td>
+                                    <td class="text-end @PnLClass(pos.UnrealizedPnL)">
+                                        @pos.UnrealizedPnL.ToString("N2")
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted">Нет активных позиций</p>
+                }
+            </div>
+        </div>
+
+        <!-- Лента сделок -->
+        <div class="card">
+            <div class="card-header">
+                <h4>Recent Trades</h4>
+            </div>
+            <div class="card-body">
+                @if (_trades.Any())
+                {
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Symbol</th>
+                                <th>Side</th>
+                                <th class="text-end">Qty</th>
+                                <th class="text-end">Price</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in _trades.Take(20))
+                            {
+                                <tr>
+                                    <td>@t.ExecutedAt.ToString("HH:mm:ss")</td>
+                                    <td>@t.Symbol</td>
+                                    <td class="@(t.Side == "Buy" ? "text-success" : "text-danger")">
+                                        @t.Side
+                                    </td>
+                                    <td class="text-end">@t.Quantity</td>
+                                    <td class="text-end">@t.Price.ToString("N4")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted">Сделок пока нет</p>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private decimal _totalPnL;
+    private int _activeBindings;
+    private int _openPositions;
+    private List<PositionSnapshot> _positions = new();
+    private List<TradeDto> _trades = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Подписка на real-time события
+        SignalR.OnPositionUpdated += HandlePositionUpdate;
+        SignalR.OnTradeExecuted += HandleTrade;
+        SignalR.OnPortfolioSnapshot += HandlePortfolioSnapshot;
+
+        await LoadInitialData();
+        _loading = false;
+    }
+
+    private async Task LoadInitialData()
+    {
+        try
+        {
+            var portfolios = await Api.GetPortfoliosAsync();
+            if (portfolios.Any())
+            {
+                var portfolioId = portfolios.First().Id;
+                var snapshot = await Api.GetPortfolioSnapshotAsync(portfolioId);
+                if (snapshot is not null)
+                {
+                    _positions = snapshot.Positions;
+                    _totalPnL = snapshot.TotalRealizedPnL + snapshot.TotalUnrealizedPnL;
+                    _activeBindings = snapshot.Positions.Count;
+                    _openPositions = snapshot.Positions.Count(p => p.NetPosition != 0);
+                }
+
+                _trades = await Api.GetTradesAsync(portfolioId);
+                await SignalR.SubscribePortfolioAsync(portfolioId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Load error: {ex.Message}");
+        }
+    }
+
+    private void HandlePositionUpdate(PositionSnapshot pos)
+    {
+        var index = _positions.FindIndex(p => p.BindingId == pos.BindingId);
+        if (index >= 0)
+        {
+            _positions[index] = pos;
+        }
+        else
+        {
+            _positions.Add(pos);
+        }
+        RecalcTotals();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleTrade(TradeDto trade)
+    {
+        _trades.Insert(0, trade);
+        if (_trades.Count > 100)
+            _trades.RemoveAt(_trades.Count - 1);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandlePortfolioSnapshot(PortfolioSnapshot snapshot)
+    {
+        _positions = snapshot.Positions;
+        RecalcTotals();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void RecalcTotals()
+    {
+        _totalPnL = _positions.Sum(p => p.RealizedPnL + p.UnrealizedPnL);
+        _openPositions = _positions.Count(p => p.NetPosition != 0);
+    }
+
+    private string PnLClass(decimal value) =>
+        value > 0 ? "text-success" : value < 0 ? "text-danger" : "text-muted";
+}
+
+================
+File: TradeSystem.Web/Components/Pages/Error.razor
+================
+@page "/Error"
+@using System.Diagnostics
+
+<PageTitle>Error</PageTitle>
+
+<h1 class="text-danger">Error.</h1>
+<h2 class="text-danger">An error occurred while processing your request.</h2>
+
+@if (ShowRequestId)
+{
+    <p>
+        <strong>Request ID:</strong> <code>@requestId</code>
+    </p>
+}
+
+<h3>Development Mode</h3>
+<p>
+    Swapping to <strong>Development</strong> environment will display more detailed information about the error that occurred.
+</p>
+<p>
+    <strong>The Development environment shouldn't be enabled for deployed applications.</strong>
+    It can result in displaying sensitive information from exceptions to end users.
+    For local debugging, enable the <strong>Development</strong> environment by setting the <strong>ASPNETCORE_ENVIRONMENT</strong> environment variable to <strong>Development</strong>
+    and restarting the app.
+</p>
+
+@code{
+    [CascadingParameter]
+    public HttpContext? HttpContext { get; set; }
+
+    private string? requestId;
+    private bool ShowRequestId => !string.IsNullOrEmpty(requestId);
+
+    protected override void OnInitialized()
+    {
+        requestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+    }
+}
+
+================
+File: TradeSystem.Web/Components/Pages/Home.razor
+================
+@page "/"
+
+<PageTitle>Home</PageTitle>
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+================
+File: TradeSystem.Web/Components/Pages/Weather.razor
+================
+@page "/weather"
+@attribute [StreamRendering(true)]
+@attribute [OutputCache(Duration = 5)]
+
+@inject WeatherApiClient WeatherApi
+
+<PageTitle>Weather</PageTitle>
+
+<h1>Weather</h1>
+
+<p>This component demonstrates showing data loaded from a backend API service.</p>
+
+@if (forecasts == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th aria-label="Temperature in Celsius">Temp. (C)</th>
+                <th aria-label="Temperature in Fahrenheit">Temp. (F)</th>
+                <th>Summary</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var forecast in forecasts)
+            {
+                <tr>
+                    <td>@forecast.Date.ToShortDateString()</td>
+                    <td>@forecast.TemperatureC</td>
+                    <td>@forecast.TemperatureF</td>
+                    <td>@forecast.Summary</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private WeatherForecast[]? forecasts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        forecasts = await WeatherApi.GetWeatherAsync();
+    }
+}
+
+================
+File: TradeSystem.Web/Components/Routes.razor
+================
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>
+
+================
+File: TradeSystem.Web/Program.cs
+================
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using TradeSystem.Web;
+using TradeSystem.Web.Services;
+
+var builder = WebAssemblyHostBuilder.CreateDefault(args);
+
+builder.Services.AddAuthorizationCore();
+builder.Services.AddCascadingAuthenticationState();
+
+// Регистрация сервисов
+builder.Services.AddScoped<SignalRClientService>();
+builder.Services.AddHttpClient<ApiClientService>(client =>
+{
+    client.BaseAddress = new Uri("https://localhost:7527");
+});
+
+await builder.Build().RunAsync();
+
+================
+File: TradeSystem.Web/Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5076",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:7220;http://localhost:5076",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: TradeSystem.Web/Services/ApiClientService.cs
+================
+using System.Net.Http.Json;
+using TradeSystem.Contracts;
+using TradeSystem.Domain;
+
+using System.Net.Http.Json;
+
+namespace TradeSystem.Web.Services;
+
+public class ApiClientService
+{
+    private readonly HttpClient _http;
+
+    public ApiClientService(HttpClient http)
+    {
+        _http = http;
+    }
+
+    // --- Портфели ---
+    public async Task<List<Portfolio>> GetPortfoliosAsync()
+        => await _http.GetFromJsonAsync<List<Portfolio>>("api/portfolios") ?? new();
+
+    public async Task<Portfolio?> GetPortfolioAsync(Guid id)
+        => await _http.GetFromJsonAsync<Portfolio>($"api/portfolios/{id}");
+
+    // --- Тикеры ---
+    public async Task<List<Ticker>> GetTickersAsync()
+        => await _http.GetFromJsonAsync<List<Ticker>>("api/tickers") ?? new();
+
+    // --- Стратегии ---
+    public async Task<List<TradeStrategy>> GetStrategiesAsync()
+        => await _http.GetFromJsonAsync<List<TradeStrategy>>("api/strategies") ?? new();
+
+    // --- Связки ---
+    public async Task<List<TickerStrategyBinding>> GetBindingsAsync(Guid portfolioId)
+        => await _http.GetFromJsonAsync<List<TickerStrategyBinding>>(
+            $"api/bindings?portfolioId={portfolioId}") ?? new();
+
+    public async Task<StrategyRegisteredEvent?> RegisterStrategyAsync(
+        StrategyRegistrationRequest request)
+    {
+        var response = await _http.PostAsJsonAsync("api/bindings/register", request);
+        if (response.IsSuccessStatusCode)
+            return await response.Content.ReadFromJsonAsync<StrategyRegisteredEvent>();
+        return null;
+    }
+
+    public async Task<bool> DeactivateBindingAsync(Guid bindingId)
+    {
+        var response = await _http.PostAsync($"api/bindings/{bindingId}/deactivate", null);
+        return response.IsSuccessStatusCode;
+    }
+
+    // --- Снимок портфеля ---
+    public async Task<PortfolioSnapshot?> GetPortfolioSnapshotAsync(Guid portfolioId)
+        => await _http.GetFromJsonAsync<PortfolioSnapshot>(
+            $"api/portfolios/{portfolioId}/snapshot");
+
+    // --- История сделок ---
+    public async Task<List<TradeDto>> GetTradesAsync(Guid portfolioId)
+        => await _http.GetFromJsonAsync<List<TradeDto>>(
+            $"api/trades?portfolioId={portfolioId}") ?? new();
+}
+
+================
+File: TradeSystem.Web/Services/SignalRClientService.cs
+================
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.SignalR.Client;
+using TradeSystem.Contracts;
+using TradeSystem.Domain;
+
+
+namespace TradeSystem.Web.Services;
+
+public class SignalRClientService : IAsyncDisposable
+{
+    private HubConnection? _hubConnection;
+    private readonly NavigationManager _navManager;
+
+    public event Action<PositionSnapshot>? OnPositionUpdated;
+    public event Action<TickerQuote>? OnQuoteReceived;
+    public event Action<OrderDto>? OnOrderUpdated;
+    public event Action<TradeDto>? OnTradeExecuted;
+    public event Action<PortfolioSnapshot>? OnPortfolioSnapshot;
+    public event Action<bool>? OnConnectionChanged;
+
+    public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
+
+    public SignalRClientService(NavigationManager navManager)
+    {
+        _navManager = navManager;
+    }
+
+    public async Task ConnectAsync()
+    {
+        if (_hubConnection is not null && IsConnected)
+            return;
+
+        var hubUrl = _navManager.ToAbsoluteUri("/tradehub");
+
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl("https://localhost:7182/tradehub")
+            .WithAutomaticReconnect(new[]
+            {
+                TimeSpan.Zero,
+                TimeSpan.FromSeconds(2),
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromSeconds(10),
+                TimeSpan.FromSeconds(30)
+            })
+            .Build();
+
+        // Регистрация обработчиков входящих событий от сервера
+        _hubConnection.On<PositionSnapshot>("PositionUpdated",
+            snapshot => OnPositionUpdated?.Invoke(snapshot));
+
+        _hubConnection.On<TickerQuote>("QuoteReceived",
+            quote => OnQuoteReceived?.Invoke(quote));
+
+        _hubConnection.On<OrderDto>("OrderUpdated",
+            order => OnOrderUpdated?.Invoke(order));
+
+        _hubConnection.On<TradeDto>("TradeExecuted",
+            trade => OnTradeExecuted?.Invoke(trade));
+
+        _hubConnection.On<PortfolioSnapshot>("PortfolioSnapshot",
+            snapshot => OnPortfolioSnapshot?.Invoke(snapshot));
+
+        _hubConnection.Reconnected += _ =>
+        {
+            OnConnectionChanged?.Invoke(true);
+            return Task.CompletedTask;
+        };
+
+        _hubConnection.Reconnecting += _ =>
+        {
+            OnConnectionChanged?.Invoke(false);
+            return Task.CompletedTask;
+        };
+
+        _hubConnection.Closed += _ =>
+        {
+            OnConnectionChanged?.Invoke(false);
+            return Task.CompletedTask;
+        };
+
+        try
+        {
+            await _hubConnection.StartAsync();
+            OnConnectionChanged?.Invoke(true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SignalR connection failed: {ex.Message}");
+            OnConnectionChanged?.Invoke(false);
+        }
+    }
+
+    public async Task SubscribePortfolioAsync(Guid portfolioId)
+    {
+        if (IsConnected)
+            await _hubConnection!.InvokeAsync("SubscribePortfolio", portfolioId);
+    }
+
+    public async Task UnsubscribePortfolioAsync(Guid portfolioId)
+    {
+        if (IsConnected)
+            await _hubConnection!.InvokeAsync("UnsubscribePortfolio", portfolioId);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+            await _hubConnection.DisposeAsync();
+    }
+}
+
+================
+File: TradeSystem.Web/TradeSystem.Web.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TradeSystem.ServiceDefaults\TradeSystem.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\TradeSystem.Domain\TradeSystem.Domain.csproj" />
+    <ProjectReference Include="..\TradeSystem.Contracts\TradeSystem.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.12" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.12" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: TradeSystem.Web/TradeSystem.Web.csproj.user
+================
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ActiveDebugProfile>https</ActiveDebugProfile>
+  </PropertyGroup>
+</Project>
+
+================
+File: TradeSystem.Web/WeatherApiClient.cs
+================
+namespace TradeSystem.Web;
+
+public class WeatherApiClient(HttpClient httpClient)
+{
+    public async Task<WeatherForecast[]> GetWeatherAsync(int maxItems = 10, CancellationToken cancellationToken = default)
+    {
+        List<WeatherForecast>? forecasts = null;
+
+        await foreach (var forecast in httpClient.GetFromJsonAsAsyncEnumerable<WeatherForecast>("/weatherforecast", cancellationToken))
+        {
+            if (forecasts?.Count >= maxItems)
+            {
+                break;
+            }
+            if (forecast is not null)
+            {
+                forecasts ??= [];
+                forecasts.Add(forecast);
+            }
+        }
+
+        return forecasts?.ToArray() ?? [];
+    }
+}
+
+public record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+{
+    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+}
+================================================================
+End of Codebase
+================================================================

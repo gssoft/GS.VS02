@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.SignalR.Client;
+﻿using Microsoft.AspNetCore.SignalR.Client;
 using TradeSystem.Contracts;
 
 namespace TradeSystem.Web.Services;
@@ -7,7 +6,6 @@ namespace TradeSystem.Web.Services;
 public class SignalRClientService : IAsyncDisposable
 {
     private HubConnection? _hubConnection;
-    private readonly NavigationManager _navManager;
 
     public event Action<PositionSnapshot>? OnPositionUpdated;
     public event Action<TickerQuote>? OnQuoteReceived;
@@ -18,17 +16,10 @@ public class SignalRClientService : IAsyncDisposable
 
     public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
 
-    public SignalRClientService(NavigationManager navManager)
-    {
-        _navManager = navManager;
-    }
-
     public async Task ConnectAsync()
     {
         if (_hubConnection is not null && IsConnected)
             return;
-
-        var hubUrl = _navManager.ToAbsoluteUri("/tradehub");
 
         _hubConnection = new HubConnectionBuilder()
             .WithUrl("https://localhost:7182/tradehub")
@@ -42,7 +33,6 @@ public class SignalRClientService : IAsyncDisposable
             })
             .Build();
 
-        // Регистрация обработчиков входящих событий от сервера
         _hubConnection.On<PositionSnapshot>("PositionUpdated",
             snapshot => OnPositionUpdated?.Invoke(snapshot));
 
@@ -106,4 +96,6 @@ public class SignalRClientService : IAsyncDisposable
             await _hubConnection.DisposeAsync();
     }
 }
+
+
 
