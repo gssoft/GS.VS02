@@ -1,0 +1,23 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>a2d69151-f651-414a-a905-df958ddedff0</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AspireTradingApp01.ApiService\Trading.ApiService.csproj" />
+    <ProjectReference Include="..\AspireTradingApp01.Web\Trading.Web.csproj" />
+    <ProjectReference Include="..\Trading.Api.MarketData\Trading.Api.MarketData.csproj" />
+    <ProjectReference Include="..\Trading.Api.Orders\Trading.Api.Orders.csproj" />
+    <ProjectReference Include="..\Trading.Gateway\Trading.Gateway.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
+  </ItemGroup>
+
+</Project>

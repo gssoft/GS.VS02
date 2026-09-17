@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="AspireTradingApp01.ApiService/Trading.ApiService.csproj" />
+  <Project Path="AspireTradingApp01.AppHost/Trading.AppHost.csproj" />
+  <Project Path="AspireTradingApp01.ServiceDefaults/Trading.ServiceDefaults.csproj" />
+  <Project Path="AspireTradingApp01.Web/Trading.Web.csproj" />
+  <Project Path="Trading.Api.MarketData/Trading.Api.MarketData.csproj" />
+  <Project Path="Trading.Api.Orders/Trading.Api.Orders.csproj" />
+  <Project Path="Trading.Gateway/Trading.Gateway.csproj" />
+</Solution>

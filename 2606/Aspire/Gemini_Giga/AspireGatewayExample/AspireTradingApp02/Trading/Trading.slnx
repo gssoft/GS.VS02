@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="Trading.Api.MarketDat/Trading.Api.MarketData.csproj" />
+  <Project Path="Trading.Api.Orders/Trading.Api.Orders.csproj" />
+  <Project Path="Trading.ApiService/Trading.ApiService.csproj" />
+  <Project Path="Trading.AppHost/Trading.AppHost.csproj" />
+  <Project Path="Trading.Gateway/Trading.Gateway.csproj" />
+  <Project Path="Trading.ServiceDefaults/Trading.ServiceDefaults.csproj" />
+  <Project Path="Trading.Web/Trading.Web.csproj" />
+</Solution>

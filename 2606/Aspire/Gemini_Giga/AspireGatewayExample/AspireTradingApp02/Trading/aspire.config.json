@@ -1,0 +1,5 @@
+{
+  "appHost": {
+    "path": "Trading.AppHost/Trading.AppHost.csproj"
+  }
+}
