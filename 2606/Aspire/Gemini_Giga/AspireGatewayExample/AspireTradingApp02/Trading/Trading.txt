@@ -1,0 +1,1686 @@
+
+================================================================
+Directory Structure
+================================================================
+aspire.config.json
+Trading.Api.MarketDat/appsettings.Development.json
+Trading.Api.MarketDat/appsettings.json
+Trading.Api.MarketDat/Controllers/WeatherForecastController.cs
+Trading.Api.MarketDat/Program.cs
+Trading.Api.MarketDat/Properties/launchSettings.json
+Trading.Api.MarketDat/Trading.Api.MarketDat.http
+Trading.Api.MarketDat/Trading.Api.MarketData.csproj
+Trading.Api.MarketDat/Trading.Api.MarketData.csproj.user
+Trading.Api.MarketDat/WeatherForecast.cs
+Trading.Api.Orders/appsettings.Development.json
+Trading.Api.Orders/appsettings.json
+Trading.Api.Orders/Controllers/WeatherForecastController.cs
+Trading.Api.Orders/Program.cs
+Trading.Api.Orders/Properties/launchSettings.json
+Trading.Api.Orders/Trading.Api.Orders.csproj
+Trading.Api.Orders/Trading.Api.Orders.csproj.user
+Trading.Api.Orders/Trading.Api.Orders.http
+Trading.Api.Orders/WeatherForecast.cs
+Trading.ApiService/appsettings.Development.json
+Trading.ApiService/appsettings.json
+Trading.ApiService/Program.cs
+Trading.ApiService/Properties/launchSettings.json
+Trading.ApiService/Trading.ApiService.csproj
+Trading.ApiService/Trading.ApiService.csproj.user
+Trading.ApiService/Trading.ApiService.http
+Trading.AppHost/AppHost.cs
+Trading.AppHost/appsettings.Development.json
+Trading.AppHost/appsettings.json
+Trading.AppHost/Program.cs
+Trading.AppHost/Properties/launchSettings.json
+Trading.AppHost/Trading.AppHost.csproj
+Trading.Gateway/appsettings.json
+Trading.Gateway/Program.cs
+Trading.Gateway/Properties/launchSettings.json
+Trading.Gateway/Trading.Gateway.csproj
+Trading.ServiceDefaults/Extensions.cs
+Trading.ServiceDefaults/Trading.ServiceDefaults.csproj
+Trading.slnx
+Trading.Web/_Imports.razor
+Trading.Web/appsettings.Development.json
+Trading.Web/appsettings.json
+Trading.Web/Components/_Imports.razor
+Trading.Web/Components/App.razor
+Trading.Web/Components/Layout/MainLayout.razor
+Trading.Web/Components/Layout/NavMenu.razor
+Trading.Web/Components/Pages/Counter.razor
+Trading.Web/Components/Pages/Error.razor
+Trading.Web/Components/Pages/Home.razor
+Trading.Web/Components/Pages/Trading.razor
+Trading.Web/Components/Pages/Weather.razor
+Trading.Web/Components/Routes.razor
+Trading.Web/Program.cs
+Trading.Web/Properties/launchSettings.json
+Trading.Web/Trading.Web.csproj
+Trading.Web/Trading.Web.csproj.user
+Trading.Web/TradingApiClient.cs
+Trading.Web/WeatherApiClient.cs
+Trading.Web/wwwroot/favicon.png
+
+================================================================
+Files
+================================================================
+
+================
+File: aspire.config.json
+================
+{
+  "appHost": {
+    "path": "Trading.AppHost/Trading.AppHost.csproj"
+  }
+}
+
+================
+File: Trading.Api.MarketDat/appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: Trading.Api.MarketDat/appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: Trading.Api.MarketDat/Controllers/WeatherForecastController.cs
+================
+using Microsoft.AspNetCore.Mvc;
+
+namespace Trading.Api.MarketDat.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+public class WeatherForecastController : ControllerBase
+{
+    private static readonly string[] Summaries =
+    [
+        "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
+    ];
+
+    [HttpGet(Name = "GetWeatherForecast")]
+    public IEnumerable<WeatherForecast> Get()
+    {
+        return Enumerable.Range(1, 5).Select(index => new WeatherForecast
+        {
+            Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+            TemperatureC = Random.Shared.Next(-20, 55),
+            Summary = Summaries[Random.Shared.Next(Summaries.Length)]
+        })
+        .ToArray();
+    }
+}
+
+================
+File: Trading.Api.MarketDat/Program.cs
+================
+var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
+
+var app = builder.Build();
+app.MapDefaultEndpoints();
+
+// Имитация рыночных данных
+var marketData = new Dictionary<string, decimal>
+{
+    ["AAPL"] = 175.50m,
+    ["MSFT"] = 420.30m,
+    ["GOOGL"] = 155.80m
+};
+
+app.MapGet("/api/marketdata/{symbol}", (string symbol) =>
+{
+    if (marketData.TryGetValue(symbol.ToUpper(), out var price))
+        return Results.Ok(new { Symbol = symbol.ToUpper(), Price = price, Timestamp = DateTime.UtcNow });
+
+    return Results.NotFound($"Symbol {symbol} not found");
+});
+
+app.MapGet("/api/marketdata", () => Results.Ok(marketData));
+
+app.Run();
+
+//var builder = WebApplication.CreateBuilder(args);
+
+//builder.AddServiceDefaults();
+
+//// Add services to the container.
+
+//builder.Services.AddControllers();
+//// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+//builder.Services.AddOpenApi();
+
+//var app = builder.Build();
+
+//app.MapDefaultEndpoints();
+
+//// Configure the HTTP request pipeline.
+//if (app.Environment.IsDevelopment())
+//{
+//    app.MapOpenApi();
+//}
+
+//app.UseHttpsRedirection();
+
+//app.UseAuthorization();
+
+//app.MapControllers();
+
+//app.Run();
+
+================
+File: Trading.Api.MarketDat/Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5123",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://localhost:7038;http://localhost:5123",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: Trading.Api.MarketDat/Trading.Api.MarketDat.http
+================
+@Trading.Api.MarketDat_HostAddress = http://localhost:5123
+
+GET {{Trading.Api.MarketDat_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+================
+File: Trading.Api.MarketDat/Trading.Api.MarketData.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.ServiceDefaults\Trading.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Trading.Api.MarketDat/Trading.Api.MarketData.csproj.user
+================
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ActiveDebugProfile>https</ActiveDebugProfile>
+  </PropertyGroup>
+</Project>
+
+================
+File: Trading.Api.MarketDat/WeatherForecast.cs
+================
+namespace Trading.Api.MarketDat;
+
+public class WeatherForecast
+{
+    public DateOnly Date { get; set; }
+
+    public int TemperatureC { get; set; }
+
+    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+
+    public string? Summary { get; set; }
+}
+
+================
+File: Trading.Api.Orders/appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: Trading.Api.Orders/appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: Trading.Api.Orders/Controllers/WeatherForecastController.cs
+================
+using Microsoft.AspNetCore.Mvc;
+
+namespace Trading.Api.Orders.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+public class WeatherForecastController : ControllerBase
+{
+    private static readonly string[] Summaries =
+    [
+        "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
+    ];
+
+    [HttpGet(Name = "GetWeatherForecast")]
+    public IEnumerable<WeatherForecast> Get()
+    {
+        return Enumerable.Range(1, 5).Select(index => new WeatherForecast
+        {
+            Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+            TemperatureC = Random.Shared.Next(-20, 55),
+            Summary = Summaries[Random.Shared.Next(Summaries.Length)]
+        })
+        .ToArray();
+    }
+}
+
+================
+File: Trading.Api.Orders/Program.cs
+================
+var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
+
+var app = builder.Build();
+app.MapDefaultEndpoints();
+
+// Простой in-memory список ордеров (для примера)
+var orders = new List<Order>();
+
+app.MapGet("/api/orders", () => Results.Ok(orders));
+
+app.MapPost("/api/orders", (Order order) =>
+{
+    order.Id = Guid.NewGuid();
+    order.CreatedAt = DateTime.UtcNow;
+    orders.Add(order);
+    return Results.Created($"/api/orders/{order.Id}", order);
+});
+
+app.Run();
+
+record Order
+{
+    public Guid Id { get; set; }
+    public string Symbol { get; set; } = string.Empty;
+    public decimal Price { get; set; }
+    public int Quantity { get; set; }
+    public string Side { get; set; } = "Buy"; // Buy / Sell
+    public DateTime CreatedAt { get; set; }
+}
+
+//var builder = WebApplication.CreateBuilder(args);
+
+//builder.AddServiceDefaults();
+
+//// Add services to the container.
+
+//builder.Services.AddControllers();
+//// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+//builder.Services.AddOpenApi();
+
+//var app = builder.Build();
+
+//app.MapDefaultEndpoints();
+
+//// Configure the HTTP request pipeline.
+//if (app.Environment.IsDevelopment())
+//{
+//    app.MapOpenApi();
+//}
+
+//app.UseHttpsRedirection();
+
+//app.UseAuthorization();
+
+//app.MapControllers();
+
+//app.Run();
+
+================
+File: Trading.Api.Orders/Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5260",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://localhost:7267;http://localhost:5260",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: Trading.Api.Orders/Trading.Api.Orders.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.ServiceDefaults\Trading.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Trading.Api.Orders/Trading.Api.Orders.csproj.user
+================
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ActiveDebugProfile>https</ActiveDebugProfile>
+  </PropertyGroup>
+</Project>
+
+================
+File: Trading.Api.Orders/Trading.Api.Orders.http
+================
+@Trading.Api.Orders_HostAddress = http://localhost:5260
+
+GET {{Trading.Api.Orders_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+================
+File: Trading.Api.Orders/WeatherForecast.cs
+================
+namespace Trading.Api.Orders;
+
+public class WeatherForecast
+{
+    public DateOnly Date { get; set; }
+
+    public int TemperatureC { get; set; }
+
+    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+
+    public string? Summary { get; set; }
+}
+
+================
+File: Trading.ApiService/appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: Trading.ApiService/appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: Trading.ApiService/Program.cs
+================
+var builder = WebApplication.CreateBuilder(args);
+
+// Add service defaults & Aspire client integrations.
+builder.AddServiceDefaults();
+
+// Add services to the container.
+builder.Services.AddProblemDetails();
+
+// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Services.AddOpenApi();
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+app.UseExceptionHandler();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
+
+app.MapGet("/", () => "API service is running. Navigate to /weatherforecast to see sample data.");
+
+app.MapGet("/weatherforecast", () =>
+{
+    var forecast = Enumerable.Range(1, 5).Select(index =>
+        new WeatherForecast
+        (
+            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+            Random.Shared.Next(-20, 55),
+            summaries[Random.Shared.Next(summaries.Length)]
+        ))
+        .ToArray();
+    return forecast;
+})
+.WithName("GetWeatherForecast");
+
+app.MapDefaultEndpoints();
+
+app.Run();
+
+record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+{
+    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+}
+
+================
+File: Trading.ApiService/Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5574",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://localhost:7345;http://localhost:5574",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: Trading.ApiService/Trading.ApiService.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.ServiceDefaults\Trading.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Trading.ApiService/Trading.ApiService.csproj.user
+================
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ActiveDebugProfile>https</ActiveDebugProfile>
+  </PropertyGroup>
+</Project>
+
+================
+File: Trading.ApiService/Trading.ApiService.http
+================
+@ApiService_HostAddress = http://localhost:5574
+
+GET {{ApiService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+================
+File: Trading.AppHost/AppHost.cs
+================
+//var builder = DistributedApplication.CreateBuilder(args);
+
+//var cache = builder.AddRedis("cache");
+
+//var apiService = builder.AddProject<Projects.Trading_ApiService>("apiservice")
+//    .WithHttpHealthCheck("/health");
+
+//builder.AddProject<Projects.Trading_Web>("webfrontend")
+//    .WithExternalHttpEndpoints()
+//    .WithHttpHealthCheck("/health")
+//    .WithReference(cache)
+//    .WaitFor(cache)
+//    .WithReference(apiService)
+//    .WaitFor(apiService);
+
+//builder.AddProject<Projects.Trading_Api_Orders>("trading-api-orders");
+
+//builder.AddProject<Projects.Trading_Api_MarketData>("trading-api-marketdat");
+
+//builder.Build().Run();
+
+================
+File: Trading.AppHost/appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: Trading.AppHost/appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Aspire.Hosting.Dcp": "Warning"
+    }
+  }
+}
+
+================
+File: Trading.AppHost/Program.cs
+================
+var builder = DistributedApplication.CreateBuilder(args);
+
+// 1. Бизнес-сервисы (не знают друг о друге)
+var ordersApi = builder.AddProject<Projects.Trading_Api_Orders>("orders-api");
+var marketDataApi = builder.AddProject<Projects.Trading_Api_MarketData>("market-data-api");
+
+
+
+// 2. Центральный шлюз (роутер). Ссылается на бизнес-сервисы.
+//    Никто, кроме Gateway, не видит Orders и MarketData.
+
+var gateway = builder.AddProject<Projects.Trading_Gateway>("gateway")
+    .WithHttpEndpoint(port: 5000, name: "http")
+    .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
+    .WithEnvironment("DOTNET_ENVIRONMENT", "Development")
+    .WithReference(ordersApi)
+    .WithReference(marketDataApi);
+
+//var gateway = builder.AddProject<Projects.Trading_Gateway>("gateway")
+//    .WithHttpEndpoint(port: 5000, name: "http")   // ← добавить эту строку
+//    .WithReference(ordersApi)
+//    .WithReference(marketDataApi);
+
+
+
+//var gateway = builder.AddProject<Projects.Trading_Gateway>("gateway")
+//    .WithReference(ordersApi)
+//    .WithReference(marketDataApi);
+
+// 3. Фронтенд. Ссылается ТОЛЬКО на Gateway.
+//    Он физически не может обратиться к Orders или MarketData напрямую.
+var web = builder.AddProject<Projects.Trading_Web>("web")
+    .WithReference(gateway);
+
+builder.Build().Run();
+
+================
+File: Trading.AppHost/Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:17234;http://localhost:15259",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21069",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22275"
+      }
+    },
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:15259",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19114",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20082"
+      }
+    }
+  }
+}
+
+================
+File: Trading.AppHost/Trading.AppHost.csproj
+================
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>da8dcbbe-ab43-4c99-a454-99f3e8212895</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.Api.MarketDat\Trading.Api.MarketData.csproj" />
+    <ProjectReference Include="..\Trading.Api.Orders\Trading.Api.Orders.csproj" />
+    <ProjectReference Include="..\Trading.ApiService\Trading.ApiService.csproj" />
+    <ProjectReference Include="..\Trading.Gateway\Trading.Gateway.csproj" />
+    <ProjectReference Include="..\Trading.Web\Trading.Web.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Trading.Gateway/appsettings.json
+================
+{
+  "ReverseProxy": {
+    "Routes": {
+      "orders-route-base": {
+        "ClusterId": "orders-cluster",
+        "Match": {
+          "Path": "/api/orders"
+        }
+      },
+      "orders-route": {
+        "ClusterId": "orders-cluster",
+        "Match": {
+          "Path": "/api/orders/{**catch-all}"
+        }
+      },
+      "marketdata-route-base": {
+        "ClusterId": "marketdata-cluster",
+        "Match": {
+          "Path": "/api/marketdata"
+        }
+      },
+      "marketdata-route": {
+        "ClusterId": "marketdata-cluster",
+        "Match": {
+          "Path": "/api/marketdata/{**catch-all}"
+        }
+      }
+    },
+    "Clusters": {
+      "orders-cluster": {
+        "Destinations": {
+          "orders-destination": {
+            "Address": "http://orders-api/"
+          }
+        }
+      },
+      "marketdata-cluster": {
+        "Destinations": {
+          "marketdata-destination": {
+            "Address": "http://market-data-api/"
+          }
+        }
+      }
+    }
+  }
+}
+
+================
+File: Trading.Gateway/Program.cs
+================
+using Microsoft.AspNetCore.Builder;
+using Yarp.ReverseProxy.Configuration;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.ServiceDiscovery;
+using Microsoft.AspNetCore.Http;   // ← может понадобиться
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();
+
+builder.Services.AddReverseProxy()
+    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+    .AddServiceDiscoveryDestinationResolver();
+
+var app = builder.Build();
+
+app.MapDefaultEndpoints();
+app.MapReverseProxy();
+
+// Диагностика: покажет все загруженные маршруты и кластеры
+app.MapGet("/debug/routes", (IProxyConfigProvider configProvider) =>
+{
+    var config = configProvider.GetConfig();
+    return Results.Ok(new
+    {
+        Routes = config.Routes.Select(r => new { r.RouteId, Path = r.Match.Path, r.ClusterId }),
+        Clusters = config.Clusters.Select(c => new
+        {
+            c.ClusterId,
+            Destinations = c.Destinations?.Select(d => new { d.Key, d.Value.Address })
+        })
+    });
+});
+
+app.Run();
+
+//using Microsoft.AspNetCore.Builder;
+//using Microsoft.Extensions.DependencyInjection;
+//using Microsoft.Extensions.Hosting;
+//using Microsoft.Extensions.ServiceDiscovery;   // ← может понадобиться
+
+//var builder = WebApplication.CreateBuilder(args);
+
+//builder.AddServiceDefaults(); // OpenTelemetry, service discovery, resilience
+
+//builder.Services.AddReverseProxy()
+//    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+//    .AddServiceDiscoveryDestinationResolver();   // ← это обязательно
+
+//// Настраиваем YARP как обратный прокси
+////builder.Services.AddReverseProxy()
+////    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+
+//var app = builder.Build();
+
+//app.MapDefaultEndpoints(); // /health, /alive
+//app.MapReverseProxy();
+
+//app.Run();
+
+================
+File: Trading.Gateway/Properties/launchSettings.json
+================
+{
+  "profiles": {
+    "Trading.Gateway": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:50647;http://localhost:50648"
+    }
+  }
+}
+
+================
+File: Trading.Gateway/Trading.Gateway.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Yarp.ReverseProxy" Version="2.3.0" />
+		<PackageReference Include="Microsoft.Extensions.ServiceDiscovery.Yarp" Version="10.0.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Trading.ServiceDefaults\Trading.ServiceDefaults.csproj" />
+	</ItemGroup>
+
+	<!-- Явная страховка: appsettings копируется в bin -->
+	<ItemGroup>
+		<Content Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+		<Content Update="appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
+
+</Project>
+
+================
+File: Trading.ServiceDefaults/Extensions.cs
+================
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ServiceDiscovery;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+
+namespace Microsoft.Extensions.Hosting;
+
+// Adds common Aspire services: service discovery, resilience, health checks, and OpenTelemetry.
+// This project should be referenced by each service project in your solution.
+// To learn more about using this project, see https://aka.ms/aspire/service-defaults
+public static class Extensions
+{
+    private const string HealthEndpointPath = "/health";
+    private const string AlivenessEndpointPath = "/alive";
+
+    public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.ConfigureOpenTelemetry();
+
+        builder.AddDefaultHealthChecks();
+
+        builder.Services.AddServiceDiscovery();
+
+        builder.Services.ConfigureHttpClientDefaults(http =>
+        {
+            // Turn on resilience by default
+            http.AddStandardResilienceHandler();
+
+            // Turn on service discovery by default
+            http.AddServiceDiscovery();
+        });
+
+        // Uncomment the following to restrict the allowed schemes for service discovery.
+        // builder.Services.Configure<ServiceDiscoveryOptions>(options =>
+        // {
+        //     options.AllowedSchemes = ["https"];
+        // });
+
+        return builder;
+    }
+
+    public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.Logging.AddOpenTelemetry(logging =>
+        {
+            logging.IncludeFormattedMessage = true;
+            logging.IncludeScopes = true;
+        });
+
+        builder.Services.AddOpenTelemetry()
+            .WithMetrics(metrics =>
+            {
+                metrics.AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation()
+                    .AddRuntimeInstrumentation();
+            })
+            .WithTracing(tracing =>
+            {
+                tracing.AddSource(builder.Environment.ApplicationName)
+                    .AddAspNetCoreInstrumentation(tracing =>
+                        // Exclude health check requests from tracing
+                        tracing.Filter = context =>
+                            !context.Request.Path.StartsWithSegments(HealthEndpointPath)
+                            && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
+                    )
+                    // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
+                    //.AddGrpcClientInstrumentation()
+                    .AddHttpClientInstrumentation();
+            });
+
+        builder.AddOpenTelemetryExporters();
+
+        return builder;
+    }
+
+    private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+
+        if (useOtlpExporter)
+        {
+            builder.Services.AddOpenTelemetry().UseOtlpExporter();
+        }
+
+        // Uncomment the following lines to enable the Azure Monitor exporter (requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
+        //if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+        //{
+        //    builder.Services.AddOpenTelemetry()
+        //       .UseAzureMonitor();
+        //}
+
+        return builder;
+    }
+
+    public static TBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        builder.Services.AddHealthChecks()
+            // Add a default liveness check to ensure app is responsive
+            .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
+
+        return builder;
+    }
+
+    public static WebApplication MapDefaultEndpoints(this WebApplication app)
+    {
+        // Adding health checks endpoints to applications in non-development environments has security implications.
+        // See https://aka.ms/aspire/healthchecks for details before enabling these endpoints in non-development environments.
+        if (app.Environment.IsDevelopment())
+        {
+            // All health checks must pass for app to be considered ready to accept traffic after starting
+            app.MapHealthChecks(HealthEndpointPath);
+
+            // Only health checks tagged with the "live" tag must pass for app to be considered alive
+            app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
+            {
+                Predicate = r => r.Tags.Contains("live")
+            });
+        }
+
+        return app;
+    }
+}
+
+================
+File: Trading.ServiceDefaults/Trading.ServiceDefaults.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAspireSharedProject>true</IsAspireSharedProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.6.0" />
+    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" Version="10.6.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Trading.slnx
+================
+<Solution>
+  <Project Path="Trading.Api.MarketDat/Trading.Api.MarketData.csproj" />
+  <Project Path="Trading.Api.Orders/Trading.Api.Orders.csproj" />
+  <Project Path="Trading.ApiService/Trading.ApiService.csproj" />
+  <Project Path="Trading.AppHost/Trading.AppHost.csproj" />
+  <Project Path="Trading.Gateway/Trading.Gateway.csproj" />
+  <Project Path="Trading.ServiceDefaults/Trading.ServiceDefaults.csproj" />
+  <Project Path="Trading.Web/Trading.Web.csproj" />
+</Solution>
+
+================
+File: Trading.Web/_Imports.razor
+================
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.AspNetCore.OutputCaching
+@using Microsoft.JSInterop
+@using Web
+@using Web.Components
+
+================
+File: Trading.Web/appsettings.Development.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+================
+File: Trading.Web/appsettings.json
+================
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+================
+File: Trading.Web/Components/_Imports.razor
+================
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.AspNetCore.OutputCaching
+@using Microsoft.JSInterop
+@* @using Trading.Web *@
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+
+================
+File: Trading.Web/Components/App.razor
+================
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["Trading.Web.styles.css"]" />
+    <ImportMap />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet />
+</head>
+
+<body>
+    <Routes />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>
+
+================
+File: Trading.Web/Components/Layout/MainLayout.razor
+================
+@inherits LayoutComponentBase
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+================
+File: Trading.Web/Components/Layout/NavMenu.razor
+================
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">Trading</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="counter">
+                <span class="bi bi-plus-square-fill" aria-hidden="true"></span> Counter
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="weather">
+                <span class="bi bi-list-nested" aria-hidden="true"></span> Weather
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+================
+File: Trading.Web/Components/Pages/Counter.razor
+================
+@page "/counter"
+@rendermode InteractiveServer
+
+<PageTitle>Counter</PageTitle>
+
+<h1>Counter</h1>
+
+<p role="status">Current count: @currentCount</p>
+
+<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+
+@code {
+    private int currentCount = 0;
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+}
+
+================
+File: Trading.Web/Components/Pages/Error.razor
+================
+@page "/Error"
+@using System.Diagnostics
+
+<PageTitle>Error</PageTitle>
+
+<h1 class="text-danger">Error.</h1>
+<h2 class="text-danger">An error occurred while processing your request.</h2>
+
+@if (ShowRequestId)
+{
+    <p>
+        <strong>Request ID:</strong> <code>@requestId</code>
+    </p>
+}
+
+<h3>Development Mode</h3>
+<p>
+    Swapping to <strong>Development</strong> environment will display more detailed information about the error that occurred.
+</p>
+<p>
+    <strong>The Development environment shouldn't be enabled for deployed applications.</strong>
+    It can result in displaying sensitive information from exceptions to end users.
+    For local debugging, enable the <strong>Development</strong> environment by setting the <strong>ASPNETCORE_ENVIRONMENT</strong> environment variable to <strong>Development</strong>
+    and restarting the app.
+</p>
+
+@code{
+    [CascadingParameter]
+    public HttpContext? HttpContext { get; set; }
+
+    private string? requestId;
+    private bool ShowRequestId => !string.IsNullOrEmpty(requestId);
+
+    protected override void OnInitialized()
+    {
+        requestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+    }
+}
+
+================
+File: Trading.Web/Components/Pages/Home.razor
+================
+@page "/"
+
+<PageTitle>Home</PageTitle>
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+================
+File: Trading.Web/Components/Pages/Trading.razor
+================
+@page "/trading"
+@rendermode InteractiveServer
+
+@inject TradingApiClient Api
+
+<h3>Трейдинг</h3>
+
+<div class="row">
+    <div class="col-md-6">
+        <h4>Рыночные данные</h4>
+        <button class="btn btn-primary" @onclick="LoadMarketData">Загрузить AAPL</button>
+        @if (marketData is not null)
+        {
+            <p>@marketData.Symbol: @marketData.Price.ToString("C")</p>
+        }
+    </div>
+    <div class="col-md-6">
+        <h4>Ордера</h4>
+        <button class="btn btn-success" @onclick="PlaceOrder">Купить AAPL x10</button>
+        <ul>
+            @foreach (var order in orders)
+            {
+                <li>@order.Side @order.Quantity @order.Symbol @@ @order.Price</li>
+            }
+        </ul>
+    </div>
+</div>
+
+@code {
+    private MarketData? marketData;
+    private List<Order> orders = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        orders = await Api.GetOrdersAsync();
+    }
+
+    // private async Task LoadMarketData()
+    // {
+    //     marketData = await Api.GetMarketDataAsync("AAPL");
+    // }
+
+    private async Task LoadMarketData()
+    {
+        Console.WriteLine("[Trading] LoadMarketData вызван");
+        marketData = await Api.GetMarketDataAsync("AAPL");
+        Console.WriteLine($"[Trading] Получено: {marketData?.Symbol} {marketData?.Price}");
+        StateHasChanged();
+    }
+
+    private async Task PlaceOrder()
+    {
+        var md = await Api.GetMarketDataAsync("AAPL");
+        if (md is null) return;
+
+        await Api.PlaceOrderAsync(new Order
+        {
+            Symbol = "AAPL",
+            Price = md.Price,
+            Quantity = 10,
+            Side = "Buy"
+        });
+
+        orders = await Api.GetOrdersAsync();
+    }
+}
+
+================
+File: Trading.Web/Components/Pages/Weather.razor
+================
+@page "/weather"
+@attribute [StreamRendering(true)]
+@attribute [OutputCache(Duration = 5)]
+
+@inject WeatherApiClient WeatherApi
+
+<PageTitle>Weather</PageTitle>
+
+<h1>Weather</h1>
+
+<p>This component demonstrates showing data loaded from a backend API service.</p>
+
+@if (forecasts == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th aria-label="Temperature in Celsius">Temp. (C)</th>
+                <th aria-label="Temperature in Fahrenheit">Temp. (F)</th>
+                <th>Summary</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var forecast in forecasts)
+            {
+                <tr>
+                    <td>@forecast.Date.ToShortDateString()</td>
+                    <td>@forecast.TemperatureC</td>
+                    <td>@forecast.TemperatureF</td>
+                    <td>@forecast.Summary</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private WeatherForecast[]? forecasts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        forecasts = await WeatherApi.GetWeatherAsync();
+    }
+}
+
+================
+File: Trading.Web/Components/Routes.razor
+================
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>
+
+================
+File: Trading.Web/Program.cs
+================
+using Trading.Web;
+using Trading.Web.Components;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();
+
+builder.Services.AddHttpClient<TradingApiClient>(client =>
+{
+    client.BaseAddress = new Uri("http://gateway");   // было "https+http://gateway"
+});
+
+//builder.Services.AddHttpClient<TradingApiClient>(client =>
+//{
+//    client.BaseAddress = new Uri("https+http://gateway");
+//});
+
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
+var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseAntiforgery();   // ← ЭТО КЛЮЧЕВАЯ СТРОКА
+
+app.MapStaticAssets();
+
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+
+app.MapDefaultEndpoints();
+
+app.Run();
+
+//using Trading.Web.Components;
+
+//var builder = WebApplication.CreateBuilder(args);
+
+//builder.AddServiceDefaults();
+
+//// Регистрируем HttpClient, который будет ходить в Gateway.
+//// "https+http://gateway" — это не реальный URL, а логическое имя,
+//// которое Aspire разрешит в конкретный адрес через Service Discovery.
+//builder.Services.AddHttpClient<TradingApiClient>(client =>
+//{
+//    client.BaseAddress = new Uri("https+http://gateway");
+//});
+
+//builder.Services.AddRazorComponents()
+//    .AddInteractiveServerComponents();
+
+//var app = builder.Build();
+
+//app.MapDefaultEndpoints();
+//app.MapRazorComponents<App>()
+//    .AddInteractiveServerRenderMode();
+
+//app.Run();
+
+
+//using Trading.Web;
+//using Trading.Web.Components;
+
+//var builder = WebApplication.CreateBuilder(args);
+
+//// Add service defaults & Aspire client integrations.
+//builder.AddServiceDefaults();
+//builder.AddRedisOutputCache("cache");
+
+//// Add services to the container.
+//builder.Services.AddRazorComponents()
+//    .AddInteractiveServerComponents();
+
+//builder.Services.AddHttpClient<WeatherApiClient>(client =>
+//    {
+//        // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
+//        // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
+//        client.BaseAddress = new("https+http://apiservice");
+//    });
+
+//var app = builder.Build();
+
+//if (!app.Environment.IsDevelopment())
+//{
+//    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+//    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+//    app.UseHsts();
+//}
+
+//app.UseHttpsRedirection();
+
+//app.UseAntiforgery();
+
+//app.UseOutputCache();
+
+//app.MapStaticAssets();
+
+//app.MapRazorComponents<App>()
+//    .AddInteractiveServerRenderMode();
+
+//app.MapDefaultEndpoints();
+
+//app.Run();
+
+================
+File: Trading.Web/Properties/launchSettings.json
+================
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5125",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:7198;http://localhost:5125",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+================
+File: Trading.Web/Trading.Web.csproj
+================
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.ServiceDefaults\Trading.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.StackExchange.Redis.OutputCaching" Version="13.4.6" />
+  </ItemGroup>
+
+</Project>
+
+================
+File: Trading.Web/Trading.Web.csproj.user
+================
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ActiveDebugProfile>https</ActiveDebugProfile>
+  </PropertyGroup>
+</Project>
+
+================
+File: Trading.Web/TradingApiClient.cs
+================
+public class TradingApiClient
+{
+    private readonly HttpClient _http;
+
+    public TradingApiClient(HttpClient http) => _http = http;
+
+    public async Task<List<Order>> GetOrdersAsync()
+    {
+        return await _http.GetFromJsonAsync<List<Order>>("/api/orders") ?? new();
+    }
+
+    public async Task<Order?> PlaceOrderAsync(Order order)
+    {
+        var response = await _http.PostAsJsonAsync("/api/orders", order);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<Order>();
+    }
+
+    public async Task<MarketData?> GetMarketDataAsync(string symbol)
+    {
+        return await _http.GetFromJsonAsync<MarketData>($"/api/marketdata/{symbol}");
+    }
+}
+
+public record Order
+{
+    public Guid Id { get; set; }
+    public string Symbol { get; set; } = string.Empty;
+    public decimal Price { get; set; }
+    public int Quantity { get; set; }
+    public string Side { get; set; } = "Buy";
+    public DateTime CreatedAt { get; set; }
+}
+
+public record MarketData(string Symbol, decimal Price, DateTime Timestamp);
+
+================
+File: Trading.Web/WeatherApiClient.cs
+================
+namespace Trading.Web;
+
+public class WeatherApiClient(HttpClient httpClient)
+{
+    public async Task<WeatherForecast[]> GetWeatherAsync(int maxItems = 10, CancellationToken cancellationToken = default)
+    {
+        List<WeatherForecast>? forecasts = null;
+
+        await foreach (var forecast in httpClient.GetFromJsonAsAsyncEnumerable<WeatherForecast>("/weatherforecast", cancellationToken))
+        {
+            if (forecasts?.Count >= maxItems)
+            {
+                break;
+            }
+            if (forecast is not null)
+            {
+                forecasts ??= [];
+                forecasts.Add(forecast);
+            }
+        }
+
+        return forecasts?.ToArray() ?? [];
+    }
+}
+
+public record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+{
+    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+}
+================================================================
+End of Codebase
+================================================================
