@@ -1,4 +1,6 @@
 ﻿@page "/trading"
+@rendermode InteractiveServer
+
 @inject TradingApiClient Api
 
 <h3>Трейдинг</h3>
@@ -33,9 +35,17 @@
         orders = await Api.GetOrdersAsync();
     }
 
+    // private async Task LoadMarketData()
+    // {
+    //     marketData = await Api.GetMarketDataAsync("AAPL");
+    // }
+
     private async Task LoadMarketData()
     {
+        Console.WriteLine("[Trading] LoadMarketData вызван");
         marketData = await Api.GetMarketDataAsync("AAPL");
+        Console.WriteLine($"[Trading] Получено: {marketData?.Symbol} {marketData?.Price}");
+        StateHasChanged();
     }
 
     private async Task PlaceOrder()

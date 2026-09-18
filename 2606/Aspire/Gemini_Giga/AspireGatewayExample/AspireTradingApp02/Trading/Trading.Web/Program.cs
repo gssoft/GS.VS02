@@ -1,27 +1,67 @@
+using Trading.Web;
 using Trading.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
-// Регистрируем HttpClient, который будет ходить в Gateway.
-// "https+http://gateway" — это не реальный URL, а логическое имя,
-// которое Aspire разрешит в конкретный адрес через Service Discovery.
 builder.Services.AddHttpClient<TradingApiClient>(client =>
 {
-    client.BaseAddress = new Uri("https+http://gateway");
+    client.BaseAddress = new Uri("http://gateway");   // было "https+http://gateway"
 });
+
+//builder.Services.AddHttpClient<TradingApiClient>(client =>
+//{
+//    client.BaseAddress = new Uri("https+http://gateway");
+//});
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
 
-app.MapDefaultEndpoints();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseAntiforgery();   // ← ЭТО КЛЮЧЕВАЯ СТРОКА
+
+app.MapStaticAssets();
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+app.MapDefaultEndpoints();
+
 app.Run();
+
+//using Trading.Web.Components;
+
+//var builder = WebApplication.CreateBuilder(args);
+
+//builder.AddServiceDefaults();
+
+//// Регистрируем HttpClient, который будет ходить в Gateway.
+//// "https+http://gateway" — это не реальный URL, а логическое имя,
+//// которое Aspire разрешит в конкретный адрес через Service Discovery.
+//builder.Services.AddHttpClient<TradingApiClient>(client =>
+//{
+//    client.BaseAddress = new Uri("https+http://gateway");
+//});
+
+//builder.Services.AddRazorComponents()
+//    .AddInteractiveServerComponents();
+
+//var app = builder.Build();
+
+//app.MapDefaultEndpoints();
+//app.MapRazorComponents<App>()
+//    .AddInteractiveServerRenderMode();
+
+//app.Run();
 
 
 //using Trading.Web;
