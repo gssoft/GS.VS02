@@ -1,0 +1,6 @@
+@Trading.Api.TradeFeed_HostAddress = http://localhost:5062
+
+GET {{Trading.Api.TradeFeed_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

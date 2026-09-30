@@ -1,0 +1,12 @@
+<Solution>
+  <Project Path="Trading.Api.MarketData/Trading.Api.MarketData.csproj" />
+  <Project Path="Trading.Api.Orders/Trading.Api.Orders.csproj" />
+  <Project Path="Trading.Api.TradeFeed/Trading.Api.TradeFeed.csproj" />
+  <Project Path="Trading.Api.Watchlist/Trading.Api.Watchlist.csproj" />
+  <Project Path="Trading.ApiService/Trading.ApiService.csproj" />
+  <Project Path="Trading.AppHost/Trading.AppHost.csproj" />
+  <Project Path="Trading.Contracts/Trading.Contracts.csproj" Id="d1777f84-f3f6-401e-8486-3ce208dde844" />
+  <Project Path="Trading.Gateway/Trading.Gateway.csproj" />
+  <Project Path="Trading.ServiceDefaults/Trading.ServiceDefaults.csproj" />
+  <Project Path="Trading.Web/Trading.Web.csproj" />
+</Solution>

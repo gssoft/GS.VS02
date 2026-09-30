@@ -1,0 +1,358 @@
+Да, вы правильно понимаете: YARP — это библиотека.
+Полное название обычно раскрывают как:
+YARP = Yet Another Reverse Proxy
+Это библиотека от Microsoft для создания обратного прокси на .NET.
+В нашем приложении YARP используется в проекте:
+Trading.Gateway
+и выполняет роль центрального маршрутизатора входящих HTTP-запросов.
+Что делает YARP в нашем приложении
+Если коротко:
+Trading.Web
+   |
+   | HTTP-запрос
+   v
+Trading.Gateway + YARP
+   |
+   | смотрит на путь запроса
+   |
+   +--> /api/orders/*       -> orders-api
+   +--> /api/marketdata/*   -> market-data-api
+--
+То есть фронтенд не ходит напрямую в Orders API и MarketData API.
+Он ходит только в Gateway, а YARP уже решает, куда этот запрос нужно переслать.
+
+де именно это подключено
+В файле:
+Trading.Gateway/Program.cs
+есть такой код:
+builder.Services.AddReverseProxy()
+    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+    .AddServiceDiscoveryDestinationResolver();
+
+Разберем по частям.
+1. AddReverseProxy()
+Подключает YARP как reverse proxy.
+builder.Services.AddReverseProxy()
+Это значит, что приложение будет принимать чужие HTTP-запросы и перенаправлять их внутрь системы.
+2. LoadFromConfig(...)
+Загружает маршруты из конфигурации:
+.LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+Конфигурация находится в:
+Trading.Gateway/appsettings.json
+Там описаны маршруты:
+"ReverseProxy": {
+  "Routes": {
+    "orders-route-base": {
+      "ClusterId": "orders-cluster",
+      "Match": {
+        "Path": "/api/orders"
+      }
+    },
+    "orders-route": {
+      "ClusterId": "orders-cluster",
+      "Match": {
+        "Path": "/api/orders/{**catch-all}"
+      }
+    },
+    "marketdata-route-base": {
+      "ClusterId": "marketdata-cluster",
+      "Match": {
+        "Path": "/api/marketdata"
+      }
+    },
+    "marketdata-route": {
+      "ClusterId": "marketdata-cluster",
+      "Match": {
+        "Path": "/api/marketdata/{**catch-all}"
+      }
+    }
+  }
+}
+--
+То есть YARP знает:
+Если запрос пришел на /api/orders
+    → отправить его в orders-cluster
+
+Если запрос пришел на /api/marketdata
+    → отправить его в marketdata-cluster
+
+3. AddServiceDiscoveryDestinationResolver()
+Это очень важная строка для Aspire:
+.AddServiceDiscoveryDestinationResolver();
+Она позволяет YARP использовать логические имена сервисов, а не жесткие адреса типа:
+http://localhost:5260
+В конфигурации написано:
+"Clusters": {
+  "orders-cluster": {
+    "Destinations": {
+      "orders-destination": {
+        "Address": "http://orders-api/"
+      }
+    }
+  },
+  "marketdata-cluster": {
+    "Destinations": {
+      "marketdata-destination": {
+        "Address": "http://market-data-api/"
+      }
+    }
+  }
+}
+---
+http://orders-api
+http://market-data-api
+— это не реальные физические адреса, а логические имена ресурсов, которые объявлены в AppHost.
+В Trading.AppHost/Program.cs есть
+
+var ordersApi = builder.AddProject<Projects.Trading_Api_Orders>("orders-api");
+var marketDataApi = builder.AddProject<Projects.Trading_Api_MarketData>("market-data-api");
+
+То есть Aspire знает:
+orders-api       = Trading.Api.Orders
+market-data-api  = Trading.Api.MarketData
+
+И YARP через Service Discovery может найти реальный адрес этих сервисов во время выполнения.
+
+Что конкретно делает YARP на запросе
+Например, пользователь на странице Trading.razor нажимает:
+
+Загрузить AAPL
+Код во фронтенде вызывает:
+await Api.GetMarketDataAsync("AAPL");
+
+Внутри:
+public async Task<MarketData?> GetMarketDataAsync(string symbol)
+{
+    return await _http.GetFromJsonAsync<MarketData>($"/api/marketdata/{symbol}");
+}
+
+Фронтенд отправляет запрос в:
+http://gateway/api/marketdata/AAP
+Gateway принимает этот запрос.
+YARP смотрит:
+Путь начинается с /api/marketdata
+Находит маршрут:
+"marketdata-route": {
+  "ClusterId": "marketdata-cluster",
+  "Match": {
+    "Path": "/api/marketdata/{**catch-all}"
+  }
+}
+Затем смотрит кластер:
+"marketdata-cluster": {
+  "Destinations": {
+    "marketdata-destination": {
+      "Address": "http://market-data-api/"
+    }
+  }
+}
+Service Discovery превращает:
+http://market-data-api
+в реальный адрес сервиса Trading.Api.MarketData.
+YARP пересылает запрос туда.
+Сервис MarketData API отвечает:
+{
+  "symbol": "AAPL",
+  "price": 175.50,
+  "timestamp": "..."
+}
+YARP возвращает этот ответ обратно во фронтенд.
+Какие маршруты у нас настроены
+У нас есть два основных направления.
+1. Запросы к ордерам
+/api/orders
+/api/orders/{**catch-all}
+направляются в:
+orders-api
+То есть в проект:
+Trading.Api.Orders
+Там есть эндпоинты:
+app.MapGet("/api/orders", () => Results.Ok(orders));
+
+app.MapPost("/api/orders", (Order order) =>
+{
+    order.Id = Guid.NewGuid();
+    order.CreatedAt = DateTime.UtcNow;
+    orders.Add(order);
+    return Results.Created($"/api/orders/{order.Id}", order);
+});
+----
+2. Запросы к рыночным данным
+/api/marketdata
+/api/marketdata/{**catch-all}
+направляются в:
+market-data-api
+То есть в проект: Trading.Api.MarketData
+Там есть эндпоинты:
+app.MapGet("/api/marketdata/{symbol}", (string symbol) =>
+{
+    if (marketData.TryGetValue(symbol.ToUpper(), out var price))
+        return Results.Ok(new
+        {
+            Symbol = symbol.ToUpper(),
+            Price = price,
+            Timestamp = DateTime.UtcNow
+        });
+
+    return Results.NotFound($"Symbol {symbol} not found");
+});
+
+app.MapGet("/api/marketdata", () => Results.Ok(marketData));
+
+Зачем это нужно архитектурно
+В нашей архитектуре YARP помогает реализовать вашу идею:
+Сервисы не должны общаться хаотично: каждый с каждым.
+Нужен центральный узел:
+
+ServiceA <--> Router <--> ServiceB
+В текущем приложении этот центральный узел — Trading.Gateway.
+YARP делает из обычного ASP.NET Core проекта обратный прокси, то есть шлюз.
+Получается:
+
+Web
+ |
+ v
+Gateway
+ |
+ +--> Orders
+ |
+ +--> MarketData
+
+Это уже элемент архитектуры Hub-and-Spoke.
+Важный нюанс: пока YARP у нас «тупой»
+Сейчас YARP в основном выполняет роль прозрачного проксировщика.
+Он делает примерно это:
+Пришел запрос /api/orders?
+Перешли в Orders.
+
+Пришел запрос /api/marketdata?
+Перешли в MarketData.
+Он пока не делает сложной бизнес-логики:
+не агрегирует данные;
+не проверяет пользователя;
+не принимает команды через Outbox;
+не возвращает 202 Accepted;
+не склеивает ответы нескольких сервисов;
+не управляет идемпотентностью.
+То есть сейчас это фундамент для CentralRouter, но еще не полностью «умный» центральный роутер.
+Почему это хорошо
+Потому что YARP позволяет сделать первый шаг без лишней сложности:
+HTTP -> Gateway -> сервисы
+Без этого пришлось бы:
+либо фронтенду самому знать адреса всех сервисов;
+либо делать ручной прокси в контроллерах;
+либо сразу тащить сложные брокеры.
+А так мы получаем:
+Единую точку входа.
+Изоляцию фронтенда от внутренних сервисов.
+Централизованную маршрутизацию.
+Возможность позже добавить агрегацию.
+Возможность позже добавить Outbox/Wolverine.
+Наблюдаемость через Aspire.
+Дополнительный диагностический эндпоинт
+В Trading.Gateway/Program.cs есть также:
+app.MapGet("/debug/routes", (IProxyConfigProvider configProvider) =>
+{
+    var config = configProvider.GetConfig();
+
+    return Results.Ok(new
+    {
+        Routes = config.Routes.Select(r => new
+        {
+            r.RouteId,
+            Path = r.Match.Path,
+            r.ClusterId
+        }),
+        Clusters = config.Clusters.Select(c => new
+        {
+            c.ClusterId,
+            Destinations = c.Destinations?.Select(d => new
+            {
+                d.Key,
+                d.Value.Address
+            })
+        })
+    });
+});
+Этот эндпоинт позволяет посмотреть, какие маршруты и кластеры реально загрузил YARP.
+Например, если открыть:
+/debug/routes
+можно увидеть что-то вроде:
+{
+  "routes": [
+    {
+      "routeId": "orders-route-base",
+      "path": "/api/orders",
+      "clusterId": "orders-cluster"
+    },
+    {
+      "routeId": "orders-route",
+      "path": "/api/orders/{**catch-all}",
+      "clusterId": "orders-cluster"
+    },
+    {
+      "routeId": "marketdata-route-base",
+      "path": "/api/marketdata",
+      "clusterId": "marketdata-cluster"
+    },
+    {
+      "routeId": "marketdata-route",
+      "path": "/api/marketdata/{**catch-all}",
+      "clusterId": "marketdata-cluster"
+    }
+  ],
+  "clusters": [
+    {
+      "clusterId": "orders-cluster",
+      "destinations": [
+        {
+          "key": "orders-destination",
+          "address": "http://orders-api/"
+        }
+      ]
+    },
+    {
+      "clusterId": "marketdata-cluster",
+      "destinations": [
+        {
+          "key": "marketdata-destination",
+          "address": "http://market-data-api/"
+        }
+      ]
+    }
+  ]
+}
+-------
+Это удобно для диагностики.
+Итог
+В нашем приложении YARP делает следующее:
+Принимает HTTP-запросы от фронтенда
+    |
+    v
+Смотрит на путь
+    |
+    v
+Решает, какой внутренний сервис должен обработать запрос
+    |
+    v
+Пересылает запрос в Orders API или MarketData API
+    |
+    v
+Возвращает ответ обратно клиенту
+То есть в текущей архитектуре:
+YARP = механизм обратной проксировки внутри Trading.Gateway
+Он реализует первый слой вашей идеи центрального роутера:
+Web -> Gateway -> внутренние сервисы
+Но в будущем Gateway должен стать не просто прокси, а настоящим умным узлом:
+агрегатором данных;
+точкой приема команд;
+местом подключения Outbox;
+местом управления политикой доступов;
+центром наблюдаемости.
+YARP — это хорошая первая ступень для этого.
+
+
+
+
+
+
