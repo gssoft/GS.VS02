@@ -1,0 +1,12 @@
+Markdown All in One
+Markdown Preview Enhanced
+Paste Image
+Markdown Preview Mermaid Support
+Mermaid Preview
+Code Spell Checker
+DocFX
+Docker
+------
+Markdown All in One
+Paste Image
+Markdown Preview Mermaid Support

@@ -17,14 +17,14 @@ public MyClass {
     int id;
     string str;
 }
-
+```
+``` csharp
 var gateway = builder.AddProject<Projects.Trading_Gateway>("gateway")
     .WithReference(ordersApi)
     .WithReference(marketDataApi);
 
 var web = builder.AddProject<Projects.Trading_Web>("web")
     .WithReference(gateway);
-
 ```
 
 Этап 1:
@@ -33,4 +33,5 @@ var web = builder.AddProject<Projects.Trading_Web>("web")
 
 Этап 2:
 - Выделить два Gateway: `Trading.Gateway`, `MarketData.Gateway`
-``` csharp
+
+```

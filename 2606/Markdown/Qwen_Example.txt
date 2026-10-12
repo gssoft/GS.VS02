@@ -1,0 +1,74 @@
+Что уже хорошо
+1. Правильная топология в Trading.AppHost/Program.cs
+У вас уже есть ядро архитектурного закона:
+var ordersApi = builder.AddProject<Projects.Trading_Api_Orders>("orders-api");
+var marketDataApi = builder.AddProject<Projects.Trading_Api_MarketData>("market-data-api");
+
+var gateway = builder.AddProject<Projects.Trading_Gateway>("gateway")
+    .WithReference(ordersApi)
+    .WithReference(marketDataApi);
+
+var web = builder.AddProject<Projects.Trading_Web>("web")
+    .WithReference(gateway);
+
+Это уже правильно:
+web знает только gateway;
+gateway знает про orders-api и market-data-api;
+бизнес-сервисы не знают друг о друге;
+фронтенд не может напрямую обратиться к orders-api или market-data-api, потому что у него нет на них ссылки.
+Это и есть принцип:
+Безопасность и архитектурная чистота через физическое отсутствие путей.
+Для начала — отлично.
+
+2. Trading.Gateway уже использует YARP
+В Trading.Gateway/Program.cs:
+builder.Services.AddReverseProxy()
+    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+    .AddServiceDiscoveryDestinationResolver();
+Это очень правильно.
+Вы не просто сделали отдельный веб-проект, а начали делать настоящий L7-роутер:
+маршрутизация по путям /api/orders, /api/marketdata;
+кластеры orders-cluster, marketdata-cluster;
+интеграция с Aspire Service Discovery;
+диагностический эндпоинт /debug/routes.
+Это уже хороший фундамент для будущего CentralRouter.
+3. Web уже ходит через Gateway
+В Trading.Web/Program.cs:
+builder.Services.AddHttpClient<TradingApiClient>(client =>
+{
+    client.BaseAddress = new Uri("http://gateway");
+});
+А в TradingApiClient.cs запросы идут на:
+/api/orders
+/api/marketdata/{symbol}
+
+То есть фронтенд не знает реальные адреса бизнес-сервисов. Он знает только логическое имя:
+gateway
+Это правильно.
+4. Уже есть диагностический эндпоинт
+В Trading.Gateway/Program.cs:
+app.MapGet("/debug/routes", ...)
+Очень полезная вещь.
+На раннем этапе это помогает видеть, что YARP реально загрузил маршруты и кластеры.
+Что я бы поправил в первую очередь
+1. Убрать фиксированный порт у Gateway, если он не обязателен
+Сейчас:
+var gateway = builder.AddProject<Projects.Trading_Gateway>("gateway")
+    .WithHttpEndpoint(port: 5000, name: "http")
+    ...
+Для локальной разработки фиксированный порт не обязателен.
+Лучше оставить Aspire самому назначать порт, если только вам не нужен конкретный адрес для внешнего доступа.
+Можно упростить:
+var gateway = builder.AddProject<Projects.Trading_Gateway>("gateway")
+    .WithReference(ordersApi)
+    .WithReference(marketDataApi);
+Если нужно внешнее обращение именно к Gateway, тогда можно добавить:
+.WithExternalHttpEndpoints()
+Но для внутренней архитектуры достаточно WithReference.
+2. В Trading.Gateway/appsettings.json лучше убрать завершающий слэш
+Сейчас:
+"Address": "http://orders-api/"
+"Address": "http://market-data-api/"
+
+
+
