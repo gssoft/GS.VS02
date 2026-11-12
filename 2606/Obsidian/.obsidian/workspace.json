@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "acde6b322c97d834",
+        "id": "feb0e5d7b7d3633d",
         "type": "tabs",
         "children": [
           {
-            "id": "912fccfeeef3a381",
+            "id": "618132d300b66300",
             "type": "leaf",
             "state": {
               "type": "empty",
@@ -37,7 +37,7 @@
               "type": "file-explorer",
               "state": {
                 "sortOrder": "alphabetical",
-                "autoReveal": false,
+                "autoReveal": true,
                 "showSearch": false,
                 "searchQuery": ""
               },
@@ -75,11 +75,12 @@
               "title": "Bookmarks"
             }
           }
-        ]
+        ],
+        "currentTab": 2
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 200
   },
   "right": {
     "id": "9fd8735f2c9f8c04",
@@ -162,13 +163,23 @@
               "icon": "lucide-list",
               "title": "Outline"
             }
+          },
+          {
+            "id": "a19dbb465036bfbf",
+            "type": "leaf",
+            "state": {
+              "type": "git-view",
+              "state": {},
+              "icon": "git-pull-request",
+              "title": "Source Control"
+            }
           }
-        ]
+        ],
+        "currentTab": 5
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 332.5
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -178,9 +189,22 @@
       "daily-notes:Open today's daily note": false,
       "templates:Insert template": false,
       "command-palette:Open command palette": false,
-      "bases:Create new base": false
+      "bases:Create new base": false,
+      "obsidian-git:Open Git source control": false
     }
   },
-  "active": "912fccfeeef3a381",
-  "lastOpenFiles": []
+  "active": "618132d300b66300",
+  "lastOpenFiles": [
+    "2026-11-12.md",
+    "Untitled 4.canvas",
+    "Untitled 2.base",
+    "Untitled 3.canvas",
+    "Untitled 1.base",
+    "Untitled 2.canvas",
+    "Untitled 1.canvas",
+    "Untitled.base",
+    "Untitled.md",
+    "Untitled.canvas",
+    "Untitled"
+  ]
 }
