@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "e7be2c3f8a9c370c",
+        "id": "c05fef98865cd71a",
         "type": "tabs",
         "children": [
           {
-            "id": "0d29206f757a6556",
+            "id": "e97242ef6f7a223e",
             "type": "leaf",
             "state": {
               "type": "empty",
@@ -179,7 +179,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 332.5
+    "width": 240.5
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -193,8 +193,17 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "a19dbb465036bfbf",
+  "active": "e97242ef6f7a223e",
   "lastOpenFiles": [
+    "261017_Obsidian_.pdf",
+    "~$1017_Obsidian_.docx",
+    "Untitled 5.canvas",
+    "Obsidian_.txt",
+    "mso9FC3.tmp",
+    "mso9E5B.tmp",
+    "~WRL0001.tmp",
+    "~WRD0000.tmp",
+    "Untitled 3.base",
     "2026-11-12.md",
     "Untitled 4.canvas",
     "Untitled 2.base",
@@ -202,9 +211,7 @@
     "Untitled 1.base",
     "Untitled 2.canvas",
     "Untitled 1.canvas",
-    "Untitled.base",
     "Untitled.md",
-    "Untitled.canvas",
-    "Untitled"
+    "Untitled.canvas"
   ]
 }
