@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "c05fef98865cd71a",
+        "id": "08f23e7777226004",
         "type": "tabs",
         "children": [
           {
-            "id": "e97242ef6f7a223e",
+            "id": "b4bd5559fb76530d",
             "type": "leaf",
             "state": {
               "type": "empty",
@@ -163,23 +163,13 @@
               "icon": "lucide-list",
               "title": "Outline"
             }
-          },
-          {
-            "id": "a19dbb465036bfbf",
-            "type": "leaf",
-            "state": {
-              "type": "git-view",
-              "state": {},
-              "icon": "git-pull-request",
-              "title": "Source Control"
-            }
           }
         ],
-        "currentTab": 5
+        "currentTab": 4
       }
     ],
     "direction": "horizontal",
-    "width": 240.5
+    "width": 200
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -193,8 +183,11 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "e97242ef6f7a223e",
+  "active": "836eac1474d35e6f",
   "lastOpenFiles": [
+    "Untitled 4.base",
+    "2026-11-12.md",
+    "Untitled 6.canvas",
     "261017_Obsidian_.pdf",
     "~$1017_Obsidian_.docx",
     "Untitled 5.canvas",
@@ -204,11 +197,9 @@
     "~WRL0001.tmp",
     "~WRD0000.tmp",
     "Untitled 3.base",
-    "2026-11-12.md",
     "Untitled 4.canvas",
     "Untitled 2.base",
     "Untitled 3.canvas",
-    "Untitled 1.base",
     "Untitled 2.canvas",
     "Untitled 1.canvas",
     "Untitled.md",
